@@ -5,6 +5,7 @@ data/
 .venv/
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # OS / editors
 .DS_Store

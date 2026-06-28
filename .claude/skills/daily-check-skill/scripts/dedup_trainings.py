@@ -139,6 +139,42 @@ def _norm(cell: str) -> str:
     return re.sub(r"\s+", " ", (cell or "").strip().lower())
 
 
+# Datums-Formate (Mirror von banister._DATE_FORMATS) — nur zum Noise-Test.
+_DATE_FORMATS = (
+    "%Y-%m-%d", "%Y/%m/%d", "%d.%m.%Y", "%d.%m.%y",
+    "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M",
+)
+
+
+def _date_ok(cell) -> bool:
+    """True, wenn die Zelle als Datum parsebar ist (gleiche Logik wie banister)."""
+    import datetime as _dt
+    s = str(cell or "").strip()
+    if not s:
+        return False
+    head = s.split()[0].split("T")[0] if (" " in s or "T" in s) else s
+    for cand in (s, head):
+        for fmt in _DATE_FORMATS:
+            try:
+                _dt.datetime.strptime(cand, fmt)
+                return True
+            except ValueError:
+                continue
+    return False
+
+
+def _num(cell, decimals):
+    """Parst eine (ggf. deutsche) Dezimalzahl wie banister._to_float + Rundung.
+    Liefert float (gerundet) oder None. So kollabieren 489,23 und 489 auf denselben Key."""
+    if cell is None:
+        return None
+    try:
+        v = float(str(cell).replace(",", ".").strip())
+    except (ValueError, AttributeError):
+        return None
+    return round(v, decimals)
+
+
 def dedup(raw: str):
     """
     Dedupliziert Trainings-Zeilen.
@@ -155,16 +191,62 @@ def dedup(raw: str):
     idx_dist = _col_index(header, DIST_HINTS)
     key_cols = [i for i in (idx_date, idx_type, idx_trimp, idx_dist) if i is not None]
 
+    # (1) Header-Schema-Assertion: Datum + TRIMP MÜSSEN erkannt sein (Strecke optional).
+    # Fehlen sie, ist das fast immer ein falscher Tab/Export → laute Warnung.
+    schema_warning = None
+    if header is None:
+        schema_warning = (
+            "Kein Header erkannt — Fallback auf exakte Voll-Zeilen-Dedup. "
+            "Datum-/TRIMP-Spalten unbekannt, Noise/Session-Key nicht prüfbar."
+        )
+    else:
+        missing = []
+        if idx_date is None:
+            missing.append("Datum")
+        if idx_trimp is None:
+            missing.append("TRIMP")
+        if missing:
+            schema_warning = (
+                f"Header-Schema unvollständig: {'/'.join(missing)}-Spalte nicht erkannt "
+                f"(falscher Tab/Export?). Erkannter Header: {header}"
+            )
+
+    # (3) Noise-Erkennung nur möglich, wenn Datum UND TRIMP als Spalten existieren.
+    detect_noise = idx_date is not None and idx_trimp is not None
+
+    def is_noise(r):
+        """Strukturelles Rauschen: Zeile ohne parsebares (Datum UND TRIMP)."""
+        d_ok = idx_date < len(r) and _date_ok(r[idx_date])
+        t_ok = idx_trimp < len(r) and _num(r[idx_trimp], 0) is not None
+        return not (d_ok and t_ok)
+
     def row_key(r):
-        if key_cols:
-            return tuple(_norm(r[i]) if i < len(r) else "" for i in key_cols)
-        # Fallback: exakte Voll-Zeile
-        return hashlib.md5("\x1f".join(_norm(c) for c in r).encode()).hexdigest()
+        if not key_cols:
+            # Fallback: exakte Voll-Zeile
+            return hashlib.md5("\x1f".join(_norm(c) for c in r).encode()).hexdigest()
+        # (2) Numerische Key-Felder normalisieren: TRIMP→0, Strecke→2 Dezimalen.
+        parts = []
+        for i in key_cols:
+            cell = r[i] if i < len(r) else ""
+            if i == idx_trimp:
+                v = _num(cell, 0)
+                parts.append(f"trimp={v:.0f}" if v is not None else _norm(cell))
+            elif i == idx_dist:
+                v = _num(cell, 2)
+                parts.append(f"dist={v:.2f}" if v is not None else _norm(cell))
+            else:
+                parts.append(_norm(cell))
+        return tuple(parts)
 
     seen = {}
     clean = []
     dup_counter = Counter()
+    noise_rows = 0
     for r in rows:
+        # (3) Noise VOR der Dup-Zählung aussortieren — nie als "Duplikat" zählen.
+        if detect_noise and is_noise(r):
+            noise_rows += 1
+            continue
         k = row_key(r)
         if k in seen:
             dup_counter[k] += 1
@@ -172,7 +254,8 @@ def dedup(raw: str):
         seen[k] = True
         clean.append(r)
 
-    removed = total - len(clean)
+    nutzdaten = total - noise_rows  # Zeilen mit verwertbarem Datum+TRIMP
+    removed = nutzdaten - len(clean)  # ECHTE Session-Duplikate (ohne Noise)
     mode = "session-key (" + "+".join(
         n for n, i in [("Datum", idx_date), ("Typ", idx_type),
                        ("TRIMP", idx_trimp), ("Distanz", idx_dist)] if i is not None
@@ -189,8 +272,11 @@ def dedup(raw: str):
 
     report = {
         "zeilen_gesamt": total,
+        "zeilen_nutzdaten": nutzdaten,
         "zeilen_eindeutig": len(clean),
         "duplikate_entfernt": removed,
+        "noise_rows": noise_rows,
+        "schema_warning": schema_warning,
         "dedup_modus": mode,
         "top_duplikate": top,
         "header": header,
@@ -200,9 +286,22 @@ def dedup(raw: str):
 
 def format_warning(report: dict) -> str:
     """Copy-paste-fertige Sheet-Hygiene-Warnung für den Skill-Output."""
+    alarms = []
+    if report.get("schema_warning"):
+        alarms.append(
+            f"🛑 **Schema-Alarm:** {report['schema_warning']} "
+            "→ CTL/ATL/TSB evtl. NICHT vertrauenswürdig (Read-Layer prüfen)."
+        )
+    if report.get("noise_rows"):
+        alarms.append(
+            f"🔍 **Read-Layer:** {report['noise_rows']} Struktur-/Noise-Zeile(n) "
+            f"(kein gültiges Datum+TRIMP) verworfen — NICHT als Duplikate gezählt "
+            f"({report['zeilen_gesamt']} roh → {report.get('zeilen_nutzdaten', '?')} Nutzdaten)."
+        )
     if report["duplikate_entfernt"] == 0:
-        return "🟢 Trainings_v5 sauber — keine Duplikate (CTL/ATL/TSB unverfälscht)."
-    lines = [
+        base = "🟢 Trainings_v5 sauber — keine Session-Duplikate (CTL/ATL/TSB unverfälscht)."
+        return "\n".join(alarms + [base]) if alarms else base
+    lines = alarms + [
         f"⚠️ **Sheet-Hygiene:** {report['duplikate_entfernt']} doppelte Zeile(n) in "
         f"`Trainings_v5` entfernt **vor** der CTL/ATL/TSB-Rechnung "
         f"({report['zeilen_gesamt']} → {report['zeilen_eindeutig']}). "

@@ -237,6 +237,8 @@ SCHRITT 4: Trainings_v5 für CTL/ATL/TSB pullen
   → 🧹 DEDUP PFLICHT vor CTL/ATL/TSB (scripts/dedup_trainings.py, siehe §6b) —
     doppelte Session-Zeilen (Sync-Müll: HM 489×4, Di 78×2) sonst = überhöhte ATL.
     Deterministischer Banister (scripts/banister.py, §6c) ruft Dedup intern.
+    ⚠️ Dedup-Report prüfen: `schema_warning` gesetzt → falsches Tab gezogen, STOPP & warnen;
+    `noise_rows`/große Dup-Zahl = READ-LAYER-ALARM, nicht still schlucken (§6b).
   → Letzte Session: Typ, Dauer, km, HR, TRIMP, Temp, RPE, HR-Zonen, CTL/ATL Pre→Post (aus deduplizierter Historie)
   → Pull schlägt fehl: ./data/live.md als Fallback (silent)
 
@@ -526,6 +528,8 @@ python3 .claude/skills/run-bundle-skill/scripts/dedup_trainings.py ./data/Traini
 - **Session-Key:** Datum + Typ + TRIMP + Distanz; behält erste Vorkommnis. Fallback ohne Key-Spalten = exakte Voll-Zeile (merged NIE zwei echte Sessions).
 - **Read-only:** Sheet wird NICHT verändert; Dedup nur im Speicher.
 - **Warnung PFLICHT** bei `duplikate_entfernt > 0` → in den `💖 Fitness · Fatigue · Form`-Block, plus Hinweis „Quelle (Sheet + Sync) aufräumen". Bei 0 Duplikaten: stiller 🟢-Vermerk.
+- **🛑 `report['schema_warning']` (Wrong-Tab-Alarm):** Ist es gesetzt (falsches Sheet/Tab gezogen, Key-Spalten passen nicht) → **STOPP & WARNEN**, nicht stillschweigend weiterrechnen — CTL/ATL/TSB wären nicht vertrauenswürdig. `format_warning(report)` rendert den 🛑-Alarm bereits 1:1 für den Output.
+- **🔍 `report['noise_rows']` (Read-Layer-Notiz):** Struktur-/Noise-Zeilen ohne gültiges Datum+TRIMP — **verworfen, NICHT als Session-Duplikate gezählt** (klar getrennt von echten Sync-Doppelzeilen). Eine große Dup- ODER Noise-Zahl ist ein **READ-LAYER-ALARM**, kein still geschluckter Wert → in den Output, Read-Layer/Quelle prüfen.
 - Kein Script-Zugriff? Manuell: Session-gleiche Zeilen kollabieren (eine pro `Datum+Typ+TRIMP`), Anzahl melden. NIE ungeprüft über das Roh-Sheet rechnen.
 
 ---

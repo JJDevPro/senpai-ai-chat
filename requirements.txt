@@ -14,3 +14,8 @@ cffi>=1.15              # cryptography backend for google-auth signing; the VM s
                         # Debian `cryptography` that satisfies pip's resolver, so cffi is
                         # never pulled into the python3.11 site-packages on its own and the
                         # Drive pull dies with "No module named '_cffi_backend'". Pin it.
+scipy>=1.10             # robust z-score / least-squares for stats.py (banister_fit, anomaly)
+statsmodels>=0.14       # OLS + 95%-CI for stats.py bedtime_hrv / race_readiness
+                        # NOTE: scipy+statsmodels pull large wheels (scipy ~40 MB, plus
+                        # patsy) — they MEASURABLY enlarge the cloud setup-script install.
+                        # Only stats.py needs them; the core daily-check runs without.

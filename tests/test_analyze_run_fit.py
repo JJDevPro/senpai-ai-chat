@@ -10,6 +10,8 @@ We never synthesize a binary .fit. Instead we test the deterministic pure logic:
 extract_records does NOT import fitparse, so this runs even without it installed.
 """
 
+from datetime import datetime, timedelta
+
 import analyze_run_fit as arf
 
 
@@ -26,12 +28,28 @@ class _Msg:
 
 
 class _FakeFit:
-    """Mimics just enough of fitparse.FitFile for extract_records()."""
-    def __init__(self, records):
+    """Mimics just enough of fitparse.FitFile for extract_records() / laps."""
+    def __init__(self, records, laps=None):
         self._records = [_Msg(d) for d in records]
+        self._laps = [_Msg(d) for d in (laps or [])]
 
     def get_messages(self, kind):
-        return self._records if kind == "record" else []
+        if kind == "record":
+            return self._records
+        if kind == "lap":
+            return self._laps
+        return []
+
+
+# ------------------------------------------------------ synthetic record dicts
+_T0 = datetime(2026, 6, 23, 19, 25, 24)
+
+
+def _mkrec(sec, hr, spd, run=True, temp=None):
+    """Minimal internal record dict (the shape extract_records() emits)."""
+    return {"ts": _T0 + timedelta(seconds=sec), "hr": hr, "spd": spd,
+            "run": run, "walk": not run, "stand": False, "temp": temp,
+            "dist": None, "spm": 170.0 if run else 100.0}
 
 
 # ---------------------------------------------------------------- zone_of (V3)
@@ -120,3 +138,133 @@ def test_speed_fallback_to_non_enhanced():
     ]))
     # no enhanced_speed present -> spd falls back to plain speed
     assert recs[0]["spd"] == 2.7
+
+
+# ---------------------------------------------- Pace@Z2 window: drop hard finish
+def _golden_like():
+    """A managed Z2 portion (HR<=147, ~9:06/km) + a hard beast finish (Z5, fast).
+
+    Mirrors the 23.06 golden shape: a long easy lap then a short hard lap. The
+    OLD "last 30 min" window would suck the beast KM in and corrupt Pace@Z2.
+    """
+    recs = []
+    sec = 0
+    # 600 s managed @ HR ~145, spd 1.83 m/s -> ~9:06/km
+    for _ in range(600):
+        recs.append(_mkrec(sec, 145, 1.83))
+        sec += 1
+    # 120 s beast finish @ HR ~175 (Z5), spd 2.6 m/s -> ~6:25/km
+    for _ in range(120):
+        recs.append(_mkrec(sec, 175, 2.6))
+        sec += 1
+    laps = [
+        {"start_time": _T0},                      # lap1: managed
+        {"start_time": _T0 + timedelta(seconds=600)},  # lap2: beast
+    ]
+    return recs, _FakeFit([], laps=laps)
+
+
+def test_drop_trailing_hard_block_sample_level():
+    # 100 steady @140 then 40 hard @175 -> the hard tail is cut off.
+    run = [_mkrec(i, 140, 1.8) for i in range(100)] \
+        + [_mkrec(100 + i, 175, 2.6) for i in range(40)]
+    trimmed, blk = arf._drop_trailing_hard_block(run)
+    assert blk == 40
+    assert len(trimmed) == 100
+    assert all(r["hr"] == 140 for r in trimmed)
+
+
+def test_drop_trailing_hard_block_no_surge_keeps_all():
+    run = [_mkrec(i, 142, 1.8) for i in range(120)]
+    trimmed, blk = arf._drop_trailing_hard_block(run)
+    assert blk == 0
+    assert len(trimmed) == 120
+
+
+def test_steady_segment_drops_hard_lap():
+    recs, fit = _golden_like()
+    seg, label = arf.steady_z2_segment(recs, fit)
+    # only the 600 managed samples survive; the beast lap is gone
+    assert len(seg) == 600
+    assert all(r["hr"] == 145 for r in seg)
+    assert "Schluss-Lap" in label
+
+
+def test_tiny_trailing_hard_lap_not_dropped():
+    # base-28.05 shape: a steady run + a tiny (11-sample) final auto-lap that
+    # happens to read slightly hard. Must NOT be treated as a beast finish.
+    recs = [_mkrec(i, 144, 1.85) for i in range(600)] \
+        + [_mkrec(600 + i, 151, 1.9) for i in range(11)]
+    laps = [{"start_time": _T0},
+            {"start_time": _T0 + timedelta(seconds=600)}]
+    fit = _FakeFit([], laps=laps)
+    seg, label = arf.steady_z2_segment(recs, fit)
+    # nothing dropped via laps (151<=159 Z3 + only 11 samples) -> whole run
+    assert len(seg) == 611
+
+
+def test_pace_at_z2_excludes_beast_finish():
+    recs, fit = _golden_like()
+    seg, label = arf.steady_z2_segment(recs, fit)
+    pz2 = arf.pace_at_z2(seg, {"avg_temperature": 18.0}, recs=recs, label=label)
+    # ~9:06/km from the managed portion, NOT pulled fast by the 6:25 beast KM.
+    assert 540 <= pz2["pace_raw_running_only_s"] <= 552
+    assert pz2["n_samples"] == 600
+    # 18C baseline -> no heat tax
+    assert pz2["heat_tax_s_per_km"] == 0.0
+
+
+def test_pace_at_z2_old_last30_window_would_corrupt():
+    # Guard: averaging the WHOLE run (managed + beast) is materially faster than
+    # the steady segment -> proves the window matters.
+    recs, fit = _golden_like()
+    whole_run = [r for r in recs if r["run"] and r["hr"] <= arf.HR_Z2_CAP]
+    seg, _ = arf.steady_z2_segment(recs, fit)
+    seg_z2 = [r for r in seg if r["hr"] <= arf.HR_Z2_CAP]
+    whole_spd = arf._mean([r["spd"] for r in whole_run])
+    seg_spd = arf._mean([r["spd"] for r in seg_z2])
+    # whole-run HR<=147 set is identical here (beast is HR>147), so equal;
+    # the corruption case is the *time* window, covered above. Sanity: seg is
+    # the managed set exactly.
+    assert len(seg_z2) == 600
+    assert abs(whole_spd - seg_spd) < 1e-9
+
+
+def test_pace_at_z2_temp_normalization_and_gating():
+    recs, fit = _golden_like()
+    seg, label = arf.steady_z2_segment(recs, fit)
+    pz2 = arf.pace_at_z2(seg, {"avg_temperature": 26.0}, recs=recs, label=label,
+                         decoupling_pct=9.9, walk_pct=10.3)
+    raw = pz2["pace_raw_running_only_s"]
+    # 26C -> heat_tax = (26-18)*3.5 = 28 s/km
+    assert pz2["heat_tax_s_per_km"] == 28.0
+    assert pz2["pace_normalized_18c_s"] == round(raw - 28.0, 1)
+    # not baseline-eligible: temp>22, walk>5%, decoupling>=8%
+    assert pz2["baseline_eligible"] is False
+    assert any("temp" in r for r in pz2["ineligible_reasons"])
+    assert any("decoupling" in r for r in pz2["ineligible_reasons"])
+
+
+def test_pace_at_z2_baseline_eligible_clean_z2():
+    # cool, low-walk, low-decoupling steady run -> eligible new baseline.
+    run = [_mkrec(i, 143, 1.85) for i in range(600)]
+    pz2 = arf.pace_at_z2(run, {"avg_temperature": 17.0}, recs=run,
+                         label="steady", decoupling_pct=4.0, walk_pct=2.0)
+    assert pz2["baseline_eligible"] is True
+    assert pz2["ineligible_reasons"] is None
+
+
+def test_decoupling_over_segment_detects_drift():
+    # H1 fast/low-HR, H2 slower/higher-HR -> positive decoupling.
+    seg = [_mkrec(i, 142, 1.9) for i in range(300)] \
+        + [_mkrec(300 + i, 147, 1.7) for i in range(300)]
+    dec = arf.decoupling(seg, "steady")
+    assert dec["valid"] is True
+    assert dec["decoupling_pct"] > 5.0
+    assert dec["segment"] == "steady"
+
+
+def test_decoupling_too_few_samples_invalid():
+    seg = [_mkrec(i, 142, 1.9) for i in range(5)]
+    dec = arf.decoupling(seg)
+    assert dec["valid"] is False

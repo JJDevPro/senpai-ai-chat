@@ -29,7 +29,12 @@ python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match ath
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match baselines.md --out ./data   # dann ./data/baselines.md lesen
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match learnings.md --out ./data    # dann ./data/learnings.md lesen
 ```
-Fehlende Werte = `[?]` markieren, nicht erfinden.
+**Zusätzlich PFLICHT (CLAUDE.md §0 Hol-Pflicht): die Wochen-Metriken ZIEHEN, die der Block braucht** — nicht nur die State-Files. Vor dem Block holen + reduzieren:
+- **HAE-Tages-JSONs** der KW (Schlaf-Ø, Bedtime-Count, HRV-Trend, Load) via `pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthAutoExport-{tag}" --out ./data` → über `slice_hae_day.py`/`daily_signals.py` reduzieren.
+- **Trainings_v5** + **Gesundheitsdaten_v5** (`--sheet …`) für Absolvierung/CTL-ATL-TSB + Body-Comp/KW-Trend.
+- **Makro-Quelle** für die 4-Ampeln-Compliance (Source-of-Truth siehe `nutrition-skill` — NICHT aus der Luft, NICHT pauschal `[?]`).
+
+Erst nach einem **echten, fehlgeschlagenen Pull-Versuch** gilt: fehlender Wert = `[?]` markieren — **mit Quelle + Grund** („Sheet X leer", „Nutrition nicht im HAE-Export"). Nie erfinden, **nie ein Feld stillschweigend weglassen** (Verschweigen = Halluzination, §0).
 
 ---
 
@@ -84,7 +89,7 @@ Fehlende Werte = `[?]` markieren, nicht erfinden.
 ## 3. Ausgabe-Regeln
 
 - **Kein Preamble, kein Postamble** — nur der Block als Code-Fence.
-- Alle Felder ausfüllen. Fehlende Daten → `[?]`, User ergänzt im Folge-Chat manuell.
+- **Erst ZIEHEN, dann `[?]` (§0 Hol-Pflicht).** Alle Felder ausfüllen — vorher die Wochen-Daten aktiv holen (§1). `[?]` NUR für einen Wert, dessen Quelle real gepullt wurde und leer war (mit Quelle + Grund). **Niemals `[?]` als Abkürzung statt eines Pulls, niemals ein Feld stillschweigend weglassen** — Verschweigen = Halluzination. „User ergänzt manuell" gilt erst, nachdem ICH die Quelle erfolglos gezogen habe.
 - Ampeln immer mit Symbol (🟢🟡🟠🔴), nicht nur Wort.
 - Trend-Pfeile aus KW-Vergleich (Vor-KW-Payload falls vorhanden).
 - Persona-State ehrlich aus aktuellem Chat extrahieren — keine Fake-Diagnose. Anrede-Tier + Roast-Anrede aus `athlete.md`, nicht erfinden.

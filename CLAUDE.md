@@ -43,6 +43,9 @@ Senpai patcht den State sichtbar (regenerieren + Upload), nie still. **Truth-Ord
 ### ⛔ DIE KERNREGEL (Existenzgrund des Repos)
 Nur **Aggregate + das Persona-Verdict** gelangen in den Modell-Kontext — **NIEMALS rohe Per-Sekunden-/Per-Minuten-Serien.** Python reduziert die Roh-Daten auf der Disk, nur die kompakten Aggregate werden gelesen. (Der claude.ai-Chat brach bei großen Uploads — genau dafür existiert dieser Repo.)
 
+### 🔎 DIE HOL-PFLICHT (Kehrseite der Kernregel)
+Die Kernregel begrenzt, WAS in den Kontext darf (nur Aggregate) — die Hol-Pflicht regelt, dass die nötigen Daten überhaupt erst **GEHOLT** werden. Bei JEDER Wochen-/Insights-/Payload-/Daily-Anfrage gilt: **fehlende Daten werden GEZOGEN, nicht geraten und nicht verschwiegen.** `pull_drive.py` ist der Reflex (Step-0, §9) — Makros, Schlaf, HRV, Training etc. aus ihrer SoT holen, BEVOR geliefert wird. `[?]`/„keine Daten" ist NUR nach einem **echten, fehlgeschlagenen Pull-Versuch** zulässig — dann mit **Quelle + Grund** benannt. **Weglassen, abkürzen oder „nichts anbieten" ist selbst eine Halluzination — Daten verschweigen ist genauso verboten wie Daten erfinden.** Kein stiller `[?]`: erst ziehen; bleibt der Wert leer, sagen WO gesucht wurde und WARUM leer.
+
 ### 🟢 Git/Push/Merge-Autonomie (stehende Freigabe)
 Senpai darf **ohne Rückfrage** committen, auf den Arbeits-Branch pushen, den PR anlegen/aktualisieren **und den eigenen, verifizierten PR nach `main` mergen** — jede Session, kein Nachfragen nötig. **Voraussetzung: „alles okay".** Das heißt:
 - Arbeit ist fertig und **selbst verifiziert** (Skripte kompilieren / Smoke-Test grün / Tests bestanden, soweit vorhanden).
@@ -209,6 +212,7 @@ Bei Konflikt gewinnt die höhere Stufe:
 - Schuhnamen abkürzen (immer voll: "ASICS Superblast 3", "ASICS Megablast", "ASICS Novablast 5" — Gemini-Handoff)
 - **Roh-Serien (Per-Sekunde/Per-Minute) in den Kontext laden** — nur Aggregate + Verdict (§0-Kernregel) · **nach Drive-Truth-Ordnern oder Personal-Modulen schreiben** (read-only; nur State-Dateien dürfen via `--upload` zurück)
 - **Persönliche Daten in den Repo / in `CLAUDE.md` schreiben** — Identität bleibt ausschließlich im Drive-Athlet-Profil
+- **Bei Payload/Insights/Wochen-/Daily-Anfragen `[?]` setzen oder ein Feld weglassen OHNE echten Pull-Versuch** — fehlende Daten erst via `pull_drive.py` ziehen; „nichts anbieten"/Verschweigen = Halluzination durch Auslassung (§0 Hol-Pflicht)
 
 ---
 

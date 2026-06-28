@@ -3,7 +3,7 @@ name: daily-check-skill
 description: "AI Coach Daily Check für den Athleten — WHOOP-artiges Tages-Dashboard. PFLICHT laden bei: dem dailycheck-Command, Daily Check/Morgen-Check/Status/wie war die Nacht/wie sehen die Werte aus, sowie weichen Triggern wie was geht ab/was steht an/wie läufts/Update und Begrüßung ohne Aufgabe (Hi Senpai/Moin). Liefert: Recovery-Ampel, Schlaf-Score, Gestern-Load (TRIMP + CTL/ATL/TSB), stündliche HRV-Tabelle, KW-Trend, Heute-Plan, Senpais Urteil. Zieht zwei Tages-JSONs (heute+gestern, Mitternachts-Merge) lokal nach ./data via pull_drive.py und reduziert sie deterministisch per slice_hae_day.py. NICHT bei spezifischen Aufgaben wie Lauf-/Gym-Analyse, Was soll ich essen, oder Einzeldaten-Fragen."
 ---
 
-# Daily-Check-Skill v0.13 — "Senpai-WHOOP"
+# Daily-Check-Skill v0.14 — "Senpai-WHOOP"
 
 > Modul-Datei. Senpai liest sie automatisch beim Daily-Check-Trigger oder per `/dailycheck`.
 >
@@ -52,10 +52,21 @@ Step 6:  slice_hae_day mergt die stündlichen Serien (HRV/HR/SpO2/Atmung) gester
 Step 7:  sleep_analysis aus der slice_hae_day-JSON (sleepEnd == heute; §3f / §3f-bis bei Multi-Day).
 Step 8:  GESTERN-LOAD aus der slice_hae_day-JSON: active_energy (Tagessumme), step_count, physical_effort (Ø/Peak),
          heart_rate (Tages-Ø wach / Peak / Uhrzeit), walking_hr.
+         **Plus `load_extra`** (nur wenn vorhanden, §7): `true_tdee_kcal` (Grundumsatz+Aktiv → Energie-Bilanz),
+         `exercise_min` + `flights_climbed` (Load-Proxys), `gait.asymmetry_pct`/`gait.double_support_pct`
+         (Gang-Trip-Wire — NUR surfacen wenn `flag=True` = erhöht → Verletzungs-/Ermüdungs-Kontext).
          **Multi-Day: slice_hae_day filtert ZWINGEND auf den Vortag** (`day==gestern`), sonst Wochen-/Monats-Summe (§3f-bis).
 Step 8.5: TAG-SIGNALE: `python3 .claude/skills/daily-check-skill/scripts/daily_signals.py <hae_json> --as-of {heute}` (§3i) —
          `<hae_json>` = die HEUTE-Datei ODER der Multi-Day-Export (lokaler Pfad in `./data`). `as_of` pinnt today/yesterday.
          Liefert Tageslicht, Schlaf-Effizienz, Wrist-Temp+Baseline, Audio-Tag-Kontext, VO2max/cardio_recovery-Fallback, Wasser.
+Step 8.6: ⛔ SAFETY-GATE (deterministisch, NICHT verhandelbar — CLAUDE.md §6):
+         `python3 .claude/skills/daily-check-skill/scripts/safety_gate.py <slice_json> [--injury] [--opt-out] [--prev-hrv N]`
+         `<slice_json>` = die slice_hae_day-Ausgabe (Datei oder '-' via Pipe). Liefert
+         `{gate,level,reasons,training_allowed,roast_allowed}`. Das Gate IMMER feuern und
+         RESPEKTIEREN: `training_allowed=false` (HRV🔴🔴 <40 + Schlaf <6h) = Training
+         STREICHEN, kein Verhandeln — übersteuert Plan-Matrix + Persona. `roast_allowed=false`
+         (Verletzung/Opt-out) = Persona aus. `--prev-hrv` (gestern hrv_night.avg) bestätigt
+         HRV🔴 als 2-Tage-Deload-Muster. AFib-Burden wird BEWUSST nicht gegated (§6 Medical).
 Step 9:  TRAININGS-LOAD TIEF: Trainings_v5 nach CSV ziehen →
          `python3 lib/pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU --out ./data/Trainings_v5.csv` →
          🧮 `banister.compute_from_sheet(raw, as_of=heute)` (§3h) — Dedup + Kalendertag-Zerofill
@@ -114,9 +125,11 @@ data.metrics[] → { name, units, data[] }
   active_energy {qty,date}(stündl., kcal) · step_count{qty,date} · physical_effort{qty,date}
   walking_heart_rate_average {qty,date} · walking_running_distance{qty,date}
   sleep_analysis {inBedStart,sleepStart,sleepEnd,inBedEnd,totalSleep,deep,core,rem,awake}(h)
-  weight_body_mass / body_fat_percentage → source Körperwaage (SoT, manuell — NIE im JSON)
+  weight_body_mass / body_fat_percentage / lean_body_mass / body_mass_index → KANN via Withings IM JSON liegen → slice_hae_day `body_comp`
 ```
 Datum: `"2026-06-16 06:00:00 +0200"` → Stunde = Zeichen 11:13.
+
+**🩻 Körper-Komposition (`body_comp`, korrigierte Annahme):** Anders als früher angenommen liegt Gewicht/Körperfett/Lean/BMI **manchmal DOCH im HAE-JSON** — via Withings-Sync (real beobachtet: 116,56 kg, Sa 11:29). `slice_hae_day` gibt sie als `body_comp.{weight_body_mass|body_fat_percentage|lean_body_mass|body_mass_index} = {value,date,time,source,in_json,off_protocol}`. **Wenn vorhanden → explizit zeigen, aber als OFF-PROTOCOL markieren** (Datum/Uhrzeit/Source nennen) — es ist **NICHT die SoT**. Die echte SoT bleibt das **Mo-früh-nüchtern**-Wiegen (manuell gepostet); alles andere (Quelle ≠ Körperwaage ODER nach 09:00 gemessen) kommt mit `off_protocol=True`. NIE „Wert fehlt im JSON" annehmen, ohne `body_comp` gelesen zu haben; Abwesenheit NIE als 0/Verschlechterung zeigen.
 
 ### 3d. CSV-Anomalie-Trigger (Auto-Load)
 | Trigger | Schwelle |
@@ -247,6 +260,7 @@ Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` +
 🕒 HH:MM | 🌤️ [°C - Wetter ODER "kein Wetter"] | 🔋 Recovery-Ampel | 🤖 Emotion | 🧠 Modell
 ```
 **Datum/Wochentag** = User-Angabe → Claudes interner Kontext (zuverlässig, **NIE API**). **Uhrzeit** = User-Angabe → Kontext-Ableitung → Datei-Timestamp → `[Zeit n/a]` (kein Drama, nur fragen wenn für die Antwort nötig). **TimeAPI entfernt (v0.5).**
+> **B5-Zeit-Regel:** Ist die Uhr unsicher → lieber `[Zeit n/a]` als eine **halluzinierte Zeit** pinnen. Eine Schlaf-Aufwachzeit darf inhaltlich als „Wake HH:MM (abgeleitet)" zitiert werden, aber die **Header-Uhr bleibt konservativ** (`[Zeit n/a]`) — die Wake-Zeit NIE als aktuelle Uhrzeit ausgeben.
 
 -----
 
@@ -288,6 +302,9 @@ Top-Karte, drei Achsen auf einen Blick. Recovery = Komposit, ehrlich als **Ampel
 - Schritte / Distanz: [X.XXX / X,X km]
 - Physical Effort: Ø [X,X] · Peak [X,X] kcal/h·kg
 - Stand-Stunden: [XX]
+- Energie-Bilanz: TDEE [X.XXX kcal] (Grundumsatz + Aktiv)   [NUR wenn load_extra.true_tdee_kcal]
+- Bewegung / Etagen: [XX min] · [XX Etagen]                 [Load-Proxy, NUR wenn load_extra.exercise_min/flights_climbed]
+- 🦵 Gang-Trip-Wire: Asymmetrie [X,X %] / Doppelstand [X,X %]  [NUR wenn flag=True = erhöht → Verletzungs-/Ermüdungs-Kontext, sonst Zeile weg]
 
 🏋️ Trainings-Load (tief)
 - Session: [Typ + Dauer ODER "Ruhetag, kein Training"]
@@ -316,6 +333,7 @@ Top-Karte, drei Achsen auf einen Blick. Recovery = Komposit, ehrlich als **Ampel
 - TRIMP-Ampel (Einzelsession): 🟢 <100 · 🟡 100−150 · 🟠 150−180 · 🔴 >180.
 - **Ruhetag:** Load-Block zeigt Ruhe + Rest-CTL/ATL/TSB-Drift (Erholung sichtbar machen). Kein Drama bei niedrigem TRIMP.
 - **Abgrenzung Run-Bundle-Skill:** Retro nennt LOAD + Recovery-Kosten, **keine Splits/Laufdynamik**. Tiefe Lauf-Analyse → "/runanalyse".
+- **Zusatz-Last (`load_extra`, Step 8 — nur surfacen wenn vorhanden):** `true_tdee_kcal` (Grundumsatz + Aktiv) rahmt die **Energie-Bilanz** ohne separates Nutrition-Sheet; `exercise_min` + `flights_climbed` sind **Load-Proxys** neben TRIMP. **Gang-Trip-Wire** (`gait.asymmetry_pct`/`double_support_pct`): **NUR zeigen, wenn das `flag` True ist** (Asymmetrie >5 % bzw. Doppelstand außerhalb 20–40 % = veränderte Gangmechanik) → vorsichtiger Verletzungs-/Ermüdungs-Hinweis, NIE als Befund framen. Flag False / nicht gemessen → komplett weglassen.
 
 -----
 
@@ -355,6 +373,9 @@ Std    HRV     Ampel
 ─────────────────
 Ø Schlaf: XX ms [Ampel] · Min XX · Max XX · Range XX · σ XX
 [1 Satz: hohe σ = unruhig; später Peak = Recovery-Zeichen]
+```
+> **Volatilität aus ROH-Punkten:** `Min/Max/Range/σ` für die Volatilitäts-Aussage IMMER aus `hrv_night.{min,max,range,std}` zitieren — die sind jetzt aus den **rohen In-Window-HRV-Punkten** gerechnet, nicht mehr aus den Stunden-Mitteln (die glätten σ künstlich runter: roh σ ~33 / Range ~117 vs hourly σ ~21 / Range ~63). Für einen feineren Read steht `hrv_night.fine[]` (15-Min-Serie) bereit; die `hourly[]`-Tabelle bleibt unverändert die Anzeige-Tabelle oben.
+```
 
 - Ruhepuls: [XX bpm] (resting_heart_rate, Heute-Datei) [vs. Baseline]
 - Min-HR-Tiefpunkt: [XX bpm] um [HH:MM]
@@ -417,6 +438,7 @@ Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
 | Sa | Parkrun 09:00 + Parkrun-Partner + Core/OK Gym |
 | So | Total Rest |
 > **Wetter-Input (PFLICHT an Mo/Mi/Sa/Do):** Das §12-Wetter ist Teil der Empfehlung, nicht Nachgang. Bei Hitze/Gewitter Rest oder Slot-Shift **begründen**; bei überraschend kühlem Do die Flex-Regel prüfen; an Do generell die Gym-Hitze (keine AC) einpreisen. Empfehlung NIE ohne Wetter, wenn Lauf/Gym ansteht.
+> **⛔ Safety-Gate ist AUTORITATIV (Step 8.6, §6 CLAUDE.md):** Liefert `safety_gate.py` `training_allowed=false` (HRV🔴🔴 + Schlaf <6h) → der Heute-Plan gibt **KEIN Training frei, Punkt** — egal was Wochenrhythmus, Wetter oder Persona sagen. Kein Verhandeln, hartes & frühes Gate VOR dem Urteil. `roast_allowed=false` (Verletzung/Opt-out) → Persona-Ton aus, neutral.
 > **Override:** Race-Taper / Deload / "Pause bis [Tag]" überschreiben den Default → explizit REST ausgeben.
 
 -----
@@ -442,6 +464,7 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 | 🔴🔴 | egal | 🔥 SCHARF | {Anrede} + Training STREICHEN |
 > **{Anrede}/{Roast-Anrede}:** Die echten Anrede-Stufen (Lob-Anrede in ihren Tiers + die Roast-Anrede) stehen in `athlete.md` (privater Drive-Ordner) — die Tier-STRUKTUR (lobend → bremsend → eskalierend/Roast → Wake-up) bleibt identisch, nur die konkreten Worte kommen aus dem Profil.
 > **Override:** Legitime Erholung (Tag nach Race/hartem Training, korrektes Ruhen) → STOLZ/Recovery-Ton trotz Matrix. Verletzung → Medical Override, Roast aus.
+> **⛔ Safety-Gate übersteuert die Matrix:** `safety_gate.py` (Step 8.6) ist die maßgebliche V3-Instanz und gewinnt IMMER — `training_allowed=false` = das Urteil **streicht Training kompromisslos** (egal was die Modus-Matrix oben sagt); `roast_allowed=false` = Persona/Roast aus (Verletzung/Opt-out/Krise). Die Matrix wählt nur den TON innerhalb dessen, was das Gate erlaubt.
 
 **Form:** 3-5 Sätze, voller Persona, zieht **Load (gestern) + Recovery (heute) → EIN konkreter Hebel** zusammen. Max 1 {Roast-Anrede}-Ansprache. Kein Coaching-Roman, aber mehr als ein Einzeiler — es ist das Urteil über den ganzen Tag.
 
@@ -461,7 +484,7 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 | **Ruhetag (kein Training gestern)** | **Load-Block = Ruhe + CTL/ATL/TSB-Erholungs-Drift, kein TRIMP-Drama** |
 | Uhrzeit nicht ableitbar | `[Zeit n/a]`, kein Drama; nur fragen wenn nötig (Bedtime/Pre-Lauf). Datum bleibt aus Kontext |
 | Wetterochs fail | nur die andere Quelle / `[kein Wetter]` |
-| Körperwaage-Wert nicht im JSON | erwartet — manuell, Mo nachfragen |
+| Körperwaage-Wert im JSON | NICHT mehr „erwartet abwesend": Withings kann ihn ins HAE-JSON syncen → `body_comp` lesen (§3c). Vorhanden → als **off-protocol / NICHT SoT** zeigen (Datum/Zeit/Source). Echte Mo-nüchtern-SoT bleibt manuell gepostet |
 | Arrhythmie-Marker hoch | IGNORIEREN (HRV-Frequenz-Trick, kein med. Signal — siehe Medical-Notes im Athleten-Profil) |
 | Datei liegt schon lokal in `./data` | Pull überspringen, lokalen Pfad direkt an `slice_hae_day.py`/`daily_signals.py` geben |
 
@@ -489,6 +512,7 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 | **v0.8** | **24.06.2026** | **Parkrun-Temp-Guard (§12): Sa-09:00-Slot nutzt Morgenwert (Tagesmin+Rampe), nie den Tagesmax — auch nicht im Narrativ/Verdict/Reminder. Behebt das Zitieren der Nachmittags-Höchsttemp als Parkrun-Temp. Detail-Logik in weather-runprep §2a.** |
 | **v0.9** | **24.06.2026** | **TSB-Konsistenz: TSB = HEUTIGE Readiness (CTL−ATL durch gestern), EINE Zahl im ganzen Dashboard (Card/Gestern-Retro/Trend identisch). Card-Zeile auf „TRIMP gestern · TSB heute" umgestellt. Behebt das Mischen von gestrigem (+2,4) und heutigem (+10,3) TSB im selben Report.** |
 | **v0.10** | **24.06.2026** | **Deterministischer Banister (§3h + gebündeltes Script `scripts/banister.py`, byte-identisch zum run-bundle). `compute_from_sheet` = Dedup + Kalendertag-Zerofill + feste 42/7-EWMA (Seed 0) in einem Aufruf → reproduzierbares CTL/ATL/TSB lauf-für-lauf. Behebt TSB-Inter-Run-Varianz (+10,3 vs −0,5 bei gleichen Daten). Step 9 auf compute_from_sheet umgestellt.** |
+| **v0.14** | **28.06.2026** | **Wave-1-Felder verdrahtet (Prosa, keine Schwellen/Logik geändert): (1) `body_comp`-Korrektur — Körper-Komposition KANN via Withings im HAE-JSON liegen (§3c + Edge-Case); vorhanden → als off-protocol / NICHT-SoT zeigen, echte Mo-nüchtern-SoT bleibt manuell. (2) §9 HRV-Volatilität aus `hrv_night.{min,max,range,std}` (jetzt ROH-Punkt-basiert, σ nicht mehr von Stunden-Mitteln geglättet) + `fine[]` 15-Min-Serie, `hourly[]` bleibt Anzeige. (3) §7/Step 8 `load_extra`: true_tdee (Energie-Bilanz), exercise_min + flights (Load-Proxys), Gang-Trip-Wire (Asymmetrie/Doppelstand NUR bei flag=True). (4) `safety_gate.py` (Step 8.6) als AUTORITATIVES Gate in §13/§16 verdrahtet — `training_allowed=false` streicht Training kompromisslos, `roast_allowed=false` Persona aus. (5) B5-Zeit-Regel (§5): lieber `[Zeit n/a]` als halluzinierte Uhr, Wake nur „(abgeleitet)".** |
 | **v0.13** | **25.06.2026** | **Multi-Day-Export-Pfad (§3f-bis + Step 3.5-Branch): EIN Wochen-/Monats-Export wird sauber verarbeitet — Schlaf = Record mit sleepEnd==heute, Stunden-Serien auf die Ziel-Nacht gesliced, **Tages-Aggregate ZWINGEND auf den Vortag gefiltert** (sonst Wochen-/Monats-Summe). daily_signals mit `as_of` gepinnt. Gegen echten 23-MB-Monatsexport (31 Tage, 11k HR-Punkte) verifiziert. Kern bleibt HEUTE-Dashboard.** |
 | **v0.12** | **25.06.2026** | **daily_signals gehärtet: `daylight`/`audio` mit `today`+`yesterday`-Split (Gestern-Retro zieht nie mehr den Teil-Tag heute), Wrist-Temp-Baseline = rollende letzte 28 Vornächte (Flag fängt akute Ausreißer, nicht die Hitze-Dome-Drift), optional `as_of`. Gegen echten Wochen-Export verifiziert.** |
 | **v0.11** | **25.06.2026** | **Tag-Signale via `scripts/daily_signals.py` (Step 8.5 + §3i): 🌞 Tageslicht (Ampel + Circadian-Hebel zur Bettzeit), 🌡️ Schlaf-Handgelenk-Temp (Recovery-Modifier, Rolling-Baseline + Flag >+0,4°C), 😴 Schlaf-Effizienz (aus totalSleep+awake), 🔊 Audio-Tag-Kontext (NUR Narrativ, mögliches Muster, HARTE Nicht-Judging-Regel — Wochenende/unterwegs = ein Leben), 🛡️ VO2max/cardio_recovery-Robustheit (sporadisch → letzter Wert + `state/live.md`-Fallback, Abwesenheit ≠ Verschlechterung). Alkohol-Streak ENTFERNT (nicht getrackt = Geist-Wert, wie den Arrhythmie-Marker ignorieren).** |
@@ -502,4 +526,4 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 
 -----
 
-**Ende v0.13. Senpai liefert bei jedem Daily-Check-Trigger das volle WHOOP-Dashboard mit Gestern-Retro und Urteil.**
+**Ende v0.14. Senpai liefert bei jedem Daily-Check-Trigger das volle WHOOP-Dashboard mit Gestern-Retro und Urteil.**

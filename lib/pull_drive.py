@@ -24,8 +24,9 @@ CLI contract (used verbatim by the skills + CLAUDE.md):
   python3 lib/pull_drive.py --folder <ID> --match "HealthAutoExport-2026-06-24" --out ./data
   # list matches (name<TAB>id<TAB>modifiedTime), download nothing:
   python3 lib/pull_drive.py --folder <ID> --match "HealthAutoExport-" --list
-  # export a Google Sheet to CSV:
-  python3 lib/pull_drive.py --sheet <SHEET_ID> --out ./data/Trainings_v5.csv
+  # read ONE tab of a Google Sheet to CSV (tab pinned BY NAME via the Sheets API;
+  # Drive files.export(csv) fallback only if the Sheets API call fails):
+  python3 lib/pull_drive.py --sheet <SHEET_ID> --tab "Trainings" --out ./data/Trainings_v5.csv
   # WRITE/UPDATE a file in the personal state folder (create or overwrite by name):
   python3 lib/pull_drive.py --upload ./data/senpai-state.md --folder <STATE_FOLDER_ID> [--name senpai-state.md]
 
@@ -42,6 +43,12 @@ from pathlib import Path
 
 SCOPES_RO = ["https://www.googleapis.com/auth/drive.readonly"]
 SCOPES_RW = ["https://www.googleapis.com/auth/drive"]
+# --sheet reads use the Sheets API (tab-by-name, structured) with a Drive-export
+# CSV fallback, so they need BOTH the spreadsheets-read and drive-read scopes.
+SCOPES_SHEET = [
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
 
 
 def _eprint(*a):
@@ -82,6 +89,12 @@ def _drive(creds):
     from googleapiclient.discovery import build
 
     return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+
+def _sheets(creds):
+    from googleapiclient.discovery import build
+
+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
 
 
 def _q_escape(s: str) -> str:
@@ -130,7 +143,59 @@ def _download_media(svc, file_id, dest: Path):
             _, done = dl.next_chunk()
 
 
+def _first_sheet_title(sheets_svc, spreadsheet_id):
+    """Fetch the title of the FIRST tab via spreadsheets.get (used if --tab omitted)."""
+    meta = (
+        sheets_svc.spreadsheets()
+        .get(spreadsheetId=spreadsheet_id, fields="sheets.properties(title,index)")
+        .execute()
+    )
+    sheets = sorted(
+        meta.get("sheets", []),
+        key=lambda s: s.get("properties", {}).get("index", 0),
+    )
+    if not sheets:
+        raise RuntimeError("spreadsheet has no sheets")
+    return sheets[0]["properties"]["title"]
+
+
+def _read_sheet_via_api(sheets_svc, spreadsheet_id, tab, dest: Path):
+    """
+    Read exactly ONE tab BY NAME via the Sheets API and write it as a proper CSV.
+
+    Pins the tab by name (no silent first-tab / reorder hazard like Drive
+    files.export), returns structured rows with a single deterministic render
+    option (UNFORMATTED_VALUE + FORMATTED_STRING for dates). Returns the tab
+    title actually read.
+    """
+    import csv
+
+    if not tab:
+        tab = _first_sheet_title(sheets_svc, spreadsheet_id)
+    rng = f"{tab}!A:Z"
+    resp = (
+        sheets_svc.spreadsheets()
+        .values()
+        .get(
+            spreadsheetId=spreadsheet_id,
+            range=rng,
+            valueRenderOption="UNFORMATTED_VALUE",
+            dateTimeRenderOption="FORMATTED_STRING",
+        )
+        .execute()
+    )
+    rows = resp.get("values", [])
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        for row in rows:
+            w.writerow(["" if c is None else c for c in row])
+    return tab, len(rows)
+
+
 def _export_sheet_csv(svc, file_id, dest: Path):
+    """FALLBACK: Drive files.export(text/csv). Returns ONLY the first tab and is
+    format-/tab-order-sensitive — used only if the Sheets-API read fails."""
     from googleapiclient.http import MediaIoBaseDownload
 
     req = svc.files().export_media(fileId=file_id, mimeType="text/csv")
@@ -173,7 +238,8 @@ def main(argv=None):
     p.add_argument("--newest", action="store_true", help="download only the newest match")
     p.add_argument("--all", action="store_true", help="download all matches")
     p.add_argument("--list", action="store_true", help="list matches, download nothing")
-    p.add_argument("--sheet", help="Google Sheet ID to export as CSV (with --out FILE)")
+    p.add_argument("--sheet", help="Google Sheet ID to read as CSV (with --out FILE)")
+    p.add_argument("--tab", help="sheet tab/worksheet name to read (--sheet); default = first tab")
     p.add_argument("--upload", help="local file to create/overwrite in --folder (write)")
     p.add_argument("--name", help="target Drive name for --upload (default: local basename)")
     p.add_argument("--out", default="./data", help="output dir (reads) or file path (--sheet)")
@@ -191,17 +257,23 @@ def main(argv=None):
         print(fid)
         return 0
 
-    creds = _load_credentials(args.sa_file, SCOPES_RO)
-    svc = _drive(creds)
-
-    # --- Google Sheet -> CSV ---
+    # --- Google Sheet -> CSV (Sheets API, tab-by-name; Drive-export fallback) ---
     if args.sheet:
         out = Path(args.out)
         if out.suffix.lower() != ".csv":
             out = out / f"{args.sheet}.csv"
-        _export_sheet_csv(svc, args.sheet, out)
+        creds = _load_credentials(args.sa_file, SCOPES_SHEET)
+        try:
+            tab, nrows = _read_sheet_via_api(_sheets(creds), args.sheet, args.tab, out)
+            _eprint(f"INFO: read tab {tab!r} via Sheets API ({nrows} rows) -> {out}")
+        except Exception as e:
+            _eprint(f"WARNING: Sheets API read failed ({e!r}); falling back to Drive export(csv) — first tab only")
+            _export_sheet_csv(_drive(creds), args.sheet, out)
         print(str(out))
         return 0
+
+    creds = _load_credentials(args.sa_file, SCOPES_RO)
+    svc = _drive(creds)
 
     if not args.folder:
         _eprint("ERROR: need --folder (+ --match), --sheet, or --upload")

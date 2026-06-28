@@ -115,6 +115,13 @@ def _day_stat(metrics, name, target):
     return {"avg": round(sum(vals) / len(vals), 2), "peak": round(max(vals), 2)}
 
 
+def _day_avg(metrics, name, target):
+    """Tages-MITTEL (nicht Summe) einer Metrik AM Zieltag (z. B. Gait-Prozente)."""
+    vals = [_val(r) for r in _series(metrics, name) if _day(r.get("date")) == target]
+    vals = [v for v in vals if v is not None]
+    return (sum(vals) / len(vals)) if vals else None
+
+
 def _latest_reading(metrics, name, on_or_before=None):
     """Letzte verfügbare Lesung (sporadische Metrik). Optional ≤ on_or_before."""
     pts = [(r.get("date"), _val(r)) for r in _series(metrics, name)]
@@ -214,37 +221,117 @@ def _hrv_ampel(v):
 
 
 def _hrv_night(metrics, sleep_rec):
-    """Stündliche HRV-Tabelle NUR im Schlaffenster. Minuten-Shapes werden auf Stunden gebucketet
-    (kleine Tabelle, nie Roh-Minuten)."""
+    """HRV-Nacht-Stats im Schlaffenster.
+
+    B3: Volatilitäts-Kennzahlen (avg/min/max/range/std) kommen aus den ROHEN
+    In-Window-HRV-Punkten — NICHT aus den Stunden-Mitteln (Stunden-Mittel glätten σ
+    künstlich runter: Audit-Beweis raw σ 33.1 / range 117 vs hourly σ 20.9 / range 63;
+    claude.ai rechnet roh, wir jetzt auch). Zusätzlich:
+      • `hourly`  — die bestehende Stunden-Tabelle (§9-Anzeige, unverändert).
+      • `fine`    — 15-Minuten-Feinserie (Key YYYY-MM-DD HH:Q, Q=minute//15);
+                    klein gehalten (≤~36 Punkte/Nacht), nie Roh-Minuten-Arrays.
+    """
     if sleep_rec is None:
         return None
     ss, se = str(sleep_rec.get("sleepStart")), str(sleep_rec.get("sleepEnd"))
     if not ss or not se:
         return None
-    buckets = defaultdict(list)          # date[:13] (Tag+Stunde) → werte
+    raw_vals = []                        # ROHE In-Window-Punkte → Volatilität
+    hour_buckets = defaultdict(list)     # date[:13] (Tag+Stunde) → werte (Anzeige)
+    fine_buckets = defaultdict(list)     # "YYYY-MM-DD HH:Q" (15-min) → werte
     for r in _series(metrics, "heart_rate_variability"):
         dt = str(r.get("date"))
         if ss <= dt <= se:
             v = _val(r)
             if v is not None:
-                buckets[dt[:13]].append(v)
-    if not buckets:
+                raw_vals.append(v)
+                hour_buckets[dt[:13]].append(v)
+                mm = dt[14:16]
+                q = int(mm) // 15 if mm.isdigit() else 0
+                fine_buckets[f"{dt[:10]} {dt[11:13]}:{q}"].append(v)
+    if not raw_vals:
         return None
-    hourly, all_vals = [], []
-    for bkey in sorted(buckets):
-        v = sum(buckets[bkey]) / len(buckets[bkey])
-        all_vals.append(v)
-        hourly.append({"t": bkey[11:13] + ":00", "hrv": round(v), "ampel": _hrv_ampel(v)})
+    hourly = []
+    for bkey in sorted(hour_buckets):
+        hv = sum(hour_buckets[bkey]) / len(hour_buckets[bkey])
+        hourly.append({"t": bkey[11:13] + ":00", "hrv": round(hv), "ampel": _hrv_ampel(hv)})
+    fine = []
+    for fkey in sorted(fine_buckets):
+        fv = sum(fine_buckets[fkey]) / len(fine_buckets[fkey])
+        fine.append({"t": fkey, "hrv": round(fv), "ampel": _hrv_ampel(fv)})
+    avg = sum(raw_vals) / len(raw_vals)
     return {
-        "avg": round(sum(all_vals) / len(all_vals)),
-        "min": round(min(all_vals)),
-        "max": round(max(all_vals)),
-        "range": round(max(all_vals) - min(all_vals)),
-        "std": round(statistics.pstdev(all_vals), 1) if len(all_vals) > 1 else 0.0,
-        "n": len(all_vals),
-        "ampel": _hrv_ampel(sum(all_vals) / len(all_vals)),
+        "avg": round(avg),
+        "min": round(min(raw_vals)),
+        "max": round(max(raw_vals)),
+        "range": round(max(raw_vals) - min(raw_vals)),
+        "std": round(statistics.pstdev(raw_vals), 1) if len(raw_vals) > 1 else 0.0,
+        "n": len(raw_vals),
+        "ampel": _hrv_ampel(avg),
         "hourly": hourly,
+        "fine": fine,
     }
+
+
+# ---------------------------------------------------------------- body composition (B4)
+def _body_comp(metrics, as_of):
+    """Letzte Körper-Mess-Werte (≤ as_of) je Metrik mit Protokoll-Flag.
+
+    off_protocol = Quelle ist NICHT die Protokoll-Körperwaage ODER gemessen nach 09:00
+    (claude.ai flaggt das Withings-Spät-Wiegen; wir hatten es übersehen)."""
+    out = {}
+    for name in ("weight_body_mass", "body_fat_percentage", "lean_body_mass", "body_mass_index"):
+        pts = [r for r in _series(metrics, name)
+               if _val(r) is not None and _day(r.get("date")) <= as_of]
+        if not pts:
+            out[name] = None
+            continue
+        pts.sort(key=lambda r: str(r.get("date")))
+        rec = pts[-1]
+        src = rec.get("source") or ""
+        t = _hhmm(rec.get("date"))
+        off = (src.lower() != "körperwaage") or (t is not None and t > "09:00")
+        out[name] = {
+            "value": round(_val(rec), 2),
+            "date": _day(rec.get("date")),
+            "time": t,
+            "source": src,
+            "in_json": True,
+            "off_protocol": off,
+        }
+    return out
+
+
+# ---------------------------------------------------------------- load extras (C)
+def _load_extra(metrics, gestern):
+    """Zusätzliche Tages-Last-Signale (nur wenn vorhanden):
+    Grundumsatz → echter TDEE, Bewegungs-Minuten, Etagen, Gang-Symmetrie/Doppelstand."""
+    out = {}
+    basal = _day_sum(metrics, "basal_energy_burned", gestern)
+    active = _day_sum(metrics, "active_energy", gestern)
+    if basal is not None:
+        out["basal_energy_kcal"] = round(basal, 1)
+        if active is not None:
+            out["true_tdee_kcal"] = round(basal + active, 1)  # Grundumsatz + Aktiv
+    ex = _day_sum(metrics, "apple_exercise_time", gestern)
+    if ex is not None:
+        out["exercise_min"] = round(ex)
+    flights = _day_sum(metrics, "flights_climbed", gestern)
+    if flights is not None:
+        out["flights_climbed"] = round(flights)
+
+    gait = {}
+    asym = _day_avg(metrics, "walking_asymmetry_percentage", gestern)
+    if asym is not None:
+        # Gang-Asymmetrie: anhaltend >5 % gilt als auffällig (Verletzungs-/Schonhaltung).
+        gait["asymmetry_pct"] = {"avg": round(asym, 1), "flag": asym > 5}
+    dsupp = _day_avg(metrics, "walking_double_support_percentage", gestern)
+    if dsupp is not None:
+        # Doppelstand-Norm ~20–40 %; außerhalb = veränderte Gangmechanik.
+        gait["double_support_pct"] = {"avg": round(dsupp, 1), "flag": (dsupp < 20 or dsupp > 40)}
+    if gait:
+        out["gait"] = gait
+    return out or None
 
 
 # ---------------------------------------------------------------- window stats (spo2 / breathing)
@@ -298,6 +385,8 @@ def slice_day(metrics, as_of):
             "heart": _gestern_heart(metrics, gestern, sleep_windows),
             "walking_hr": walking_hr,
         },
+        "load_extra": _load_extra(metrics, gestern),
+        "body_comp": _body_comp(metrics, as_of),
         "heute_sleep": _sleep_block(sleep_rec, attribution),
         "hrv_night": _hrv_night(metrics, sleep_rec),
         "recovery": {

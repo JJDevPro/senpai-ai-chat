@@ -10,3 +10,7 @@ numpy>=1.24             # numerics for banister / aggregates
 fitparse>=1.2.0         # decode Garmin/HealthFit .fit files
 google-api-python-client>=2.0   # Drive read-only pulls
 google-auth>=2.0        # service-account auth for Drive
+cffi>=1.15              # cryptography backend for google-auth signing; the VM ships a
+                        # Debian `cryptography` that satisfies pip's resolver, so cffi is
+                        # never pulled into the python3.11 site-packages on its own and the
+                        # Drive pull dies with "No module named '_cffi_backend'". Pin it.

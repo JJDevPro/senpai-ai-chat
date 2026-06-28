@@ -1,0 +1,8 @@
+# Senpai AI Coach (chat repo) — dev/test deps.
+# Install into the repo venv with:
+#   ./.venv/bin/pip install -r requirements-dev.txt
+#
+# pytest is the only hard dependency of the regression suite. The suite is
+# DATA-FREE: every fixture under tests/fixtures/ is small + synthetic, so the
+# tests run with zero Drive creds and zero real health data.
+pytest>=8.0

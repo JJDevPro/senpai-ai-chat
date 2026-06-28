@@ -1,0 +1,164 @@
+{
+  "_README": [
+    "SYNTHETIC Health-Auto-Export fixture — hand-crafted, DATA-FREE. No real health data.",
+    "as_of (today) under test = 2026-06-28  ->  gestern (load day) = 2026-06-27.",
+    "Designed so every assertion has a KNOWN expected value:",
+    "  * Target-day slicing: active_energy / step_count / distance / physical_effort",
+    "    each have gestern (2026-06-27) samples AND a big 2026-06-26 sample. Summing",
+    "    across the whole file would explode the number; a correct slice keeps only",
+    "    gestern. gestern sums: active=500, steps=8000, distance=5.0km, effort avg6/peak8.",
+    "  * HRV night window = sleepStart..sleepEnd (2026-06-28 00:30..06:30). Six RAW",
+    "    points span 19..120 but cluster into 3 hour-buckets whose MEANS barely move",
+    "    (hour03={19,120}->~69.5, hour04={65,66}->65.5, hour05={70,71}->70.5). So raw",
+    "    sigma (~29) and raw range (101) are an order of magnitude bigger than the",
+    "    hourly-bucketed sigma (~2) / range (4). A daytime 2026-06-27 HRV point (200)",
+    "    sits OUTSIDE the window and must be excluded (max stays 120, n stays 6).",
+    "  * Body comp: a Koerperwaage 08:00 reading is superseded by a later Withings",
+    "    09:30 reading -> latest pick is off_protocol (wrong source AND after 09:00).",
+    "  * load_extra: basal(1500)+active(500)=true_tdee 2000; exercise 45min; flights 8;",
+    "    walking_asymmetry avg 7.0% (>5 -> flag fires); double_support 29% (in-range)."
+  ],
+  "data": {
+    "metrics": [
+      {
+        "name": "heart_rate_variability",
+        "units": "ms",
+        "data": [
+          {"date": "2026-06-27 14:00:00 +0200", "qty": 200, "source": "Watch"},
+          {"date": "2026-06-28 03:05:00 +0200", "qty": 19, "source": "Watch"},
+          {"date": "2026-06-28 03:25:00 +0200", "qty": 120, "source": "Watch"},
+          {"date": "2026-06-28 04:10:00 +0200", "qty": 65, "source": "Watch"},
+          {"date": "2026-06-28 04:40:00 +0200", "qty": 66, "source": "Watch"},
+          {"date": "2026-06-28 05:15:00 +0200", "qty": 70, "source": "Watch"},
+          {"date": "2026-06-28 05:45:00 +0200", "qty": 71, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "sleep_analysis",
+        "units": "hr",
+        "data": [
+          {
+            "date": "2026-06-28 06:30:00 +0200",
+            "sleepStart": "2026-06-28 00:30:00 +0200",
+            "sleepEnd": "2026-06-28 06:30:00 +0200",
+            "inBedStart": "2026-06-28 00:15:00 +0200",
+            "totalSleep": 6.0,
+            "deep": 1.0,
+            "core": 3.0,
+            "rem": 1.5,
+            "awake": 0.5,
+            "source": "Watch"
+          }
+        ]
+      },
+      {
+        "name": "active_energy",
+        "units": "kcal",
+        "data": [
+          {"date": "2026-06-26 10:00:00 +0200", "qty": 9999, "source": "Watch"},
+          {"date": "2026-06-27 10:00:00 +0200", "qty": 300, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "qty": 200, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "step_count",
+        "units": "count",
+        "data": [
+          {"date": "2026-06-26 10:00:00 +0200", "qty": 99999, "source": "Watch"},
+          {"date": "2026-06-27 10:00:00 +0200", "qty": 4000, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "qty": 4000, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "walking_running_distance",
+        "units": "km",
+        "data": [
+          {"date": "2026-06-26 10:00:00 +0200", "qty": 50.0, "source": "Watch"},
+          {"date": "2026-06-27 10:00:00 +0200", "qty": 3.0, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "qty": 2.0, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "physical_effort",
+        "units": "MET",
+        "data": [
+          {"date": "2026-06-26 10:00:00 +0200", "qty": 50, "source": "Watch"},
+          {"date": "2026-06-27 09:00:00 +0200", "qty": 4, "source": "Watch"},
+          {"date": "2026-06-27 12:00:00 +0200", "qty": 6, "source": "Watch"},
+          {"date": "2026-06-27 17:00:00 +0200", "qty": 8, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "heart_rate",
+        "units": "bpm",
+        "data": [
+          {"date": "2026-06-27 08:00:00 +0200", "Avg": 60, "Max": 90, "Min": 50, "source": "Watch"},
+          {"date": "2026-06-27 12:00:00 +0200", "Avg": 70, "Max": 110, "Min": 55, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "Avg": 80, "Max": 150, "Min": 60, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "basal_energy_burned",
+        "units": "kcal",
+        "data": [
+          {"date": "2026-06-27 10:00:00 +0200", "qty": 800, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "qty": 700, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "apple_exercise_time",
+        "units": "min",
+        "data": [
+          {"date": "2026-06-27 10:00:00 +0200", "qty": 20, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "qty": 25, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "flights_climbed",
+        "units": "count",
+        "data": [
+          {"date": "2026-06-27 10:00:00 +0200", "qty": 5, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "qty": 3, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "walking_asymmetry_percentage",
+        "units": "%",
+        "data": [
+          {"date": "2026-06-27 10:00:00 +0200", "qty": 6.0, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "qty": 8.0, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "walking_double_support_percentage",
+        "units": "%",
+        "data": [
+          {"date": "2026-06-27 10:00:00 +0200", "qty": 28.0, "source": "Watch"},
+          {"date": "2026-06-27 18:00:00 +0200", "qty": 30.0, "source": "Watch"}
+        ]
+      },
+      {
+        "name": "weight_body_mass",
+        "units": "kg",
+        "data": [
+          {"date": "2026-06-28 08:00:00 +0200", "qty": 75.0, "source": "Körperwaage"},
+          {"date": "2026-06-28 09:30:00 +0200", "qty": 75.4, "source": "Withings"}
+        ]
+      },
+      {
+        "name": "body_fat_percentage",
+        "units": "%",
+        "data": [
+          {"date": "2026-06-28 09:30:00 +0200", "qty": 18.0, "source": "Withings"}
+        ]
+      },
+      {
+        "name": "resting_heart_rate",
+        "units": "bpm",
+        "data": [
+          {"date": "2026-06-28 06:00:00 +0200", "qty": 48, "source": "Watch"}
+        ]
+      }
+    ]
+  }
+}

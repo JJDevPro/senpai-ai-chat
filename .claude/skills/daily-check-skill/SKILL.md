@@ -41,6 +41,7 @@ Step 3:  ISO-KW + Montag dieser KW.
 Step 3.5: INPUT-TYP: (a) EIN Multi-Day-Export vorhanden (Range-Datei
          `HealthAutoExport-YYYY-MM-DD-YYYY-MM-DD.json` in `./data`, Span >2 Tage) → MULTI-DAY-Pfad (§3f-bis),
          Steps 4-6 entfallen, weiter bei Step 7. (b) Sonst Standard: zwei Tagesdateien (Steps 4-6, §3f).
+         **⛓️ SCOPE-INVARIANTE (nicht verhandelbar): Daily zieht IMMER mind. heute+gestern** — beide Tage gehen in slice_hae_day UND daily_signals (Step 8.5). Fragt der User explizit einen größeren Zeitraum (»diese KW«, »letzte 7 Tage«), wird der Range-Export / mehr Tagesdateien gezogen und alles in Relation gesetzt (§3f-bis). **NIE nur heute** — Single-Day = Vortag-Verlust (Daylight/Audio/Recovery-Link brechen, der 28.06-„3-min"-Glitch). Herkunft: der Skill kam aus claude.ai mit manuellem HAE-Upload (mind. heute+gestern, oft eine ganze KW) und hat stets den vollen Scope ausgelesen.
 Step 4:  ZWEI Tages-JSONs nach `./data` ziehen (Muster YYYY-MM-DD, NIE YYYY-MM; §3b):
          ├── HEUTE:   python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthAutoExport-{heute}" --out ./data
          └── GESTERN: python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthAutoExport-{gestern}" --out ./data   ← Gestern wird VOLL ausgewertet
@@ -56,8 +57,8 @@ Step 8:  GESTERN-LOAD aus der slice_hae_day-JSON: active_energy (Tagessumme), st
          `exercise_min` + `flights_climbed` (Load-Proxys), `gait.asymmetry_pct`/`gait.double_support_pct`
          (Gang-Trip-Wire — NUR surfacen wenn `flag=True` = erhöht → Verletzungs-/Ermüdungs-Kontext).
          **Multi-Day: slice_hae_day filtert ZWINGEND auf den Vortag** (`day==gestern`), sonst Wochen-/Monats-Summe (§3f-bis).
-Step 8.5: TAG-SIGNALE: `python3 .claude/skills/daily-check-skill/scripts/daily_signals.py <hae_json> --as-of {heute}` (§3i) —
-         `<hae_json>` = die HEUTE-Datei ODER der Multi-Day-Export (lokaler Pfad in `./data`). `as_of` pinnt today/yesterday.
+Step 8.5: TAG-SIGNALE: `python3 .claude/skills/daily-check-skill/scripts/daily_signals.py <heute_json> <gestern_json> --as-of {heute}` (§3i) —
+         **BEIDE Tagesdateien übergeben** (heute + gestern) ODER den Multi-Day-Export — daily_signals mergt sie, damit der **Vortag (`daylight`/`audio` `yesterday`) nie verhungert**. NUR die Heute-Datei → `yesterday=null` → die Gestern-Retro hat kein Tageslicht/Audio (Daylight-Vortag-Glitch). `--as-of {heute}` pinnt today/yesterday (PFLICHT, sonst = letzter Tag im Export).
          Liefert Tageslicht, Schlaf-Effizienz, Wrist-Temp+Baseline, Audio-Tag-Kontext, VO2max/cardio_recovery-Fallback, Wasser.
 Step 8.6: ⛔ SAFETY-GATE (deterministisch, NICHT verhandelbar — CLAUDE.md §6):
          `python3 .claude/skills/daily-check-skill/scripts/safety_gate.py <slice_json> [--injury] [--opt-out] [--prev-hrv N]`
@@ -228,7 +229,9 @@ Gebündelter Helper `scripts/daily_signals.py`, EIN Aufruf liefert alle Zusatz-S
 ```bash
 python3 .claude/skills/daily-check-skill/scripts/daily_signals.py ./data/HealthAutoExport-{heute}.json --as-of {heute}
 ```
-Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` + `history`** (Gestern-Retro nutzt `yesterday`, Morgenlicht-Reminder nutzt `today` — NIE den Teil-Tag „heute“ in den Retro ziehen), `sleep_efficiency`, `wrist_temp` (Baseline = rollende letzte 28 Vornächte, Flag ab ≥5 Nächten), `vo2_max`/`cardio_recovery` (letzte Lesung + Datum), `dietary_water_ml`. **Fehlt eine Metrik → None.** `--as-of YYYY-MM-DD` (heute) pinnt den Bezugstag; Default = letzter Tag im Export.
+Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` + `history`** (Gestern-Retro nutzt `yesterday`, Morgenlicht-Reminder nutzt `today` — NIE den Teil-Tag „heute“ in den Retro ziehen), `sleep_efficiency`, `wrist_temp` (Baseline = rollende letzte 28 Vornächte, Flag ab ≥5 Nächten), `vo2_max`/`cardio_recovery` (letzte Lesung + Datum), `dietary_water_ml`. **Fehlt eine Metrik → None.** `--as-of YYYY-MM-DD` (heute) pinnt den Bezugstag; Default = letzter Tag im Export. **daily_signals nimmt mehrere HAE-Pfade** (heute + gestern bzw. Range) und mergt sie — IMMER mind. heute+gestern füttern, damit `yesterday` resolved.
+
+> **⛔ Vortag-Defensive (der Daylight-/Audio-Glitch):** Ist `daylight.yesterday`/`audio.yesterday` trotzdem `null` (Vortag-Datei fehlt), in der Gestern-Retro **„n/a (Vortag-Datei fehlt)" rendern — NIEMALS auf den Teil-Tag `today` zurückfallen.** Sonst erscheint der „heute-bisher"-Wert als „gestern" (real beobachtet: angezeigt „3 min 🔴" = 28.06-Teiltag statt korrekt „72 min 🟡" = 27.06-Volltag).
 
 **🌞 Tageslicht (Ampel + Circadian-Narrativ):** 🟢 ≥120 / 🟡 60–120 / 🟠 30–60 / 🔴 <30 min. **Der Hebel VOR der Bettzeit:** wenig Tageslicht (v. a. morgens) → Melatonin-Timing verschiebt sich nach hinten → späteres Einschlafen. Niedriges Tageslicht + späte Bettzeit zusammen erzählen die Kausalkette → „raus ins Morgenlicht" ist die Ursachen-Intervention, nicht nur „früher ins Bett".
 
@@ -381,7 +384,7 @@ Aus `sleep` (§3f) — Totals gelten für die ganze Nacht, egal in welcher Tages
 - REM: [XX%] ([X,X h]) [Ampel]
 - Wachphase: [X,X h] [Ampel]
 - Schlaf-Effizienz: [XX%] [Ampel]   (daily_signals: Schlafzeit/Bett-Fenster)
-- ☀️ Tageslicht gestern: [XX min] [Ampel]   (Circadian-Hebel — erklärt Bettzeit-Drift)
+- ☀️ Tageslicht gestern: [XX min] [Ampel]   (Circadian-Hebel — erklärt Bettzeit-Drift; = `daylight.yesterday`, NIE `today`; null → „n/a (Vortag-Datei fehlt)")
 ```
 | Metrik | 🟢 | 🟡 | 🔴 |
 |---|---|---|---|

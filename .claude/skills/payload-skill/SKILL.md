@@ -3,10 +3,24 @@ name: payload-skill
 description: "AI Coach Wochen-Payload-Generator für den Athleten. Laden bei dem Payload-Command oder am Sonntag-KW-Abschluss nach der SoT-Messung. Erzeugt ein verdichtetes, copy-paste-fertiges Wochen-Briefing (SoT-Snapshot, Trainings-Absolvierung, PRs, Makro-Compliance, HRV/VO2-Trend, Learnings, Persona-State, Next-KW-Fokus) als reinen Code-Fence-Block ohne Preamble und regeneriert daraus live.md (aus dem privaten Drive-Ordner) als autoritativen State-Seed für den nächsten KW-Chat. Erkennt außerdem einen Payload-Block am Chat-Anfang und integriert ihn priorisiert. NICHT für tägliche Checks (daily-check-skill) oder KW-Rekalibrierung (sync-skill)."
 ---
 
-# Payload-Skill v1.0 — KW-Abschluss-Export
+# Payload-Skill v1.1 — KW-Abschluss-Export
 
 > Senpai lädt diese Datei NUR bei `Payload`-Command oder Sonntag-Abend nach SoT.
 > **Zweck:** Verdichtetes Wochen-Briefing als State-Seed für den nächsten KW-Chat. Regeneriert `live.md` (im privaten Drive-Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`) als volatile Senpai-State.
+
+---
+
+## 0. ⛔ AKZEPTANZKRITERIUM (Definition of Done — KEIN nice-to-have)
+
+> **Herkunft (wichtig):** Der Payload ist ein **Relikt aus claude.ai**. Dort war er ein reiner **Context-Dump** — die Wochendaten lagen (manuell hochgeladen) im Kontext, also genügte „gib aus, was geladen ist". **In Claude Code gilt das NICHT MEHR:** der Kontext enthält die Wochendaten NICHT automatisch. Ein „dump-what's-loaded"-Payload hätte hier zwangsläufig **Lücken**.
+
+**Ein Payload mit Lücken aus NICHT-geholten Daten ist ein NO GO — er darf NICHT ausgegeben werden.** Vor der Ausgabe gilt verbindlich:
+
+1. **Jedes Feld** des Templates (§2) ist entweder (a) aus einer **real gezogenen Quelle** befüllt, oder (b) als `[?]` markiert **NUR** nach einem dokumentierten, fehlgeschlagenen Pull-Versuch — **mit Quelle + Grund** („Ernährungs-Sheet endet 25.06", „Nutrition nicht im HAE-Export").
+2. Ein `[?]`, das nur entstand, weil der Wert „nicht im Kontext lag" / nicht gezogen wurde, ist **unzulässig** → erst ziehen (§1, CLAUDE.md §0 Hol-Pflicht).
+3. Bevor der Block emittiert wird: **Gap-Check** über alle Felder. Findet sich ein nicht-quellenbelegtes `[?]` oder ein still weggelassenes Feld → **STOPP, nachziehen, dann erst ausgeben.** Verschweigen = Halluzination.
+
+> Kurz: In Claude Code ist der Payload ein **aktiver Daten-Sammler**, kein Context-Echo. Vollständigkeit (oder belegte, begründete Abwesenheit) ist Pflicht, nicht Kür.
 
 ---
 
@@ -29,7 +43,12 @@ python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match ath
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match baselines.md --out ./data   # dann ./data/baselines.md lesen
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match learnings.md --out ./data    # dann ./data/learnings.md lesen
 ```
-Fehlende Werte = `[?]` markieren, nicht erfinden.
+**Zusätzlich PFLICHT (CLAUDE.md §0 Hol-Pflicht): die Wochen-Metriken ZIEHEN, die der Block braucht** — nicht nur die State-Files. Vor dem Block holen + reduzieren:
+- **HAE-Tages-JSONs** der KW (Schlaf-Ø, Bedtime-Count, HRV-Trend, Load) via `pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthAutoExport-{tag}" --out ./data` → über `slice_hae_day.py`/`daily_signals.py` reduzieren.
+- **Trainings_v5** + **Gesundheitsdaten_v5** (`--sheet …`) für Absolvierung/CTL-ATL-TSB + Body-Comp/KW-Trend.
+- **Makro-Quelle** für die 4-Ampeln-Compliance (Source-of-Truth siehe `nutrition-skill` — NICHT aus der Luft, NICHT pauschal `[?]`).
+
+Erst nach einem **echten, fehlgeschlagenen Pull-Versuch** gilt: fehlender Wert = `[?]` markieren — **mit Quelle + Grund** („Sheet X leer", „Nutrition nicht im HAE-Export"). Nie erfinden, **nie ein Feld stillschweigend weglassen** (Verschweigen = Halluzination, §0).
 
 ---
 
@@ -84,7 +103,8 @@ Fehlende Werte = `[?]` markieren, nicht erfinden.
 ## 3. Ausgabe-Regeln
 
 - **Kein Preamble, kein Postamble** — nur der Block als Code-Fence.
-- Alle Felder ausfüllen. Fehlende Daten → `[?]`, User ergänzt im Folge-Chat manuell.
+- **Erst ZIEHEN, dann `[?]` (§0 Hol-Pflicht).** Alle Felder ausfüllen — vorher die Wochen-Daten aktiv holen (§1). `[?]` NUR für einen Wert, dessen Quelle real gepullt wurde und leer war (mit Quelle + Grund). **Niemals `[?]` als Abkürzung statt eines Pulls, niemals ein Feld stillschweigend weglassen** — Verschweigen = Halluzination. „User ergänzt manuell" gilt erst, nachdem ICH die Quelle erfolglos gezogen habe.
+- **⛔ GAP-CHECK vor dem Emit (Akzeptanzkriterium §0):** Vor der Ausgabe alle Template-Felder durchgehen. Findet sich ein nicht-quellenbelegtes `[?]` oder ein still weggelassenes Feld → **STOPP, nachziehen, DANN erst ausgeben.** Ein Payload mit Lücken aus nicht-geholten Daten ist ein NO GO und darf nicht emittiert werden.
 - Ampeln immer mit Symbol (🟢🟡🟠🔴), nicht nur Wort.
 - Trend-Pfeile aus KW-Vergleich (Vor-KW-Payload falls vorhanden).
 - Persona-State ehrlich aus aktuellem Chat extrahieren — keine Fake-Diagnose. Anrede-Tier + Roast-Anrede aus `athlete.md`, nicht erfinden.

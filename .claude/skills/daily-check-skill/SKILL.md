@@ -68,7 +68,7 @@ Step 8.6: ⛔ SAFETY-GATE (deterministisch, NICHT verhandelbar — CLAUDE.md §6
          (Verletzung/Opt-out) = Persona aus. `--prev-hrv` (gestern hrv_night.avg) bestätigt
          HRV🔴 als 2-Tage-Deload-Muster. AFib-Burden wird BEWUSST nicht gegated (§6 Medical).
 Step 9:  TRAININGS-LOAD TIEF: Trainings_v5 nach CSV ziehen →
-         `python3 lib/pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU --out ./data/Trainings_v5.csv` →
+         `python3 lib/pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU --tab "Trainings" --out ./data/Trainings_v5.csv` →
          🧮 `banister.compute_from_sheet(raw, as_of=heute)` (§3h) — Dedup + Kalendertag-Zerofill
          + DETERMINISTISCHES CTL/ATL/TSB in EINEM Aufruf. Plus gestrige Session (Typ, Dauer, TRIMP).
          TSB = heutige Readiness (CTL_gestern − ATL_gestern), Zeile via format_block(res).
@@ -213,7 +213,7 @@ CTL/ATL/TSB **nie ad-hoc** rechnen (schwankte lauf-für-lauf: TSB +10,3 vs −0,
 ```python
 import sys; sys.path.insert(0, ".claude/skills/daily-check-skill/scripts")
 from banister import compute_from_sheet, format_block
-raw_sheet_text = open("./data/Trainings_v5.csv", encoding="utf-8", errors="replace").read()  # vorher: pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU --out ./data/Trainings_v5.csv
+raw_sheet_text = open("./data/Trainings_v5.csv", encoding="utf-8", errors="replace").read()  # vorher: pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU --tab "Trainings" --out ./data/Trainings_v5.csv
 res = compute_from_sheet(raw_sheet_text, as_of="YYYY-MM-DD")  # as_of = HEUTE (Datum aus Kontext)
 print(format_block(res))   # CTL/ATL/TSB-Zeile, TSB = heutige Readiness
 ```

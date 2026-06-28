@@ -17,7 +17,7 @@ CLI:
   # offline / test (no Drive):
   python lib/make_ics.py --out plan.ics \\
       --rhythm "Mo=Run+Core@20:00;Mi=Long Run@18:00;Do=Gym@21:30;Sa=Parkrun@09:00" \\
-      --races  "B2Run Nürnberg 6km|2026-07-21@09:00"
+      --races  "Stadtlauf 6km|2026-07-21@09:00"
 
 Override grammar (semicolon-separated):
   --rhythm  DAY=Title@HH:MM[;…]      DAY ∈ Mo Di Mi Do Fr Sa So (German abbrevs)

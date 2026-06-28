@@ -211,15 +211,18 @@ def _dt(a, b):
 
 # ── Vertical Ratio (%) für ein running-only-Set ─────────────────────────────
 def _vr_pct(run):
-    """VR (%) record-gewichteter Median für ein running-only-Sample-Set.
-    Nutzt die native vertical_ratio; fehlt sie (Apple-Watch-FITs liefern keine
-    native VR), wird sie aus VO÷Stride rekonstruiert — sonst bliebe die Spalte
-    auf Apple-Daten durchgängig leer. None, wenn nichts ableitbar."""
+    """VR (%) für ein running-only-Sample-Set.
+    Native vertical_ratio bevorzugt (Median). Fehlt sie (Apple-Watch-FITs liefern
+    keine native VR), Rekonstruktion als VERHÄLTNIS DER MEDIANE
+    (median(VO) ÷ median(Stride) · 100) — so reconciled der Wert mit den im selben
+    Split gezeigten vo_mm/stride_mm (ratio-of-medians, nicht median-of-ratios).
+    None, wenn nichts ableitbar."""
     vals = [r["vr"] for r in run if r.get("vr") is not None]
-    if not vals:
-        vals = [r["vo"] / r["stride"] * 100.0 for r in run
-                if r.get("vo") is not None and r.get("stride")]
-    return _median(vals)
+    if vals:
+        return _median(vals)
+    vo = _median([r["vo"] for r in run if r.get("vo") is not None])
+    st = _median([r["stride"] for r in run if r.get("stride")])
+    return vo / st * 100.0 if (vo is not None and st) else None
 
 
 # ── Splits (per KM) ─────────────────────────────────────────────────────────
@@ -401,9 +404,10 @@ def hr_source_warn(recs):
         if is_lock and prev_lock:
             dt = _dt(prev_ts, r["ts"])
             if dt is None or dt <= 0 or dt > 15:
-                dt = 1.0
-            cur += dt
-            longest = max(longest, cur)
+                cur = 0.0   # echte Aufzeichnungs-Lücke (>15s) = Bruch der Strecke, kein 1s-Füller
+            else:
+                cur += dt
+                longest = max(longest, cur)
         else:
             cur = 0.0
         prev_ts, prev_lock = r["ts"], is_lock

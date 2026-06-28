@@ -328,3 +328,16 @@ def test_hr_source_warn_too_few_samples():
     w = arf.hr_source_warn(recs)
     assert w["optical_cadence_lock_suspected"] is False
     assert "zu wenige" in w["note"]
+
+
+def test_hr_source_warn_recording_gap_breaks_stretch():
+    # Zwei 69s-Lock-Cluster, getrennt durch eine 600s-Aufzeichnungslücke; keiner
+    # erreicht 2 min, Lock-Anteil < 50% -> KEIN Flag. Die Lücke darf die Cluster
+    # nicht zu einer durchgehenden Strecke verschmelzen (Gap = Bruch, kein 1s-Füller).
+    recs = [_mkrec(i, 170, 1.85) for i in range(69)]                 # Cluster 1: 0..68 s
+    recs += [_mkrec(668 + i, 170, 1.85) for i in range(69)]          # Cluster 2 nach 600 s Lücke
+    recs += [_mkrec(1000 + i, 140, 1.85) for i in range(200)]        # unlocked -> Anteil < 50%
+    w = arf.hr_source_warn(recs)
+    assert w["locked_fraction_pct"] < 50.0
+    assert w["longest_locked_stretch_s"] < arf.LOCK_MIN_SUSTAIN_S    # ~68 s, NICHT ~137 s
+    assert w["optical_cadence_lock_suspected"] is False

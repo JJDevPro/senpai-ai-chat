@@ -50,8 +50,8 @@ def _extract_name(athlete_text: str) -> str:
     m = re.search(r"\*\*Name:\*\*\s*(.+)", athlete_text or "")
     if not m:
         return "n/a"
-    # Vorname vor einer Klammer/Komma, ohne abschließende Satzzeichen ("Javier
-    # (Javier Garcell)." -> "Javier") — das ist {Name} aus dem Anrede-Mapping.
+    # Vorname vor einer Klammer/Komma, ohne abschließende Satzzeichen ("Max
+    # (Max Mustermann)." -> "Max") — das ist {Name} aus dem Anrede-Mapping.
     raw = m.group(1).strip()
     name = re.split(r"\s*[(,]", raw, 1)[0]
     return name.strip(" .*") or "n/a"

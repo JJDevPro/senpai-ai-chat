@@ -126,7 +126,9 @@ def extract_candidates(journal_text: str) -> list[dict]:
     # Erst-Auftreten merken (für Text + Reihenfolge), Vorkommen zählen.
     order: list[str] = []
     first_text: dict[str, str] = {}
-    counts: dict[str, int] = {}
+    # Pro Schlüssel die DISTINKTEN Sektions-Indizes sammeln — Recurrence zählt
+    # Sektionen (Tage), nicht Roh-Zeilen (ein Tag mit Doppel-Bullet ist kein Muster).
+    section_hits: dict[str, set] = {}
 
     candidates: list[dict] = []
     seen_keys: set[str] = set()
@@ -136,9 +138,9 @@ def extract_candidates(journal_text: str) -> list[dict]:
         if not key or key in seen_keys:
             return
         seen_keys.add(key)
-        candidates.append({"source": source, "text": text, "count": counts.get(key, 1)})
+        candidates.append({"source": source, "text": text, "count": len(section_hits.get(key, ())) or 1})
 
-    for kind, body in sections:
+    for sec_idx, (kind, body) in enumerate(sections):
         for line in body.splitlines():
             m = bullet_re.match(line)
             if not m:
@@ -150,7 +152,7 @@ def extract_candidates(journal_text: str) -> list[dict]:
             if key not in first_text:
                 order.append(key)
                 first_text[key] = text
-            counts[key] = counts.get(key, 0) + 1
+            section_hits.setdefault(key, set()).add(sec_idx)
 
             low = text.lower()
             # Neue PRs aus run-Sektionen, neue Baselines aus weekly-Sektionen:
@@ -160,9 +162,9 @@ def extract_candidates(journal_text: str) -> list[dict]:
             elif kind == "weekly" and "baseline" in low:
                 _emit("weekly", text)
 
-    # Wiederkehrende Muster (>= RECURRENCE_MIN Sektionen/Vorkommen).
+    # Wiederkehrende Muster (in >= RECURRENCE_MIN DISTINKTEN Sektionen).
     for key in order:
-        if counts.get(key, 0) >= RECURRENCE_MIN:
+        if len(section_hits.get(key, ())) >= RECURRENCE_MIN:
             _emit("pattern", first_text[key])
 
     return candidates

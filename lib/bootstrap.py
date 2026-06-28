@@ -48,7 +48,13 @@ def _eprint(*a):
 def _extract_name(athlete_text: str) -> str:
     """Ziehe den Namen aus der athlete.md-Zeile `**Name:** X` (best-effort)."""
     m = re.search(r"\*\*Name:\*\*\s*(.+)", athlete_text or "")
-    return m.group(1).strip() if m else "n/a"
+    if not m:
+        return "n/a"
+    # Vorname vor einer Klammer/Komma, ohne abschließende Satzzeichen ("Javier
+    # (Javier Garcell)." -> "Javier") — das ist {Name} aus dem Anrede-Mapping.
+    raw = m.group(1).strip()
+    name = re.split(r"\s*[(,]", raw, 1)[0]
+    return name.strip(" .*") or "n/a"
 
 
 def _extract_kw(live_text: str) -> str:
@@ -65,18 +71,20 @@ def _extract_metric(live_text: str, label: str) -> str:
     "n/a" — ein fehlender Wert ist nie ein Fehler, nur eine Lücke.
     """
     text = live_text or ""
-    # Tabellen-Zeile: | <label> ... | <wert> ... |
+    # Tabellen-Zeile: | <label> ... | <wert> ... |  (kein \b: "VO2" soll auch
+    # "VO2Max aktuell" matchen — zwischen "2" und "M" gibt es keine Wortgrenze).
     m = re.search(
-        rf"\|\s*{re.escape(label)}\b[^|]*\|\s*([^|]+?)\s*\|",
+        rf"\|\s*{re.escape(label)}[^|]*\|\s*([^|]+?)\s*\|",
         text,
         re.IGNORECASE,
     )
     if not m:
         # Schlichte Zeile: <label>: <wert>
-        m = re.search(rf"{re.escape(label)}\b\s*[:=]\s*(.+)", text, re.IGNORECASE)
+        m = re.search(rf"{re.escape(label)}[^\n:=]*[:=]\s*(.+)", text, re.IGNORECASE)
     if not m:
         return "n/a"
-    val = m.group(1).strip()
+    # Markdown-Hervorhebung (**...**) entfernen, damit der Banner sauber bleibt.
+    val = m.group(1).replace("*", "").strip()
     return val if val else "n/a"
 
 
@@ -87,7 +95,9 @@ def _count_overrides(live_text: str) -> int:
     als 0. Gezählt werden nur echte `-`/`*`-Bullets bis zur nächsten Überschrift.
     """
     text = live_text or ""
-    m = re.search(r"##\s*Aktive Overrides\s*\n", text, re.IGNORECASE)
+    # Heading-Zeile bis Zeilenende erlauben — die echte Überschrift trägt einen
+    # Zusatz ("## Aktive Overrides (zeitlich begrenzt)").
+    m = re.search(r"##\s*Aktive Overrides[^\n]*\n", text, re.IGNORECASE)
     if not m:
         return 0
     rest = text[m.end():]

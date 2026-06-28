@@ -209,6 +209,22 @@ def _dt(a, b):
         return None
 
 
+# ── Vertical Ratio (%) für ein running-only-Set ─────────────────────────────
+def _vr_pct(run):
+    """VR (%) für ein running-only-Sample-Set.
+    Native vertical_ratio bevorzugt (Median). Fehlt sie (Apple-Watch-FITs liefern
+    keine native VR), Rekonstruktion als VERHÄLTNIS DER MEDIANE
+    (median(VO) ÷ median(Stride) · 100) — so reconciled der Wert mit den im selben
+    Split gezeigten vo_mm/stride_mm (ratio-of-medians, nicht median-of-ratios).
+    None, wenn nichts ableitbar."""
+    vals = [r["vr"] for r in run if r.get("vr") is not None]
+    if vals:
+        return _median(vals)
+    vo = _median([r["vo"] for r in run if r.get("vo") is not None])
+    st = _median([r["stride"] for r in run if r.get("stride")])
+    return vo / st * 100.0 if (vo is not None and st) else None
+
+
 # ── Splits (per KM) ─────────────────────────────────────────────────────────
 def km_splits(recs):
     buckets = {}
@@ -263,6 +279,7 @@ def km_splits(recs):
             "gct_ms": _r(_median([r["gct"] for r in run]), 0),
             "vo_mm": _r(_median([r["vo"] for r in run]), 1),
             "stride_mm": _r(_median([r["stride"] for r in run]), 0),
+            "vr_pct": _r(_vr_pct(run), 1),
             "power_w": _r(_mean([r["power"] for r in run]), 0),
             "walk_pct": _r(walk_pct, 1),
             "ascent_m": _r(asc, 1),
@@ -292,6 +309,7 @@ def lap_splits(fit, recs):
             "hr_max": _num(d.get("max_heart_rate")),
             "cadence": _r((cad + frac) * 2.0, 0),
             "gct_ms": _r(_num(d.get("avg_stance_time")), 0),
+            "vr_pct": _r(_num(d.get("avg_vertical_ratio")), 1),   # nativ (Garmin); Apple → None → unten rekonstruiert
             "_start": d.get("start_time"),
         })
 
@@ -305,6 +323,8 @@ def lap_splits(fit, recs):
                    and (hi is None or r["ts"] < hi)]
             if win:
                 l["walk_pct"] = _r(100.0 * sum(1 for r in win if r["walk"]) / len(win), 1)
+                if l.get("vr_pct") is None:   # keine native Lap-VR (Apple) → aus Record-Fenster rekonstruieren
+                    l["vr_pct"] = _r(_vr_pct([r for r in win if r["run"]]), 1)
 
     out = []
     for i, l in enumerate(laps):
@@ -320,6 +340,7 @@ def lap_splits(fit, recs):
             "zone": zone_of(l["hr_avg"]),
             "cadence": l["cadence"],
             "gct_ms": l["gct_ms"],
+            "vr_pct": l.get("vr_pct"),
             "walk_pct": l.get("walk_pct"),
         })
     return out
@@ -345,6 +366,61 @@ def hr_zone_distribution(recs):
         "seconds": dist,
         "pct": pct,
         "z4_z5_pct": _r((secs["Z4"] + secs["Z5"]) / total * 100, 1) if total else None,
+    }
+
+
+# ── Optischer HR-Cadence-Lock-Detektor (T3) ─────────────────────────────────
+LOCK_TOL_BPM = 6.0          # |HR − spm/2| ≤ 6 bpm ≈ optischer Lock auf die Kadenz
+LOCK_MIN_SAMPLES = 60       # mind. so viele running-HR-Samples für ein Urteil
+LOCK_MIN_SUSTAIN_S = 120    # ≥2 min zusammenhängend gelockt → Verdacht
+LOCK_MIN_FRACTION = 0.50    # oder ≥50 % der Strecke gelockt
+
+
+def hr_source_warn(recs):
+    """Heuristik: rastet der optische HR-Sensor auf die Kadenz (HR ≈ spm/2)?
+    Der klassische Apple-Watch-Optical-Lock-Artefakt bei harten Intervallen.
+    Vergleicht HR mit spm/2 über die running-only-Samples und liefert ein
+    AGGREGAT (nie die Roh-Serie). Ohne Brustgurt bleibt die Sensor-Wand offen —
+    dieser Flag warnt, statt der Intervall-HR blind zu vertrauen.
+    """
+    run = [r for r in recs if r["run"] and r["hr"] is not None and r["spm"]]
+    n = len(run)
+    if n < LOCK_MIN_SAMPLES:
+        return {"optical_cadence_lock_suspected": False, "n_compared": n,
+                "note": "zu wenige running-only-HR-Samples für ein Urteil"}
+
+    # Lock auf die Kadenz-Grundfrequenz (HR ≈ spm, „liest zu hoch") ODER die
+    # halbe Harmonische (HR ≈ spm/2) — beide sind dokumentierte Optical-Artefakte.
+    locked = [min(abs(r["hr"] - r["spm"]), abs(r["hr"] - r["spm"] / 2.0)) <= LOCK_TOL_BPM
+              for r in run]
+    locked_n = sum(locked)
+    locked_frac = locked_n / n
+
+    # längste zusammenhängende gelockte Strecke in Sekunden (ts-Differenz, geclamped)
+    longest = cur = 0.0
+    prev_ts = None
+    prev_lock = False
+    for r, is_lock in zip(run, locked):
+        if is_lock and prev_lock:
+            dt = _dt(prev_ts, r["ts"])
+            if dt is None or dt <= 0 or dt > 15:
+                cur = 0.0   # echte Aufzeichnungs-Lücke (>15s) = Bruch der Strecke, kein 1s-Füller
+            else:
+                cur += dt
+                longest = max(longest, cur)
+        else:
+            cur = 0.0
+        prev_ts, prev_lock = r["ts"], is_lock
+
+    suspected = (longest >= LOCK_MIN_SUSTAIN_S) or (locked_frac >= LOCK_MIN_FRACTION)
+    return {
+        "optical_cadence_lock_suspected": suspected,
+        "longest_locked_stretch_s": _r(longest, 0),
+        "locked_fraction_pct": _r(100.0 * locked_frac, 1),
+        "n_compared": n,
+        "note": ("HR rastet streckenweise auf die Kadenz — Intervall-HR ohne "
+                 "Brustgurt unzuverlässig (Sensor-Wand offen)"
+                 if suspected else "kein anhaltender optischer Cadence-Lock erkannt"),
     }
 
 
@@ -810,6 +886,7 @@ def analyze(fit_path, as_of):
         "splits_km": km_splits(recs),
         "splits_lap": lap_splits(fit, recs),
         "hr_zones": hr_zone_distribution(recs),
+        "hr_source_warn": hr_source_warn(recs),
         "run_form": run_form(recs, session),
         "best_values": best_values(recs),
         "sprint_last_60s": last_60s_sprint(recs, run_avg_pace_s),

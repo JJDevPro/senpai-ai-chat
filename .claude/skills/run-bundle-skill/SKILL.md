@@ -252,6 +252,9 @@ SCHRITT 5: Gesundheitsdaten_v5 pullen (HRV/VO2)
   → Pull schlägt fehl: skip + ./data/live.md-Fallback
 
 SCHRITT 6: Analyse + Report (siehe §12 Output-Template)
+SCHRITT 7: ARCHIV (T7, NACH dem Report, best-effort, NON-BLOCKING) — Verdict ins rollende Journal:
+  → python3 lib/archive.py --report - --kind run --date {lauf_datum}   # Verdict-Text via stdin
+  → Fehlt senpai-journal.md → Pre-Seed-Hinweis melden, NICHT blockieren (Report steht bereits).
 ```
 
 **Monats-CSV (Daily-Aggregate, für Daily-Check-Kontext):** Folder/Sheet `1NLywaCKVZQlw8O4eZt20o2B14qgPIyFJ` (HealthMetrics-YYYY-MM.csv) — Komma-Delimiter, deutsche Dezimalzahlen. **Achtung: aktualisiert sich über den Tag → frühe Tageswerte (RHR/HRV) sind vorläufig, finalisieren über Nacht.**

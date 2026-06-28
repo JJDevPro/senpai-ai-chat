@@ -13,7 +13,7 @@ schöngerechneten Fits. Keine erfundenen Zahlen.
 
 ANALYSEN
 --------
-1. bedtime_hrv   — Javiers #1-Stellschraube. OLS Bettzeit → (Folge-)Tag-HFV.
+1. bedtime_hrv   — die #1-Stellschraube des Athleten. OLS Bettzeit → (Folge-)Tag-HFV.
                    slope (ms HFV pro Stunde später) + 95%-CI + R² + n.
                    Confound-Wächter: zweites Modell kontrolliert Schlafdauer.
 2. race_readiness— B2Run 6 km (21.07): aus CTL/TSB (Banister) + jüngster
@@ -377,7 +377,7 @@ def cmd_race_readiness(args):
         hrs = [r["hr"] for r in easy if r["hr"]]
         pace_basis = "z2_dominant_runs"
     elif len(runs) >= 5:
-        # Zu wenig saubere Z2-Läufe (Javier läuft selten reines Z2) → langsamere
+        # Zu wenig saubere Z2-Läufe (der Athlet läuft selten reines Z2) → langsamere
         # Hälfte der jüngsten Läufe als aerober Pace-PROXY (transparent geflaggt).
         slow = sorted(runs, key=lambda r: r["pace"])[len(runs) // 2:]
         paces = [r["pace"] for r in slow]
@@ -606,7 +606,7 @@ def fit_banister_tc(daily_trimp, response, default=(42, 7),
         res["reason"] = ("Fit instabil/marginal (Rand-Lösung, R²-Gewinn <0.01, oder R²<0.05) "
                          "→ Default 42/7 bleibt maßgeblich.")
     res["note"] = ("ADVISORY-Personalisierung. Ersetzt NICHT den deterministischen 42/7-"
-                   "Banister im Daily-Check — nur ein Hinweis, ob Javiers HFV/RHR auf "
+                   "Banister im Daily-Check — nur ein Hinweis, ob die HFV/RHR des Athleten auf "
                    "andere Zeitkonstanten reagiert.")
     return res
 

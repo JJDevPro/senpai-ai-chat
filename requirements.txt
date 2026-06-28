@@ -1,5 +1,10 @@
 # Senpai AI Coach — Python deps for the Claude Code (web) VM.
 # Installed by the cloud env setup script; the SessionStart hook is a fallback.
+# INSTALL WITH:  pip install --use-pep517 -r requirements.txt
+#   fitparse ships no PyPI wheel; its legacy setup.py build fails on Ubuntu 24.04's
+#   Debian-patched setuptools (AttributeError: install_layout) unless build isolation
+#   (--use-pep517) is forced. The cloud-env Setup-Script should install inline:
+#   pip install --use-pep517 pandas numpy fitparse google-api-python-client google-auth
 pandas>=2.0              # truth-sheet + series reduction
 numpy>=1.24             # numerics for banister / aggregates
 fitparse>=1.2.0         # decode Garmin/HealthFit .fit files

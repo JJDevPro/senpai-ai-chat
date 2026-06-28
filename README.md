@@ -35,8 +35,13 @@ Grund für den Repo: Der Claude.ai-Chat erstickte an den großen Roh-Uploads
    Truth-Ordner und **Write** auf den `Senpai-AI-Chat`-Ordner.
 3. **Network** auf *Custom*/*Full* inkl. `*.googleusercontent.com` (Drive-Downloads) und
    `wetterochs.de` (Wetter).
-4. **Deps:** Setup-Skript `pip install -r requirements.txt` (Fallback: SessionStart-Hook
-   bei `CLAUDE_CODE_REMOTE=true`).
+4. **Deps (Setup-Skript):**
+   `pip install --use-pep517 pandas numpy fitparse google-api-python-client google-auth`
+   — `--use-pep517` ist **Pflicht**: `fitparse` hat kein PyPI-Wheel, und sein legacy
+   `setup.py`-Build scheitert auf Ubuntu 24.04 am Debian-setuptools (`install_layout`) ohne
+   Build-Isolation. Inline statt `-r requirements.txt`, weil der Setup-Skript nicht zwingend
+   im Repo-Root läuft. Fallback: der SessionStart-Hook (`CLAUDE_CODE_REMOTE=true`) macht
+   `pip install --use-pep517 -r requirements.txt` im Repo-Root.
 5. **Persönliche Dateien EINMALIG in den Drive-Ordner legen** (drag-drop). Hintergrund:
    ein Service-Account hat **keine eigene Drive-Quota** und kann in „My Drive" keine
    Dateien *anlegen* — nur **bestehende, dir gehörende Dateien aktualisieren**. Lege also

@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "([ \"$CLAUDE_CODE_REMOTE\" = \"true\" ] && pip install -q --use-pep517 -r requirements.txt) ; python3 lib/preflight.py 2>&1 ; python3 lib/bootstrap.py 2>&1 ; true"
+            "command": "([ \"$CLAUDE_CODE_REMOTE\" = \"true\" ] && pip install -q --use-pep517 -r requirements.txt) ; python3 lib/preflight.py 2>&1 ; python3 lib/bootstrap.py 2>&1 ; python3 lib/session_menu.py 2>&1 ; true"
           }
         ]
       }

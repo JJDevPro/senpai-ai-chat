@@ -55,6 +55,7 @@ description: "AI Coach Ernährungs-Engine für den Athleten. PFLICHT laden, soba
 ## 3. Mittag 12:00 — Protein zuerst!
 
 Die 12:00-Entscheidung ist der Tag-Hebel. Pre-loggen.
+> **Echte Uhr (CLAUDE.md §3):** Senpai kennt die lokale Zeit (`lib/clock.py`) — die 12:00-Entscheidung kann **proaktiv** getriggert werden, wenn das Mittagsfenster (11:30–13:00) JETZT ist, statt zu warten, bis gefragt wird.
 
 | Ampel | Optionen |
 |---|---|

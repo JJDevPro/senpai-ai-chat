@@ -38,6 +38,13 @@ Notiere die Schwelle als `{WEIGHT_THRESHOLD_KG}`.
 
 Lade `.claude/skills/daily-check-skill/SKILL.md` und folge ihrem Workflow (§2). Kurzgefasst:
 
+> **🔄 HAE-Frische-Vorcheck (statt fixer-10:00-Rate):** Nach dem HAE-Pull das Datum-Alter prüfen
+> (SKILL.md §3e; `slice_hae_day` flaggt `no_gestern_data`/`multi_day_range`). Sind die heutigen Daten
+> noch nicht da (iPhone→HAE→Drive-Sync hängt) → **einmal kurz warten + erneut ziehen**, sonst transparent
+> mit Alters-Flag weiterlaufen („Daten von gestern — Sync lag noch"). So hängt das Briefing an der
+> tatsächlichen Daten-Frische, nicht an einer geratenen Uhrzeit. (Relevant v. a. für die geplante
+> Cron-Routine — `docs/AUTOMATION.md` §6.)
+
 ```bash
 # HAE heute + gestern (Mitternachts-Merge), nur volle Tagesdateien YYYY-MM-DD:
 python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthAutoExport-{heute}"   --out ./data

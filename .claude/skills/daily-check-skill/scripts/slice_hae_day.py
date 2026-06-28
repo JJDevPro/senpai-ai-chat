@@ -256,9 +256,12 @@ def _hrv_night(metrics, sleep_rec):
         hv = sum(hour_buckets[bkey]) / len(hour_buckets[bkey])
         hourly.append({"t": bkey[11:13] + ":00", "hrv": round(hv), "ampel": _hrv_ampel(hv)})
     fine = []
-    for fkey in sorted(fine_buckets):
+    for fkey in sorted(fine_buckets):          # Key "YYYY-MM-DD HH:Q" sortiert chronologisch
         fv = sum(fine_buckets[fkey]) / len(fine_buckets[fkey])
-        fine.append({"t": fkey, "hrv": round(fv), "ampel": _hrv_ampel(fv)})
+        hh = fkey[11:13]
+        q = fkey.rsplit(":", 1)[1]             # Quarter-Index 0..3 → Minuten 0/15/30/45
+        mm = int(q) * 15 if q.isdigit() else 0
+        fine.append({"t": f"{hh}:{mm:02d}", "hrv": round(fv), "ampel": _hrv_ampel(fv)})
     avg = sum(raw_vals) / len(raw_vals)
     return {
         "avg": round(avg),

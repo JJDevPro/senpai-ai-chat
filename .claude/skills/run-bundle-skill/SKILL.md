@@ -3,11 +3,14 @@ name: run-bundle-skill
 description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integriert. PFLICHT laden bei jeder Lauf-Analyse: der runanalyse-Command, Phrasen wie analysier den Lauf/Lauf-Report/wie war mein Lauf, oder ein absolvierter Lauf in den letzten 24h. Parst FIT (fitparse, Kadenz x2, enhanced_speed) und HealthAutoExport-JSON, wendet Walking-Filter v3.5 an, liefert Splits, Lauf-Form (GCT/VO/Stride/VR), Decoupling, Pace@Z2, Schuh-Check und Senpai-Verdict. NICHT für Gym (gym-bundle-skill), Ernährung (nutrition-skill) oder reine Tages-Werte (daily-check-skill)."
 ---
 
-# Run-Bundle-Analyse-Skill v3.11 — pull_drive · V3-only · Kadenz-Walking-Filter
+# Run-Bundle-Analyse-Skill v3.12 — pull_drive · V3-only · Kadenz-Walking-Filter
 
 > **Primärquelle:** FIT-Datei + Trainings_v5 + Gesundheitsdaten_v5, on-demand via `python3 lib/pull_drive.py` nach `./data` gezogen (Drive bleibt read-only Single Source of Truth, nie geschrieben).
 > **Fallback:** CSV (Apple-Watch HealthFit-Export, gleicher Folder) → lokales ZIP in `./data` (Legacy, siehe §1c).
 > **V3 Protocol v0.4 ist der einzige Bewertungs-Modus.** Alle Läufe — egal welches Datum — werden nach V3 bewertet. Kein V2-Modus, keine Backward-Compatibility.
+
+> **v3.12-Änderungen (gegenüber v3.11):**
+> - **§0h Topo-Feinsampling:** `topography` (analyze_run_fit.py) rechnet jetzt **100m-Primär** (statt 200m) + einen **50m-Fein-Layer (`fine_buckets`) NUR in/um die Steil-Zonen** (Notable |Grade|≥2%, je 1 Nachbar → Anstieg→Abstieg-Paar). Deckt den echten Peak-Grade auf, den die 200m-Mittelung wegglättete (validiert: km3,5-Hügel 50m = +4,9% vs 200m-Mittel 2,9%). Notable-Gate proportional (`dd ≥ bucket·0,75`) → partieller End-Bucket/GPS-Stop-Artefakt bleibt gefiltert. Kompakt: nur Steil-Zonen im Fein-Layer, nie der ganze Lauf in 50m-Zeilen (§0-Kernregel).
 
 > **v3.11-Änderungen (gegenüber v3.10):**
 > - **§2b NEU:** JSON-Running-Fallback (running_* aus HealthAutoExport, wenn kein FIT — gröber, FIT-First-Caveat) + Cross-Check + Einheiten-Falle (VO in cm, Stride in m). **🛡️ VO2max/Cardio-Recovery-Robustheit** (sporadisch → letzter Wert + ./data/live.md-Fallback, Abwesenheit ≠ Verschlechterung). **🦵 walking_asymmetry-Trip-Wire** (>3–5 % sustained = Dysbalance-Flag, v. a. nach Gym-Re-Entry).
@@ -53,7 +56,7 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 ✅ TL;DR-Block (2-3 Sätze, mit Verdict-Ampel)
 ✅ 🗓️ Runna-Kontext (NUR wenn workout-Messages in FIT, sonst skip)
 ✅ 📋 Übersicht (PFLICHT — min. 15 Metrik-Zeilen)
-✅ 🏞️ Topografie (PFLICHT — 200m-Auflösung §0h)
+✅ 🏞️ Topografie (PFLICHT — 100m-Primär + 50m-Fein an Steil-Zonen §0h)
 ✅ 📈 Lap-Verlauf (PFLICHT — Tabelle MIT Cadence-Spalte aus FIT records)
 ✅ 💥 Bestwerte (PFLICHT — 7 mit X,XX-KM-Präzision)
 ✅ 🏃 Letzte 60s Sprint-Check (PFLICHT — eigene Tabelle)
@@ -150,7 +153,7 @@ KEINE Quelle-Spalten in Tabellen.
 1. FIT records nach Lap-Index filtern
 2. Speed/Cadence in 50-Sample-Steps prüfen
 3. Cadence-Drops <130 spm ODER Speed-Drops <1,5 m/s innerhalb Intervall suchen
-4. **PFLICHT §0h Cross-Check:** KM-Position des Drops → Grade aus 200m-Bucket
+4. **PFLICHT §0h Cross-Check:** KM-Position des Drops → Grade aus 100m-Bucket (bei Steil-Zone 50m-`fine_buckets`)
 5. Grade >+2% → **Berg-Walking, KEIN Form-Defekt**
 6. Grade <+1% → Verschnaufpause-Hypothese erlaubt
 
@@ -158,15 +161,15 @@ KEINE Quelle-Spalten in Tabellen.
 
 ---
 
-## 0h. TOPOGRAFIE-HOCHAUFLÖSUNG · 200m-Buckets
+## 0h. TOPOGRAFIE-HOCHAUFLÖSUNG · 100m-Primär + 50m-Fein
 
-Immer zwei Auflösungen rechnen — 1km-Output + 200m-Forensik.
+Drei Auflösungen aus `topography` (v3.12): **1km-Output** (Übersicht) + **100m-Primär** (`buckets`, feiner als die alten 200m) + **50m-Fein** (`fine_buckets`) — der 50m-Layer wird **nur in/um die Steil-Zonen** (Notable, |Grade|≥2%, je 1 Nachbar) emittiert, damit Anstieg→Abstieg-Paare im Detail sichtbar sind, ohne den ganzen Lauf in 50m-Zeilen zu kippen. **Bei Steil-Zonen IMMER den 50m-`fine_buckets`-Read zeigen** — er deckt den echten Peak-Grade auf, den die gröbere Auflösung wegmittelt (validiert: km3,5-Hügel 50m = +4,9% Peak vs 200m-Mittel 2,9%).
 
 | Schwelle | Aktion |
 |---|---|
-| Grade >+2% über ≥200m | PFLICHT 200m-Detail im Topo-Block |
-| Grade <-2% über ≥200m | PFLICHT Abstieg-Detail (Free-Speed) |
-| Anstieg + direkt anschließender Abstieg | BEIDE im Topo-Block — Hügel-Pattern hat Pre-Climb + Climb + Descent |
+| Grade >+2% über ≥100m | PFLICHT 100m-Detail + 50m-`fine_buckets`-Zoom im Topo-Block |
+| Grade <-2% über ≥100m | PFLICHT Abstieg-Detail (Free-Speed) aus 50m-Fein |
+| Anstieg + direkt anschließender Abstieg | BEIDE im Topo-Block — Hügel-Pattern hat Pre-Climb + Climb + Descent (50m-Fein macht das Paar scharf) |
 | Δ ≥4m über ≤400m | PFLICHT „Hügel-Hotspot"-Markierung |
 | Walking >30% in Bucket | PFLICHT §0g Sub-Lap-Forensik |
 
@@ -508,7 +511,7 @@ Was er intern macht und als kompaktes JSON (Aggregate-only) liefert:
 - **`splits_km`** + **Records**: Sekunden-Streams werden zu KM-Buckets + running-only Aggregaten verdichtet (Cadence `(cadence + fractional_cadence) × 2`, Speed `enhanced_speed` sonst `speed`).
 - **v3.5 Walking-Filter** (Kadenz <140 & Speed <2,0; Standstill separat) → `summary.walk_pct`, `df_run`-Aggregate (§4).
 - **`workout` / `workout_step`** → `meta.workout_name`; die Soll-Ist-pro-Rep-Struktur liefert `parse_workout.py` (§3b).
-- **`topography`**: 200m-Buckets aus dem VOLLEN Datensatz (nicht walking-gefiltert), `enhanced_altitude` sonst `altitude`, Grade pro Bucket.
+- **`topography`**: 100m-Primär-Buckets + 50m-`fine_buckets` (nur Steil-Zonen) aus dem VOLLEN Datensatz (nicht walking-gefiltert), `enhanced_altitude` sonst `altitude`, Grade pro Bucket (§0h).
 - Zusätzlich: `hr_zones`, `run_form`, `best_values`, `sprint_last_60s`, `decoupling`, `pace_at_z2`.
 
 Lies diese JSON-Felder — rekonstruiere keine FIT-Logik im Kopf.
@@ -864,7 +867,7 @@ PFLICHT-Zeilen u.a.: Distanz, Pace Ø, Pace Ø running-only, HR Ø/Max, Power Ø
 [Bei Walking >10% UND Source-Divergenz >5spm: ⚠️-Hinweis-Zeile über Tabelle, sonst weglassen]
 
 ## 🏞️ Topografie
-[1km-Tabelle + 200m-Detail bei Trigger]
+[1km-Tabelle + 100m-Primär + 50m-Fein-Zoom (`fine_buckets`) an Steil-Zonen — §0h]
 
 ## 📈 Lap-Verlauf
 [Tabelle: KM | Pace | HR | Zone | Power | Cadence | GCT | VO | Stride | Ascent]
@@ -996,7 +999,7 @@ KEINE Cutoff-Panik aus methodisch ungültigen Metriken oder neuromuskulärer Erm
 - §0d Modell-Name korrekt?
 - §0f Quellen-Disziplin? (NUR bei Doppel-Trigger)
 - §0g Sub-Lap-Forensik MIT §0h Topo-Cross-Check?
-- §0h 200m-Topo-Hochauflösung MIT Anstieg+Abstieg-Pair?
+- §0h 100m-Primär + 50m-Fein-Topo MIT Anstieg+Abstieg-Pair?
 - §9c Parkrun-Auto-Detection MIT 4-Kriterien-Lock?
 - §9d Qualberg-Overlay NUR bei Qualberg-Strecke + Parkrun-Detect = TRUE?
 - §12b Output-Hygiene: keine §-Verweise, keine Formel-Blocks, keine PNG?
@@ -1134,7 +1137,7 @@ Weggelassen: Topografie-Detail, Bestwerte, HM-Projektion.
 | Gewicht fehlt | ./data/live.md / Trainings_v5 |
 | CTL/ATL fehlen | Block überspringen |
 | Sa 4,8-5,5 km 08:30-09:30 | Parkrun-Auto-Detection → GPS-Check → Qualberg-Mapping |
-| Grade >+2% über ≥200m | PFLICHT 200m-Detail-Block |
+| Grade >+2% über ≥100m | PFLICHT 100m-Detail + 50m-Fein-Block |
 | Cadence-Drop + Grade >+2% | Berg-Walking, KEINE Verschnaufpause |
 | Intervall-Lap-Pace >0,5 min/km über Ziel | Sub-Lap-Forensik PFLICHT |
 | Walking-Anteil >10% in Workout | Quellen-Disziplin PFLICHT (beide Werte) |

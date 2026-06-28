@@ -30,15 +30,17 @@ DEFAULT_TZ = os.environ.get("SENPAI_TZ", "Europe/Berlin")
 def local_now(tz: str = DEFAULT_TZ, now: datetime | None = None) -> datetime:
     """Aktuelle lokale Zeit in `tz`.
 
-    `now` (tz-aware ODER naiv→als UTC interpretiert) ist injizierbar für Tests;
-    ohne `now` wird die System-Uhr gelesen (der EINZIGE impure Punkt im Modul).
+    `now` ist injizierbar (Test/Override) — **naiv = bereits LOKALE Zeit in `tz`**
+    (so liest sich `--now 2026-07-04T08:00` als 08:00 Berlin, wie in den CLI-
+    Beispielen gemeint); ein tz-aware `now` wird in `tz` umgerechnet. Ohne `now`
+    wird die System-Uhr gelesen (der EINZIGE impure Punkt im Modul).
     """
     z = ZoneInfo(tz)
     if now is None:
         return datetime.now(z)
     if now.tzinfo is None:
-        now = now.replace(tzinfo=ZoneInfo("UTC"))
-    return now.astimezone(z)
+        return now.replace(tzinfo=z)   # naiv = schon lokale Zeit (kein UTC-Shift)
+    return now.astimezone(z)           # tz-aware → in Ziel-TZ umrechnen
 
 
 def time_window(dt: datetime) -> str:
@@ -73,7 +75,7 @@ def parse_now(s: str | None) -> datetime | None:
 def main(argv=None):
     p = argparse.ArgumentParser(description="Deterministische lokale Zeit (System-Uhr → TZ).")
     p.add_argument("--tz", default=DEFAULT_TZ, help=f"IANA-Zeitzone (default: {DEFAULT_TZ})")
-    p.add_argument("--now", help="ISO8601-Zeit injizieren (Test/Override); sonst System-Uhr")
+    p.add_argument("--now", help="ISO8601 LOKALE Zeit injizieren (z. B. 2026-07-04T08:00 = 08:00 in --tz); sonst System-Uhr")
     args = p.parse_args(argv)
     dt = local_now(args.tz, parse_now(args.now))
     print(

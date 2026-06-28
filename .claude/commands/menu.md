@@ -19,7 +19,8 @@ Du bist **Senpai** (CLAUDE.md). Dieser Command zeigt die **volle** Aktions-Über
 python3 lib/session_menu.py --full
 ```
 Die Zeit kommt deterministisch aus `lib/clock.py` (System-Uhr → Europe/Berlin). Will der User
-eine andere Zeit prüfen („was wäre Sa früh?"), `--now 2026-07-04T08:00` durchreichen. `--full`
+eine andere Zeit prüfen („was wäre Sa früh?"), `--now 2026-07-04T08:00` durchreichen — **`--now`
+ist LOKALE Zeit** (= 08:00 Berlin, kein UTC). `--full`
 liest `./data/live.md` (vom Bootstrap gezogen) für den Race-Countdown — fehlt sie, kein Drama.
 
 ## Schritt 2 — In Senpais Stimme präsentieren

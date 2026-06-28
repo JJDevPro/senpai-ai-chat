@@ -22,14 +22,15 @@ def _b(h, m=0):
     return datetime(2026, 6, 28, h, m, tzinfo=BERLIN)
 
 
-def test_local_now_converts_naive_utc_to_berlin():
-    # naiv-UTC wird als UTC interpretiert und nach Berlin umgerechnet (Sommer +2h).
+def test_local_now_naive_is_local_time():
+    # naiv = bereits lokale Zeit in tz (KEIN UTC-Shift) — so wie --now gemeint ist.
     dt = clock.local_now("Europe/Berlin", datetime(2026, 6, 28, 19, 43))
-    assert (dt.hour, dt.minute) == (21, 43)
+    assert (dt.hour, dt.minute) == (19, 43)
     assert dt.tzinfo is not None
 
 
-def test_local_now_respects_aware_input():
+def test_local_now_aware_utc_is_converted():
+    # tz-aware UTC wird in die Ziel-TZ umgerechnet (Sommer +2h).
     aware = datetime(2026, 6, 28, 12, 0, tzinfo=ZoneInfo("UTC"))
     assert clock.local_now("Europe/Berlin", aware).hour == 14  # +2 CEST
 
@@ -68,6 +69,6 @@ def test_cli_smoke(capsys):
     rc = clock.main(["--now", "2026-06-28T19:43", "--tz", "Europe/Berlin"])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "21:43" in out          # UTC 19:43 -> CEST 21:43
-    assert "bedtime=False" in out  # 21:43 < 22:00
+    assert "19:43" in out          # naiv = lokale Zeit (kein Shift)
+    assert "bedtime=False" in out  # 19:43 < 22:00
     assert "window=abend" in out

@@ -55,6 +55,13 @@ def test_hud_sunday_evening_payload_bedtime_and_tomorrow_monday():
     assert "Morgen:" in h and "Mo" in h  # forward-looking
 
 
+def test_hud_training_day_late_evening_shows_post_training():
+    # Mo 22:30 (Run-Slot 20:00 durch) -> Post-Training-Nudge trotz nacht-Fenster.
+    h = sm.build_hud(_b("2026-06-29", 22, 30), "", "", full=False)
+    assert "nach Training" in h
+    assert "Bedtime" in h          # >= 22:00 feuert auch
+
+
 def test_hud_full_lists_skill_index():
     h = sm.build_hud(_b("2026-06-29", 9), "", "", full=True)
     assert "Skills & Commands" in h

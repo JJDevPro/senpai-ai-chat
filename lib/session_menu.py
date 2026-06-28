@@ -92,7 +92,10 @@ def _now_actions(dt, day) -> list[str]:
     # Pre-Slot: Trainingstag + Slot in den nächsten ~2h
     if is_training and day["slot_hour"] is not None and 0 <= day["slot_hour"] - h <= 2:
         acts.append('Pre-Lauf/Gym: „wetter" + Aufwärm-Check')
-    if w == "abend" and is_training:
+    # Nach dem Training (Slot durch): abends UND früh-nachts — ein 20:00-Lauf
+    # wird oft erst nach 22:00 gemeldet (sonst fiele der Nudge ins „nacht"-Loch).
+    if (is_training and day["slot_hour"] is not None
+            and h >= day["slot_hour"] and w in ("abend", "nacht")):
         acts.append('nach Training: „analysier den Lauf" / „Gym-Report"')
     if clock.is_bedtime_window(dt):
         acts.append("🌙 Bedtime ≤00:30 — Handy weg")
@@ -175,7 +178,7 @@ def main(argv=None):
     )
     p.add_argument("--full", action="store_true", help="volle Liste + kompletter Skill-Index (für /menu)")
     p.add_argument("--tz", default=clock.DEFAULT_TZ, help=f"Zeitzone (default: {clock.DEFAULT_TZ})")
-    p.add_argument("--now", help="ISO8601-Zeit injizieren (Test/Override)")
+    p.add_argument("--now", help="ISO8601 LOKALE Zeit injizieren (z. B. 2026-07-04T08:00 = 08:00 in --tz)")
     p.add_argument("--out", default=DEFAULT_OUT, help="lokaler Ordner mit live.md (default: ./data)")
     args = p.parse_args(argv)
 

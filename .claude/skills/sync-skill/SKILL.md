@@ -59,6 +59,18 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 
 ---
 
+## 3.5 Memory-Konsolidierung (T8 — autonom, sichtbar)
+
+Beim Sync die episodischen Journal-Einträge ins Langzeit-Memory destillieren (claude.ai-artige Memory-Konsolidierung). Autonom + sichtbar (Diff zeigen), idempotent — nie still:
+```bash
+python3 lib/consolidate.py --target learnings  --as-of {heute}   # wiederkehrende Muster → learnings.md
+python3 lib/consolidate.py --target baselines  --as-of {heute}   # neue PRs/Baselines → baselines.md
+```
+- Promotet NUR durable Erkenntnisse, dedupt gegen den Bestand (kein Re-Promote), patcht + uploadet `learnings.md`/`baselines.md` sichtbar (gemäß CLAUDE.md §0). Fehlt eine Datei → Pre-Seed-Hinweis, nicht blockieren.
+- Nichts Neues im Journal → no-op (kein leerer Patch). Truth-Ordner + Personal-Module bleiben read-only.
+
+---
+
 ## 4. Output (knapp)
 
 ```

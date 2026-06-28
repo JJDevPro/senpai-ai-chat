@@ -101,4 +101,14 @@ Payload-Block am Chat-Anfang erkannt (`# 📦 PAYLOAD KW...`):
 
 ---
 
+## 5. Archiv (T7, NACH dem Block, best-effort)
+
+Nach der Payload-Ausgabe den Block ins rollende Journal archivieren (ändert die Ausgabe NICHT — reiner Post-Schritt):
+```bash
+python3 lib/archive.py --report - --kind payload --date {kw_sonntag}   # Payload-Block via stdin
+```
+Fehlt `senpai-journal.md` → Pre-Seed-Hinweis melden, nicht blockieren. (`live.md`-Regeneration bleibt der separate Write-Back-Schritt.)
+
+---
+
 **Ende payload-skill v1.0.** Code-Fence only. Felder vollständig oder `[?]`. V3, nicht V2.

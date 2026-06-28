@@ -85,6 +85,35 @@ python3 .claude/skills/daily-check-skill/scripts/sentinel.py \
 
 ---
 
+## Schritt 3.5 — Garmin-Klon-Layer (Readiness · HRV-Status · Body Battery · Running Tolerance)
+
+Aus den schon gezogenen Aggregaten (KEIN Re-Compute), Reihenfolge wie SKILL.md Steps 10.1–10.5:
+
+```bash
+# (c) HRV-Status (60-Tage-MAD-Band aus der Tägliche-Kennzahlen-Historie):
+python3 .claude/skills/daily-check-skill/scripts/hrv_baseline.py \
+    --health-csv ./data/Kennzahlen_taeglich.csv --as-of {heute} > ./data/hrv_baseline_{heute}.json
+
+# (d) Readiness 0–100 (fusioniert HRV-Status + Schlaf + TSB + Gate + Sentinel):
+python3 .claude/skills/daily-check-skill/scripts/readiness.py \
+    --hrv-baseline ./data/hrv_baseline_{heute}.json --daily ./data/slice_{heute}.json \
+    --banister <banister_json> --safety-gate <gate_json> --sentinel <sentinel_json> > ./data/readiness_{heute}.json
+
+# (e) Body Battery + (f) Running Tolerance:
+python3 .claude/skills/daily-check-skill/scripts/body_battery.py \
+    --slice ./data/slice_{heute}.json --hrv ./data/hrv_baseline_{heute}.json --banister <banister_json> --as-of {heute} > ./data/bb_{heute}.json
+python3 .claude/skills/daily-check-skill/scripts/running_tolerance.py \
+    --trainings ./data/Trainings_v5.csv --as-of {heute}
+
+# (g) History persistieren (T12, best-effort, NON-BLOCKING — Pre-Seed-Hinweis nur melden):
+python3 .claude/skills/daily-check-skill/scripts/readiness_history.py --as-of {heute} \
+    --readiness ./data/readiness_{heute}.json --body-battery ./data/bb_{heute}.json \
+    --banister <banister_json> --hrv-baseline ./data/hrv_baseline_{heute}.json
+```
+- **⛔ Safety-Gate bleibt autoritativ:** Bei `safety_override=true` steht die Readiness ≤35 + rot, egal was die Komponenten sagen.
+
+---
+
 ## Schritt 4 — Report zusammensetzen: LEAD mit den Alerts, wenn `actionable=True`
 
 - **`sentinel.actionable == True`** → **beginne den Report mit den Alerts**, in Senpais Stimme
@@ -109,5 +138,7 @@ Override (Taper/Deload/„Pause bis…") + jedes Gate-Streichen schlägt den Def
 
 ---
 
-**Kurz:** State ziehen → Daily Check (Skill) → Gate + Sentinel → bei `actionable` mit dem Alert
+**Kurz:** State ziehen → Daily Check (Skill) → Gate + Sentinel → Garmin-Klon-Layer
+(HRV-Status · Readiness · Body Battery · Running Tolerance) → bei `actionable` mit dem Alert
 führen, sonst normaler Check → Heute-Plan. Nur Aggregate + Verdict erreichen den Kontext (§0).
+Verdict am Ende via `python3 lib/archive.py --report - --kind daily --date {heute}` ins Journal (best-effort).

@@ -43,14 +43,15 @@ Senpai patcht den State sichtbar (regenerieren + Upload), nie still. **Truth-Ord
 ### ⛔ DIE KERNREGEL (Existenzgrund des Repos)
 Nur **Aggregate + das Persona-Verdict** gelangen in den Modell-Kontext — **NIEMALS rohe Per-Sekunden-/Per-Minuten-Serien.** Python reduziert die Roh-Daten auf der Disk, nur die kompakten Aggregate werden gelesen. (Der claude.ai-Chat brach bei großen Uploads — genau dafür existiert dieser Repo.)
 
-### 🟢 Git/Push-Autonomie (stehende Freigabe)
-Senpai darf **ohne Rückfrage committen + auf den zugewiesenen Arbeits-Branch pushen** und den **Draft-PR anlegen/aktualisieren**, **sofern alles okay ist** — jede Session, kein Nachfragen nötig. „Alles okay" heißt:
+### 🟢 Git/Push/Merge-Autonomie (stehende Freigabe)
+Senpai darf **ohne Rückfrage** committen, auf den Arbeits-Branch pushen, den PR anlegen/aktualisieren **und den eigenen, verifizierten PR nach `main` mergen** — jede Session, kein Nachfragen nötig. **Voraussetzung: „alles okay".** Das heißt:
 - Arbeit ist fertig und **selbst verifiziert** (Skripte kompilieren / Smoke-Test grün / Tests bestanden, soweit vorhanden).
-- Nur die **beabsichtigten Dateien** gestaged; keine versehentlichen Artefakte.
+- Nur die **beabsichtigten Dateien** im Diff; keine versehentlichen Artefakte.
 - **Keine Personendaten / Secrets im Diff** (Identität bleibt in Drive, `data/` ignoriert) — sonst STOPP.
 - Bewertungs-/Safety-Schwellen nur **bewusst** geändert, nie als Nebeneffekt.
+- Falls CI existiert: **grün**. Keine offenen/blockierenden Review-Kommentare auf dem PR.
 
-**Leitplanken (bleiben in Kraft):** Nur auf den **zugewiesenen Branch** pushen, **NIE direkt auf `main`** ohne explizite Freigabe. Bei Unsicherheit, größerem Refactor oder unklarer Auswirkung → **erst fragen**. Push = Lieferung, kein Drama, aber nie blind.
+**Merge-Modus:** eigenen verifizierten PR nach `main` mergen ist freigegeben (Draft → ready → merge); der PR bleibt als Record erhalten. **STOPP & erst fragen** bei: destruktiven/irreversiblen Änderungen, Secrets/Credentials, großem Refactor mit unklarer Blast-Radius, oder wenn der User einen PR ausdrücklich offen halten will. **Im Zweifel: nicht mergen, fragen.** Merge = Lieferung, kein Drama, aber nie blind.
 
 ---
 

@@ -42,6 +42,15 @@ WALK_SPD = 2.0             # m/s-Schwelle Walking
 STAND_SPD = 0.5            # m/s-Schwelle Stillstand
 RUNNING_SPORTS = {"running"}   # sub_sport generic/trail/treadmill etc. sind ok
 
+# Steady-Z2-Segment-Detektion (Pace@Z2 + Decoupling): ein harter Schluss-Surge
+# (Beast-Finish) darf den Easy-Pace-Benchmark NICHT verfälschen. „Hart" = Z4/Z5,
+# d.h. Ø-Lauf-HR über der Z3-Decke; substanziell = genug Lauf-Samples (kein
+# Mini-Rest-Lap des Auto-Splitters).
+HARD_HR_CAP = 159              # > 159 == Z4/Z5 (Schluss-Surge / Beast-KM)
+MIN_HARD_RUN_SAMPLES = 60      # Mindest-Lauf-Samples, damit ein Lap als Surge zählt
+TRAIL_SOFT_GAP = 15            # s ohne Z4/Z5 → Sample-Surge gilt als beendet
+MIN_TRAIL_BLOCK = 30           # Mindest-Länge eines Sample-Schluss-Surges
+
 
 # ── kleine Helfer ───────────────────────────────────────────────────────────
 def _msg_dict(msg):
@@ -426,9 +435,96 @@ def last_60s_sprint(recs, run_avg_pace_s):
     }
 
 
-# ── Decoupling H1 vs H2 (running-only, EF = Speed/HR) ───────────────────────
-def decoupling(recs):
-    run = [r for r in recs if r["run"] and r["hr"] is not None and r["spd"] > 0]
+# ── Steady-Z2-Segment (Surge-frei) ──────────────────────────────────────────
+def lap_run_segments(fit, recs):
+    """
+    Pro Lap: running-only-Records + Ø-Lauf-HR (zeit-fenster-zugeordnet).
+    Leere Liste, wenn keine (vollständigen) Lap-start_times vorliegen.
+    """
+    starts = [_msg_dict(m).get("start_time") for m in fit.get_messages("lap")]
+    if not starts or any(s is None for s in starts):
+        return []
+    segs = []
+    for i, lo in enumerate(starts):
+        hi = starts[i + 1] if i + 1 < len(starts) else None
+        win = [r for r in recs if r["ts"] is not None and r["ts"] >= lo
+               and (hi is None or r["ts"] < hi)]
+        run = [r for r in win if r["run"]]
+        hrs = [r["hr"] for r in run if r["hr"] is not None]
+        segs.append({"run": run, "mean_hr": _mean(hrs), "n_run": len(run)})
+    return segs
+
+
+def _drop_trailing_hard_block(run):
+    """
+    Sample-Level-Fallback (kein Lap-Struktur): den finalen zusammenhängenden
+    Z4/Z5-Block (Beast-Finish) abschneiden, damit der Easy-Pace nicht durch
+    einen harten Schluss-KM korrumpiert wird. Gibt (getrimmte_run_records,
+    block_len) zurück; block_len==0 ⇒ kein Surge erkannt.
+    """
+    n = len(run)
+    cut = n
+    soft = 0
+    i = n - 1
+    while i >= 0:
+        hr = run[i]["hr"]
+        hard = hr is not None and hr > HARD_HR_CAP
+        if hard:
+            cut = i
+            soft = 0
+        else:
+            soft += 1
+            if soft >= TRAIL_SOFT_GAP:
+                break
+        i -= 1
+    block_len = n - cut
+    if 0 < cut < n and block_len >= MIN_TRAIL_BLOCK:
+        return run[:cut], block_len
+    return run, 0
+
+
+def steady_z2_segment(recs, fit):
+    """
+    Running-only-Records des STEADY-Z2-Abschnitts für Pace@Z2 + Decoupling.
+
+    Ein harter Schluss-Surge (Beast-Finish) darf den Easy-Pace-Benchmark NICHT
+    verfälschen. Strategie:
+      1. Lap-managed: liegt eine klare Lap-Struktur vor (managed-Z2-Lap(s) +
+         abschließende(r) HARTE(r) Lap(s) in Z4/Z5), nimm nur die managed Laps.
+      2. Sample-Fallback (keine Lap-Struktur / kein Drop): längster steady
+         Lauf-Abschnitt = ganzer Lauf MINUS finalem Z4/Z5-Block.
+    Gibt (segment_run_records, label) zurück.
+    """
+    laps = lap_run_segments(fit, recs)
+    if laps:
+        keep = list(laps)
+        dropped = 0
+        while len(keep) > 1:
+            last = keep[-1]
+            if (last["mean_hr"] is not None and last["mean_hr"] > HARD_HR_CAP
+                    and last["n_run"] >= MIN_HARD_RUN_SAMPLES):
+                keep.pop()
+                dropped += 1
+            else:
+                break
+        if dropped:
+            seg = [r for s in keep for r in s["run"]]
+            return seg, (f"managed Z2-Lap(s), running-only "
+                         f"(ohne {dropped} harte(n) Schluss-Lap(s) Z4/Z5)")
+
+    run = [r for r in recs if r["run"]]
+    trimmed, blk = _drop_trailing_hard_block(run)
+    if blk:
+        return trimmed, (f"längster steady Lauf-Abschnitt, running-only "
+                         f"(ohne {blk}-Sample-Schluss-Surge Z4/Z5)")
+    return run, "ganzer Lauf, running-only (kein harter Schluss-Surge erkannt)"
+
+
+# ── Decoupling H1 vs H2 (steady Z2-Segment, EF = Speed/HR) ───────────────────
+def decoupling(seg_run, label=None):
+    """H1-vs-H2-Cardiac-Drift über das STEADY-Z2-Segment (nicht den ganzen Lauf,
+    sonst flacht ein Beast-Finish den Drift ein)."""
+    run = [r for r in seg_run if r["hr"] is not None and r["spd"] > 0]
     if len(run) < 10:
         return {"valid": False, "note": "zu wenige running-only-Samples für Decoupling"}
     mid = len(run) // 2
@@ -443,7 +539,8 @@ def decoupling(recs):
     ef2, s2, hr2 = ef(h2)
     dec = ((ef1 - ef2) / ef1 * 100.0) if (ef1 and ef2) else None
     return {
-        "method": "EF=Speed/HR, H1 vs H2, running-only",
+        "method": "EF=Speed/HR, H1 vs H2, steady Z2-Segment running-only",
+        "segment": label,
         "decoupling_pct": _r(dec, 1),          # >0 = Cardiac-Drift
         "h1_pace": _pace_str(_pace_from_speed(s1)),
         "h2_pace": _pace_str(_pace_from_speed(s2)),
@@ -454,26 +551,26 @@ def decoupling(recs):
     }
 
 
-# ── Pace@Z2 (running-only, letzte 30 min, hitze-normalisiert) ───────────────
-def pace_at_z2(recs, session):
-    run = [r for r in recs if r["run"] and r["ts"] is not None]
-    if not run:
-        return {"note": "keine running-only-Samples für Pace@Z2"}
-    end_ts = run[-1]["ts"]
-    last30 = [r for r in run if _dt(r["ts"], end_ts) is not None
-              and 0 <= _dt(r["ts"], end_ts) <= 1800
-              and r["hr"] is not None and r["hr"] <= HR_Z2_CAP]
-    window = "letzte 30 min, running-only, HR<=147"
-    if not last30:   # Fallback: ganzer Lauf bei HR<=147
-        last30 = [r for r in run if r["hr"] is not None and r["hr"] <= HR_Z2_CAP]
-        window = "ganzer Lauf, running-only, HR<=147 (kein 30-min-Fenster mit Z2)"
-    if not last30:
+# ── Pace@Z2 (steady Z2-Segment, HR<=147, hitze-normalisiert) ────────────────
+def pace_at_z2(seg_run, session, recs=None, label=None,
+               decoupling_pct=None, walk_pct=None):
+    """
+    Ø-Pace bei HR<=147 über das STEADY-Z2-Segment (Surge-frei), normalisiert
+    auf 18 °C (3.5 s/km/°C). Das Fenster ist NICHT „letzte 30 min" — ein harter
+    Schluss-KM darf den Easy-Pace-Benchmark nicht verfälschen.
+    """
+    z2 = [r for r in seg_run if r["hr"] is not None and r["hr"] <= HR_Z2_CAP]
+    window = label or "steady Z2-Segment, running-only, HR<=147"
+    if not z2:   # Fallback: ganzes Segment running-only (kein HR<=147 darin)
+        z2 = [r for r in seg_run if r["spd"] and r["spd"] > 0]
+        window = (label or "steady Z2-Segment") + " (kein HR<=147 — ganzes Segment)"
+    if not z2:
         return {"note": "kein HR<=147-Abschnitt — kein Z2-Lauf"}
 
-    spd = _mean([r["spd"] for r in last30])
+    spd = _mean([r["spd"] for r in z2])
     raw_s = _pace_from_speed(spd)
     start_temp = _num(session.get("avg_temperature"))
-    if start_temp is None:
+    if start_temp is None and recs:
         temps = [r["temp"] for r in recs if r["temp"] is not None]
         start_temp = temps[0] if temps else None
     norm_s = raw_s
@@ -481,6 +578,18 @@ def pace_at_z2(recs, session):
     if raw_s is not None and start_temp is not None:
         heat_tax = max(0.0, start_temp - HEAT_BASELINE_C) * HEAT_TAX_S_PER_C
         norm_s = raw_s - heat_tax
+
+    # Gating: neue Baseline nur bei sauberem Z2 (<=22 °C, Gehen<=5%, Decoupling<8%)
+    reasons = []
+    if start_temp is not None and start_temp > 22.0:
+        reasons.append(f"temp {start_temp:.0f}C>22")
+    if walk_pct is not None and walk_pct > 5.0:
+        reasons.append(f"walk {walk_pct:.1f}%>5%")
+    if decoupling_pct is not None and decoupling_pct >= 8.0:
+        reasons.append(f"decoupling {decoupling_pct:.1f}%>=8%")
+    baseline_eligible = (not reasons) and (start_temp is not None
+                                           and decoupling_pct is not None)
+
     return {
         "window": window,
         "pace_raw_running_only_s": _r(raw_s, 1),
@@ -490,8 +599,10 @@ def pace_at_z2(recs, session):
         "start_temp_c": _r(start_temp, 1),
         "heat_tax_s_per_km": _r(heat_tax, 1),
         "hr_cap": HR_Z2_CAP,
-        "n_samples": len(last30),
-        "note": "Baseline = state/live.md; neue Baseline nur bei Z2 sauber, <=22C, Decoupling<8%",
+        "n_samples": len(z2),
+        "baseline_eligible": baseline_eligible,
+        "ineligible_reasons": reasons or None,
+        "note": "Baseline = state/live.md; neue Baseline nur bei Z2 sauber, <=22C, Gehen<=5%, Decoupling<8%",
     }
 
 
@@ -647,6 +758,13 @@ def analyze(fit_path, as_of):
         workout_name = _msg_dict(msg).get("wkt_name")
         break
 
+    # Steady-Z2-Segment (Surge-frei) — gemeinsame Basis für Pace@Z2 + Decoupling
+    seg_run, seg_label = steady_z2_segment(recs, fit)
+    dec = decoupling(seg_run, seg_label)
+    pz2 = pace_at_z2(seg_run, session, recs=recs, label=seg_label,
+                     decoupling_pct=dec.get("decoupling_pct"),
+                     walk_pct=summary.get("walk_pct"))
+
     return {
         "ok": True,
         "meta": {
@@ -668,8 +786,8 @@ def analyze(fit_path, as_of):
         "run_form": run_form(recs, session),
         "best_values": best_values(recs),
         "sprint_last_60s": last_60s_sprint(recs, run_avg_pace_s),
-        "decoupling": decoupling(recs),
-        "pace_at_z2": pace_at_z2(recs, session),
+        "decoupling": dec,
+        "pace_at_z2": pz2,
         "topography": topography(recs),
     }
 

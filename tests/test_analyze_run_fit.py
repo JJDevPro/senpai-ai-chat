@@ -268,3 +268,63 @@ def test_decoupling_too_few_samples_invalid():
     seg = [_mkrec(i, 142, 1.9) for i in range(5)]
     dec = arf.decoupling(seg)
     assert dec["valid"] is False
+
+
+# ---------------------------------------------- T4: Vertical Ratio (per km/lap)
+def _mkfull(sec, dist, hr=145, spd=1.85, spm=170.0, vo=90.0, stride=1100.0,
+            vr=None, run=True):
+    """Vollständiges internes Record-Dict (Form-Felder), wie extract_records es liefert."""
+    return {"ts": _T0 + timedelta(seconds=sec), "hr": hr, "spd": spd, "alt": None,
+            "dist": dist, "spm": spm if run else 100.0, "power": None, "gct": 250.0,
+            "vo": vo, "stride": stride, "vr": vr, "temp": None,
+            "run": run, "walk": not run, "stand": False}
+
+
+def test_vr_pct_native_preferred():
+    # native vertical_ratio present -> used directly (median), VO/stride ignored.
+    run = [_mkfull(i, i, vr=11.5) for i in range(5)]
+    assert arf._vr_pct(run) == 11.5
+
+
+def test_vr_pct_reconstructed_from_vo_stride_when_native_absent():
+    # Apple-Watch case: no native vr -> reconstruct VO/stride*100. 90/1100*100 ≈ 8.18.
+    run = [_mkfull(i, i, vo=90.0, stride=1100.0, vr=None) for i in range(5)]
+    assert round(arf._vr_pct(run), 2) == 8.18
+
+
+def test_vr_pct_none_when_nothing_derivable():
+    run = [_mkfull(i, i, vo=None, stride=None, vr=None) for i in range(3)]
+    assert arf._vr_pct(run) is None
+
+
+def test_km_splits_emit_vr_pct():
+    # one km bucket (dist 0..900), Apple-shape (no native vr) -> reconstructed VR present.
+    recs = [_mkfull(i, i * 100, vo=90.0, stride=1100.0, vr=None) for i in range(10)]
+    splits = arf.km_splits(recs)
+    assert splits and "vr_pct" in splits[0]
+    assert round(splits[0]["vr_pct"], 1) == 8.2
+
+
+# ---------------------------------------------- T3: optical HR cadence-lock flag
+def test_hr_source_warn_detects_cadence_lock():
+    # HR ≈ spm (170) sustained -> classic optical lock reading too high.
+    recs = [_mkrec(i, 170, 1.85) for i in range(200)]   # _mkrec sets spm=170 for run
+    w = arf.hr_source_warn(recs)
+    assert w["optical_cadence_lock_suspected"] is True
+    assert w["locked_fraction_pct"] == 100.0
+    assert w["longest_locked_stretch_s"] >= arf.LOCK_MIN_SUSTAIN_S
+
+
+def test_hr_source_warn_clean_run_not_flagged():
+    # real Z2 HR 145, cadence 170 -> min(|145-170|,|145-85|)=25 > tol -> no lock.
+    recs = [_mkrec(i, 145, 1.85) for i in range(200)]
+    w = arf.hr_source_warn(recs)
+    assert w["optical_cadence_lock_suspected"] is False
+    assert w["locked_fraction_pct"] == 0.0
+
+
+def test_hr_source_warn_too_few_samples():
+    recs = [_mkrec(i, 170, 1.85) for i in range(10)]
+    w = arf.hr_source_warn(recs)
+    assert w["optical_cadence_lock_suspected"] is False
+    assert "zu wenige" in w["note"]

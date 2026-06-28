@@ -35,7 +35,7 @@ Step 0:  KEIN Tool-Setup nötig — alle Daten kommen lokal via `python3 lib/pul
          `./data` + die gebündelten Scripts unter `.claude/skills/daily-check-skill/scripts/`.
          Drive ist read-only SoT (NIE zurückschreiben). Alle Aufrufe vom Repo-Root (CWD).
 Step 1a: DATUM (Tag/Wochentag/KW) — NICHT aus API: User-Angabe → sonst Claudes internes Datum.
-Step 1b: UHRZEIT (HH:MM): User-Angabe → Kontext-Ableitung → Datei-Timestamp → `[Zeit n/a]`. **KEINE API.**
+Step 1b: UHRZEIT (HH:MM): User-Angabe → **`lib/clock.py` (echte VM-Uhr → Europe/Berlin; der SessionStart-Hook druckt sie im 🗺️ HUD)** → `[Zeit n/a]` nur falls Clock-Read scheitert. CLAUDE.md §3. **Kein API, kein Raten.**
 Step 2:  Wochentag → Trainingstag (Mo/Mi/Sa/Do)? → Wetterochs-Flag (PROAKTIV — auch wenn Rest empfohlen wird; Wetter ist Entscheidungs-Input).
 Step 3:  ISO-KW + Montag dieser KW.
 Step 3.5: INPUT-TYP: (a) EIN Multi-Day-Export vorhanden (Range-Datei
@@ -273,8 +273,8 @@ Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` +
 ```
 🕒 HH:MM | 🌤️ [°C - Wetter ODER "kein Wetter"] | 🔋 Recovery-Ampel | 🤖 Emotion | 🧠 Modell
 ```
-**Datum/Wochentag** = User-Angabe → Claudes interner Kontext (zuverlässig, **NIE API**). **Uhrzeit** = User-Angabe → Kontext-Ableitung → Datei-Timestamp → `[Zeit n/a]` (kein Drama, nur fragen wenn für die Antwort nötig). **TimeAPI entfernt (v0.5).**
-> **B5-Zeit-Regel:** Ist die Uhr unsicher → lieber `[Zeit n/a]` als eine **halluzinierte Zeit** pinnen. Eine Schlaf-Aufwachzeit darf inhaltlich als „Wake HH:MM (abgeleitet)" zitiert werden, aber die **Header-Uhr bleibt konservativ** (`[Zeit n/a]`) — die Wake-Zeit NIE als aktuelle Uhrzeit ausgeben.
+**Datum/Wochentag + Uhrzeit** = **`lib/clock.py` (echte VM-Uhr → Europe/Berlin)**; **User-Angabe gewinnt** immer. Der Header zeigt die **echte lokale Zeit** (`HH:MM`), nicht mehr `[Zeit n/a]` als Default. CLAUDE.md §3. **(Der claude.ai-TimeAPI-Workaround ist obsolet — die VM hat eine echte Uhr.)**
+> **B5-Zeit-Regel:** Die Header-Uhr kommt aus `lib/clock.py`. Eine Schlaf-Aufwachzeit ist eine **inhaltliche** Angabe („Wake HH:MM") und NIE die Header-Uhr — die zwei nicht verwechseln. User-Angabe übersteuert den Clock.
 
 -----
 
@@ -518,7 +518,7 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 | **Trainings_v5 doppelte Zeilen (Sync-Müll)** | **§3g Dedup PFLICHT vor Banister (Script `dedup_trainings.py`); ohne Dedup explodiert ATL. Warnung in Output + Quelle-aufräumen-Hinweis.** |
 | **Trainings_v5 ohne CTL/ATL/TSB-Spalten** | **TRIMP nehmen/schätzen, CTL/ATL/TSB qualitativ, Hinweis "berechnet/geschätzt"** |
 | **Ruhetag (kein Training gestern)** | **Load-Block = Ruhe + CTL/ATL/TSB-Erholungs-Drift, kein TRIMP-Drama** |
-| Uhrzeit nicht ableitbar | `[Zeit n/a]`, kein Drama; nur fragen wenn nötig (Bedtime/Pre-Lauf). Datum bleibt aus Kontext |
+| Clock-Read scheitert (selten) | `[Zeit n/a]`, kein Drama; sonst kommt die Zeit aus `lib/clock.py` (echte VM-Uhr). Datum bleibt aus Kontext |
 | Wetterochs fail | nur die andere Quelle / `[kein Wetter]` |
 | Körperwaage-Wert im JSON | NICHT mehr „erwartet abwesend": Withings kann ihn ins HAE-JSON syncen → `body_comp` lesen (§3c). Vorhanden → als **off-protocol / NICHT SoT** zeigen (Datum/Zeit/Source). Echte Mo-nüchtern-SoT bleibt manuell gepostet |
 | Arrhythmie-Marker hoch | IGNORIEREN (HRV-Frequenz-Trick, kein med. Signal — siehe Medical-Notes im Athleten-Profil) |

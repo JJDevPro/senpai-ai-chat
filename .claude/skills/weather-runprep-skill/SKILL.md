@@ -8,7 +8,7 @@ description: "AI Coach Wetter- und Pre-Lauf-Engine für den Athleten (Heimatstad
 > Senpai lädt diese Datei bei Trainingstag/Lauf-/Wetter-Triggern.
 > **Trainingstage = Mo / Mi / Sa / Do.** Mo/Mi/Sa = Lauf-Slots. **Do = Gym (KEINE Klimaanlage, siehe Ausrüstung im Profil) + Flex-Regel-Tag** → auch hier wetterrelevant (§4).
 > **🎯 Kern-Prinzip: Wetter ist ENTSCHEIDUNGS-INPUT, kein Nachgang.** An einem Trainingstag wird die Vorhersage **VOR** der Rest-vs-Lauf-/Gym-Empfehlung gezogen — nicht erst, wenn der User „doch Lauf" sagt. Auch wenn Rest empfohlen wird: Wetter zuerst, dann Empfehlung (38°C stützt Rest; überraschend kühl kippt die Rechnung / triggert die Flex-Regel).
-> **Wochentag = bekanntes Kontextdatum (zuverlässig).** Uhrzeit-Hierarchie siehe Instructions §3.
+> **Wochentag + Uhrzeit = echte VM-Uhr** (`lib/clock.py`, CLAUDE.md §3). Slot-Zeiten sind fest (Sa 09:00, Mo/Mi 20:00, Do-Gym ≤21:30); der Clock sagt, ob ein Slot JETZT ansteht → Pre-Lauf-Fenster feuert verlässlich.
 > **Wetter-Source-Priorität:** User-Angabe (Apple-Weather-Screenshot/Temp) > Wetterochs > `[kein Wetter]`.
 
 ---

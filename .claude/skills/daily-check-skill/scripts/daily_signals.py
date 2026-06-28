@@ -28,9 +28,33 @@ from datetime import date, timedelta
 
 
 def _load(obj):
-    d = obj if isinstance(obj, dict) else json.load(open(obj, encoding="utf-8"))
-    data = d.get("data", d)
-    return {m["name"]: m for m in data.get("metrics", [])}
+    """Akzeptiert EINEN Pfad/Dict ODER eine LISTE davon (heute + gestern / Range).
+    Mehrere Quellen werden pro Metrik-Name gemergt: data-Arrays aneinandergehängt,
+    nach Zeitstempel dedupt + sortiert. So sieht daily_signals heute UND gestern →
+    der Vortag (daylight/audio `yesterday`) verhungert nie, auch wenn nur Tagesdateien
+    statt eines Range-Exports gezogen wurden (Daylight-Vortag-Fix)."""
+    objs = obj if isinstance(obj, (list, tuple)) else [obj]
+    merged = {}
+    for o in objs:
+        d = o if isinstance(o, dict) else json.load(open(o, encoding="utf-8"))
+        data = d.get("data", d)
+        for m in data.get("metrics", []):
+            name = m.get("name")
+            if not name:
+                continue
+            slot = merged.setdefault(
+                name, {"name": name, "units": m.get("units"), "data": [], "_seen": set()}
+            )
+            for p in m.get("data", []):
+                key = str(p.get("date", ""))
+                if key and key in slot["_seen"]:
+                    continue          # exakter Zeitstempel-Dup über Dateien → überspringen
+                slot["_seen"].add(key)
+                slot["data"].append(p)
+    for slot in merged.values():
+        slot["data"].sort(key=lambda p: str(p.get("date", "")))  # "letzte"=jüngste global
+        slot.pop("_seen", None)
+    return merged
 
 
 def _day(s):
@@ -221,10 +245,16 @@ def all_signals(json_obj, as_of=None):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(1)
-    print(json.dumps(all_signals(sys.argv[1]), ensure_ascii=False, indent=2))
+    import argparse
+    ap = argparse.ArgumentParser(
+        description="Tag-Signale aus HealthAutoExport-JSON(s). HEUTE + (optional) GESTERN/Range "
+        "übergeben — mehrere Dateien werden gemergt, damit der Vortag nie verhungert."
+    )
+    ap.add_argument("hae", nargs="+", help="HAE-JSON-Pfad(e): HEUTE zuerst, dann optional GESTERN bzw. ein Range-Export")
+    ap.add_argument("--as-of", dest="as_of", default=None,
+                    help="Bezugstag YYYY-MM-DD (pinnt today/yesterday); Default = letzter Tag im Export")
+    args = ap.parse_args()
+    print(json.dumps(all_signals(args.hae, as_of=args.as_of), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

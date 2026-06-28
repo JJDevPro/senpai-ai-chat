@@ -29,8 +29,9 @@ SKILLS = REPO_ROOT / ".claude" / "skills"
 
 # Script dirs that hold the modules under test.
 _SCRIPT_DIRS = [
-    SKILLS / "run-bundle-skill" / "scripts",   # analyze_run_fit, banister, dedup_trainings
+    SKILLS / "run-bundle-skill" / "scripts",   # analyze_run_fit, banister, dedup_trainings, pacing_card
     SKILLS / "daily-check-skill" / "scripts",  # slice_hae_day, safety_gate, daily_signals, banister, dedup
+    REPO_ROOT / "lib",                          # make_ics, pull_drive
 ]
 for _d in _SCRIPT_DIRS:
     p = str(_d)

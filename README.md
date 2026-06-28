@@ -48,6 +48,10 @@ Grund für den Repo: Der Claude.ai-Chat erstickte an den großen Roh-Uploads
    die State-Dateien + persönlichen Module einmal selbst in den Ordner; danach
    aktualisiert Senpai den State dort automatisch. (Die Start-Dateien liegen bereit; s.
    Morgen-Notiz.)
+   - **Zur Seed-Liste gehört auch eine leere `senpai-journal.md`** — das rollende
+     Coaching-Journal (s.u.). Aus demselben Quota-Grund kann der Service-Account es
+     **nicht selbst anlegen**: einmal leer reinlegen, danach hängt `archive.py` jeden
+     fertigen Report dort an.
 
 ## Usage (vom Handy)
 
@@ -57,3 +61,17 @@ Grund für den Repo: Der Claude.ai-Chat erstickte an den großen Roh-Uploads
   Verdict.
 
 State-Updates schreibt Senpai per `pull_drive.py --upload` zurück in den Drive-Ordner.
+
+### Coaching-Journal (rollende Historie)
+
+Fertige Reports werden mit `lib/archive.py` als datierte Abschnitte an **ein**
+markdown-Journal im Drive-Ordner angehängt — eine durchsuchbare Coaching-Historie:
+
+```bash
+python3 lib/archive.py --report ./data/daily.md --kind daily            # oder run|weekly|payload
+echo "Verdict…" | python3 lib/archive.py --report - --kind run --date 2026-06-28
+```
+
+Ablauf: zieht `senpai-journal.md` (via `pull_drive.py`), hängt
+`## [kind] YYYY-MM-DD\n<report>` an und lädt es per `files.update` zurück. Fehlt das
+Journal, bricht es mit einer Pre-Seed-Anweisung ab (legt es **nie** selbst an — Quota).

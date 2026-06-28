@@ -100,3 +100,29 @@ Trip-Wire feuert, statt brav zu warten, bis du fragst.
 
 Alles deterministisch: nur **Aggregate + Verdict** erreichen den Modell-Kontext, nie Roh-Serien
 (CLAUDE.md §0).
+
+---
+
+## 6. NEU (Claude-Code-VM): In-Repo-Cron via `/automation` — VORBEREITET, **INAKTIV**
+
+Die Claude-Code-VM hat **echtes Scheduling** — kein UI-Klick nötig. Der `/automation`-Command
+(`.claude/commands/automation.md`) armt/disarmt die Routinen direkt via `CronCreate`/`CronDelete`
+und ersetzt den manuellen UI-Schritt aus §4 durch einen versionierten, reproduzierbaren Schalter.
+
+> ⚠️ **Status: NICHT GEARMT.** Diese Automatik wird bewusst **inaktiv** ausgeliefert — erst ein paar
+> Tage testen, ob das VM-System claude.ai-Chat vollwertig ersetzt, **dann selbst armen** (`/automation arm`).
+> Bis dahin feuert nichts; das HUD zeigt „Automation: inaktiv".
+
+**Geplanter Schedule (erst beim Armen angelegt):**
+
+| Job | Cron (Europe/Berlin) | Prompt |
+|---|---|---|
+| Morgen-Briefing | `0 10 * * *` (tgl. 10:00) | `/briefing` |
+| KW-Abschluss | `0 20 * * 0` (So 20:00) | `/payload` |
+| KW-Start-Sync | `0 7 * * 1` (Mo 07:00) | `/sync` (inkl. Memory-Konsolidierung) |
+
+- **HAE-Frische statt fixer-10:00-Rate:** `/briefing` macht jetzt einen **Frische-Vorcheck** (Datum-Alter,
+  daily-check §3e) — bei stale Daten kurz warten/retrien statt blind auf eine „sichere" Uhrzeit zu
+  vertrauen. Die 10:00 bleibt nur ein konservativer Default-Start.
+- **Disarm/Status:** `/automation disarm` löscht die Jobs; `/automation status` listet sie (`CronList`).
+- Die **manuelle UI-Routine (§1–§4) bleibt** als Alternative gültig.

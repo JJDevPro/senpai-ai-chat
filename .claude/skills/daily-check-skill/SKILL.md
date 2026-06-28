@@ -3,7 +3,7 @@ name: daily-check-skill
 description: "AI Coach Daily Check für den Athleten — WHOOP-artiges Tages-Dashboard. PFLICHT laden bei: dem dailycheck-Command, Daily Check/Morgen-Check/Status/wie war die Nacht/wie sehen die Werte aus, sowie weichen Triggern wie was geht ab/was steht an/wie läufts/Update und Begrüßung ohne Aufgabe (Hi Senpai/Moin). Liefert: Recovery-Ampel, Schlaf-Score, Gestern-Load (TRIMP + CTL/ATL/TSB), stündliche HRV-Tabelle, KW-Trend, Heute-Plan, Senpais Urteil. Zieht zwei Tages-JSONs (heute+gestern, Mitternachts-Merge) lokal nach ./data via pull_drive.py und reduziert sie deterministisch per slice_hae_day.py. NICHT bei spezifischen Aufgaben wie Lauf-/Gym-Analyse, Was soll ich essen, oder Einzeldaten-Fragen."
 ---
 
-# Daily-Check-Skill v0.14 — "Senpai-WHOOP"
+# Daily-Check-Skill v0.15 — "Senpai-WHOOP"
 
 > Modul-Datei. Senpai liest sie automatisch beim Daily-Check-Trigger oder per `/dailycheck`.
 >
@@ -242,7 +242,7 @@ Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` +
 ✅ 🎯 TAGES-ÜBERSICHT (WHOOP-Card)      — Recovery + Schlaf + Gestern-Load auf einen Blick
 ✅ 📆 GESTERN-RETRO                      — Load, Tages-Herz, TRIMP/CTL/ATL/TSB, Tag-Kontext, Recovery-Link
 ✅ 🛌 SCHLAF                              — voll (Bedtime/Total/Deep/REM/Wach + Effizienz + Tageslicht)
-✅ 💓 HRV-STUNDENTABELLE + RHR           — voll, gemergte Serie + Wrist-Temp
+✅ 💓 HRV-FEINVERLAUF (15-Min) + RHR     — voll, 15-Min-fine[]-Serie + Stunden-Rollup + Wrist-Temp
 ✅ 🫁 ATMUNG & SpO2 / WALKING-HR          — bei Anomalie/Allergie-Saison, sonst 1 Zeile
 ✅ 🔬 CSV-FORENSIK                        — nur wenn Anomalie-Trigger
 ✅ 📈 KW-TREND
@@ -363,18 +363,21 @@ Aus `sleep` (§3f) — Totals gelten für die ganze Nacht, egal in welcher Tages
 
 -----
 
-## 9. 💓 HRV-STUNDENTABELLE + RHR (immer voll)
+## 9. 💓 HRV-FEINVERLAUF (15-Min) + RHR (immer voll)
 
-Aus `sleep_hrv` (§3f) — alle gemergten Stundenwerte sleepStart→sleepEnd (auch Vor-Mitternacht aus Gestern-Datei):
+**Primäre Anzeige = `hrv_night.fine[]` (15-Min-Feinserie, §3f), NICHT mehr die Stundentabelle.** Die Stunden-Mittel glätten die nächtliche Volatilität künstlich weg (Audit: roh σ ~33 / Range ~117 vs hourly σ ~21 / Range ~63) — die 15-Min-Raster zeigen die echten Einbrüche/Peaks, die ein Stunden-Schnitt verschluckt. `fine[]` liefert sauberes `HH:MM`-Label (z. B. `04:30`), ist klein (≤~36 Punkte/Nacht) und verletzt NIE die §0-Kernregel (kein Roh-Minuten-Array). Alle gemergten 15-Min-Buckets sleepStart→sleepEnd (auch Vor-Mitternacht aus der Gestern-Datei):
 ```
-💓 HRV-Verlauf (Schlaf)
-Std    HRV     Ampel
+💓 HRV-Feinverlauf (Schlaf, 15-Min)
+Zeit    HRV     Ampel
+04:15   81      🟢
+04:30   23      🔴
 […]
 ─────────────────
-Ø Schlaf: XX ms [Ampel] · Min XX · Max XX · Range XX · σ XX
+Ø Schlaf: XX ms [Ampel] · Min XX · Max XX · Range XX · σ XX   (aus ROH-Punkten, n=NN)
+Stunden-Rollup: [HH Ø · HH Ø · …]   (1-Zeilen-Scan-Ansicht aus hourly[])
 [1 Satz: hohe σ = unruhig; später Peak = Recovery-Zeichen]
 ```
-> **Volatilität aus ROH-Punkten:** `Min/Max/Range/σ` für die Volatilitäts-Aussage IMMER aus `hrv_night.{min,max,range,std}` zitieren — die sind jetzt aus den **rohen In-Window-HRV-Punkten** gerechnet, nicht mehr aus den Stunden-Mitteln (die glätten σ künstlich runter: roh σ ~33 / Range ~117 vs hourly σ ~21 / Range ~63). Für einen feineren Read steht `hrv_night.fine[]` (15-Min-Serie) bereit; die `hourly[]`-Tabelle bleibt unverändert die Anzeige-Tabelle oben.
+> **Volatilität aus ROH-Punkten:** `Min/Max/Range/σ` IMMER aus `hrv_night.{min,max,range,std}` zitieren (rohe In-Window-Punkte, nicht Stunden-/15-Min-Mittel — auch die `fine[]`-Buckets sind gemittelt, nur feiner). Die `hourly[]`-Serie bleibt als **kompakter Stunden-Rollup** verfügbar (1-Zeilen-Scan), ist aber nicht mehr die Haupt-Tabelle.
 ```
 
 - Ruhepuls: [XX bpm] (resting_heart_rate, Heute-Datei) [vs. Baseline]
@@ -501,6 +504,7 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 ## 19. VERSIONS-LOG
 | Version | Datum | Änderung |
 |---|---|---|
+| **v0.15** | **28.06.2026** | **15-Min-Feinraster als Default-HRV-Anzeige (§9): `hrv_night.fine[]` ist jetzt die primäre Tabelle statt der Stundentabelle — die Stunden-Mittel glätteten die nächtliche Volatilität weg (Audit roh σ ~33/Range ~117 vs hourly σ ~21/Range ~63). Engine (`slice_hae_day.py`) emittiert die `fine[]`-Buckets jetzt mit sauberem `HH:MM`-Label (vorher interner Key `…HH:Q`). `hourly[]` bleibt als kompakter Stunden-Rollup. Verifiziert an Nacht 27.→28.06. (30 fine-Buckets, deckt 04:30→23 / 05:00→19 auf, die das Stundenmittel auf ~41 glättete). σ/Min/Max/Range weiter aus ROH-Punkten. Keine Schwellen geändert.** |
 | v0.1-v0.2 | 26.-27.05.2026 | Drive-Konzept, Time-API, Wetterochs, Tageszeit-Adaption, Trigger. |
 | v0.3 | 28.05.2026 | Deferred-Tool-Pipeline, 3-Ebenen, stündliche HRV-Tabelle, CSV-Auto-Load, KW-Trend. |
 | v0.3.1 | 28.05.2026 | Datum/Uhrzeit getrennte Quellen (Datum nie aus API). |
@@ -526,4 +530,4 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 
 -----
 
-**Ende v0.14. Senpai liefert bei jedem Daily-Check-Trigger das volle WHOOP-Dashboard mit Gestern-Retro und Urteil.**
+**Ende v0.15. Senpai liefert bei jedem Daily-Check-Trigger das volle WHOOP-Dashboard mit Gestern-Retro und Urteil.**

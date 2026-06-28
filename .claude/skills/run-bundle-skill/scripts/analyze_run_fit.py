@@ -606,8 +606,34 @@ def pace_at_z2(seg_run, session, recs=None, label=None,
     }
 
 
-# ── Topografie (200m-Buckets, Auf+Abstieg) ──────────────────────────────────
-def topography(recs):
+# ── Topografie (100m-Primär + 50m-Fein an Steil-Zonen) ──────────────────────
+def _bucketize(pts, size_m):
+    """Höhen-Buckets fester Größe → Zeilen mit km_start, Δh, Grade (+ interne Felder
+    idx/_grade/_dd für Notable-Gate & Fein-Layer-Mapping)."""
+    buckets = {}
+    for r in pts:
+        buckets.setdefault(int(r["dist"] // size_m), []).append(r)
+    rows = []
+    for b in sorted(buckets):
+        grp = buckets[b]
+        dh = grp[-1]["alt"] - grp[0]["alt"]
+        dd = grp[-1]["dist"] - grp[0]["dist"]
+        grade = (dh / dd * 100.0) if dd else None
+        rows.append({
+            "idx": b,
+            "km_start": _r(grp[0]["dist"] / 1000.0, 2),
+            "delta_h_m": _r(dh, 1),
+            "grade_pct": _r(grade, 1),
+            "_grade": grade,
+            "_dd": dd,
+        })
+    return rows
+
+
+def topography(recs, bucket_m=100, fine_m=50):
+    """Zwei Auflösungen: Primär (100m, feiner als die alten 200m) + 50m-Fein-Layer
+    NUR in/um die Steil-Zonen (|Grade|>=2%), damit Anstieg→Abstieg-Paare im Detail
+    sichtbar bleiben, ohne den ganzen Lauf in 50m-Zeilen zu kippen (§0-Kernregel)."""
     pts = [r for r in recs if r["dist"] is not None and r["alt"] is not None]
     if len(pts) < 2:
         return {"note": "keine Höhendaten"}
@@ -624,33 +650,34 @@ def topography(recs):
                 desc += -dh
         prev = r["alt"]
 
-    buckets = {}
-    for r in pts:
-        b = int(r["dist"] // 200)
-        buckets.setdefault(b, []).append(r)
+    def _clean(rows):
+        return [{"km_start": r["km_start"], "delta_h_m": r["delta_h_m"],
+                 "grade_pct": r["grade_pct"]} for r in rows]
 
-    bucket_rows = []
-    notable = []
-    for b in sorted(buckets):
-        grp = buckets[b]
-        dh = grp[-1]["alt"] - grp[0]["alt"]
-        dd = grp[-1]["dist"] - grp[0]["dist"]
-        grade = (dh / dd * 100.0) if dd else None
-        row = {
-            "km_start": _r(grp[0]["dist"] / 1000.0, 2),
-            "delta_h_m": _r(dh, 1),
-            "grade_pct": _r(grade, 1),
-        }
-        bucket_rows.append(row)
-        if grade is not None and abs(grade) >= 2.0 and dd >= 150:
-            notable.append(row)
+    # Primär-Auflösung (100m). Notable-Gate proportional: Bucket muss ≥75% voll sein
+    # (filtert den partiellen End-Bucket / GPS-Stop-Artefakt raus).
+    prim = _bucketize(pts, bucket_m)
+    notable = [r for r in prim if r["_grade"] is not None
+               and abs(r["_grade"]) >= 2.0 and r["_dd"] >= bucket_m * 0.75]
+
+    # 50m-Fein-Layer NUR in/um die Steil-Zonen (+ je 1 Nachbar → Climb+Descent-Paar).
+    fine_all = _bucketize(pts, fine_m)
+    ratio = max(1, int(round(bucket_m / float(fine_m))))   # Fein-Buckets je Primär-Bucket
+    keep = set()
+    for r in notable:
+        base = r["idx"] * ratio
+        for fi in range(base - 1, base + ratio + 1):
+            keep.add(fi)
+    fine_rows = [r for r in fine_all if r["idx"] in keep]
 
     return {
         "ascent_m": _r(asc, 1),
         "descent_m": _r(desc, 1),
-        "bucket_size_m": 200,
-        "buckets": bucket_rows,
-        "notable_buckets": notable,   # |Grade| >= 2% — 200m-Forensik-Trigger
+        "bucket_size_m": bucket_m,
+        "buckets": _clean(prim),
+        "notable_buckets": _clean(notable),    # |Grade| >= 2% (Primär-Auflösung)
+        "fine_bucket_size_m": fine_m,
+        "fine_buckets": _clean(fine_rows),      # 50m-Detail NUR in den Steil-Zonen
     }
 
 

@@ -297,6 +297,14 @@ def main(argv=None):
             f"({matches[0]['name']}). Use --all or a tighter --match to change."
         )
     for f in selected:
+        mt = f.get("mimeType", "")
+        if mt.startswith("application/vnd.google-apps"):
+            _eprint(
+                f"ERROR: '{f['name']}' is a Google-Apps file ({mt}), not a downloadable binary. "
+                f"A state/journal file must be a PLAIN-TEXT .md — re-upload it as a text file "
+                f"(don't create it as a Google Doc). For a Google Sheet use --sheet/--tab instead."
+            )
+            raise SystemExit(1)
         dest = out_dir / f["name"]
         _download_media(svc, f["id"], dest)
         print(str(dest))

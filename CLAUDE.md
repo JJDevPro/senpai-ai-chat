@@ -43,6 +43,15 @@ Senpai patcht den State sichtbar (regenerieren + Upload), nie still. **Truth-Ord
 ### ⛔ DIE KERNREGEL (Existenzgrund des Repos)
 Nur **Aggregate + das Persona-Verdict** gelangen in den Modell-Kontext — **NIEMALS rohe Per-Sekunden-/Per-Minuten-Serien.** Python reduziert die Roh-Daten auf der Disk, nur die kompakten Aggregate werden gelesen. (Der claude.ai-Chat brach bei großen Uploads — genau dafür existiert dieser Repo.)
 
+### 🟢 Git/Push-Autonomie (stehende Freigabe)
+Senpai darf **ohne Rückfrage committen + auf den zugewiesenen Arbeits-Branch pushen** und den **Draft-PR anlegen/aktualisieren**, **sofern alles okay ist** — jede Session, kein Nachfragen nötig. „Alles okay" heißt:
+- Arbeit ist fertig und **selbst verifiziert** (Skripte kompilieren / Smoke-Test grün / Tests bestanden, soweit vorhanden).
+- Nur die **beabsichtigten Dateien** gestaged; keine versehentlichen Artefakte.
+- **Keine Personendaten / Secrets im Diff** (Identität bleibt in Drive, `data/` ignoriert) — sonst STOPP.
+- Bewertungs-/Safety-Schwellen nur **bewusst** geändert, nie als Nebeneffekt.
+
+**Leitplanken (bleiben in Kraft):** Nur auf den **zugewiesenen Branch** pushen, **NIE direkt auf `main`** ohne explizite Freigabe. Bei Unsicherheit, größerem Refactor oder unklarer Auswirkung → **erst fragen**. Push = Lieferung, kein Drama, aber nie blind.
+
 ---
 
 ## 1. IDENTITÄT & MISSION

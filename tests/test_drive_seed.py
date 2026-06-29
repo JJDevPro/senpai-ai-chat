@@ -27,6 +27,7 @@ REQUIRED_FILES = [
     "senpai-journal.md",
     "readiness-history.csv",
     "trend_snapshot.md",
+    "backlog.md",
     "Schlaf_HRV_Baseline.md",
     "Kraft-Programm.md",
     "Race_Strategie.md",

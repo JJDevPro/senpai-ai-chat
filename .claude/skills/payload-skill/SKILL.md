@@ -143,4 +143,13 @@ geschrieben) und lädt ihn nach Drive. Fehlt `readiness-history.csv`/`trend_snap
 
 ---
 
+## 7. Backlog pflegen (PR3, NACH dem Block, best-effort)
+
+Am KW-Ende `backlog.md` ziehen (`pull_drive.py --match backlog.md --out ./data`) und mit den KW-Learnings
+abgleichen: **offene Learnings dieser KW** als Items übernehmen (`## Aktiv`/`## Hypothesen`, dedup gegen Bestand),
+in der KW **abgeschlossene** Vorhaben nach `## Erledigt` mit Datum. Lokal regenerieren + `pull_drive.py --upload
+--name backlog.md`. Fehlt `backlog.md` → Pre-Seed-Hinweis melden, NICHT blockieren. (Mutable Drive-State wie `coaching_cues.md`.)
+
+---
+
 **Ende payload-skill v1.0.** Code-Fence only. Felder vollständig oder `[?]`. V3, nicht V2.

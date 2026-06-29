@@ -27,6 +27,11 @@ oder nur das Briefing gewünscht ist:
 | KW-Abschluss | `0 20 * * 0` (So) | `/payload` |
 | KW-Start-Sync | `0 7 * * 1` (Mo) | `/sync` |
 
+> **Kein neuer Cron für Snapshot/Backlog:** Die obigen Routinen tragen die Pflege **automatisch mit** —
+> `/briefing` (via daily-check) regeneriert den `trend_snapshot.md`-Rollup + schreibt/surft `backlog.md`,
+> `/payload` versiegelt am KW-Ende die Woche im Snapshot + räumt den Backlog, `/sync` reviewt offene Items.
+> Armst du das Briefing, läuft Snapshot + Backlog ohne expliziten Prompt mit (CLAUDE.md §7/§11).
+
 Danach `CronList` zur Bestätigung + Hinweis: „🟢 Automation scharf. Disarm jederzeit via `/automation disarm`."
 
 ## `disarm`

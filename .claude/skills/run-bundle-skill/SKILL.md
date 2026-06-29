@@ -256,6 +256,12 @@ SCHRITT 6: Analyse + Report (siehe §12 Output-Template)
 SCHRITT 7: ARCHIV (T7, NACH dem Report, best-effort, NON-BLOCKING) — Verdict ins rollende Journal:
   → python3 lib/archive.py --report - --kind run --date {lauf_datum}   # Verdict-Text via stdin
   → Fehlt senpai-journal.md → Pre-Seed-Hinweis melden, NICHT blockieren (Report steht bereits).
+SCHRITT 8: TREND-HISTORY (best-effort, NON-BLOCKING) — Tageszeile in readiness-history.csv halten,
+  damit die Tageskette lückenlos bleibt (sonst fällt der inkrementelle Banister auf Vollrechnung):
+  → python3 .claude/skills/daily-check-skill/scripts/readiness_history.py --as-of {lauf_datum} \
+       --banister <banister_json> --tolerance <tolerance_json>
+  → Idempotent auf Datum: hat der Daily-Check heute schon geschrieben, ist das ein No-op. Fehlt die
+    CSV → Pre-Seed-Hinweis, NICHT blockieren.
 ```
 
 **Monats-CSV (Daily-Aggregate, für Daily-Check-Kontext):** Folder/Sheet `1NLywaCKVZQlw8O4eZt20o2B14qgPIyFJ` (HealthMetrics-YYYY-MM.csv) — Komma-Delimiter, deutsche Dezimalzahlen. **Achtung: aktualisiert sich über den Tag → frühe Tageswerte (RHR/HRV) sind vorläufig, finalisieren über Nacht.**

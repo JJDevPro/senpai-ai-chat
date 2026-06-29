@@ -75,6 +75,12 @@ Step 9:  TRAININGS-LOAD TIEF: Trainings_v5 nach CSV ziehen →
          TSB = heutige Readiness (CTL_gestern − ATL_gestern), Zeile via format_block(res).
          Wenn Duplikate entfernt (res['dedup_report']) → Sheet-Hygiene-Warnung in den Output (§5 🏋️-Block).
          Trainings_v5 nicht pullbar → TRIMP aus FIT/qualitativ + Hinweis, KEINE erfundenen Zahlen.
+         ⚡ **INKREMENTELL (Snapshot-Beschleuniger, §7):** zuerst die letzte Zeile aus
+         `readiness-history.csv` lesen (`readiness_history.last_row`); ist deren `date` == gestern
+         UND ctl/atl vorhanden → `banister.compute_incremental(ctl, atl, date, gestern_TRIMP, heute)`
+         = EIN EWMA-Schritt statt 126-Tage-Replay (Tokens/Zeit ↓, Ergebnis identisch). **ESCAPE-HATCH
+         → volle `compute_from_sheet`** bei: Lücke (letzte Zeile < gestern), fehlendem/leerem Snapshot,
+         `warmup_ok`-Zweifel, Anomalie ODER explizitem Deep-Dive. Im Zweifel gewinnt die Vollrechnung.
 Step 10: Gesundheitsdaten_v5 nach CSV ziehen →
          `python3 lib/pull_drive.py --sheet 1ENUtb3LS5GgaDDhciBCuyUDqlwJTsjU6n6PTCZuIcDE --out ./data/Gesundheitsdaten_v5.csv` → nur KW-Zeilen (Trend).
 Step 10.1: 🟢 HRV-STATUS (Garmin-Klon): 'Tägliche Kennzahlen'-Tab für die 60-Tage-HFV-Historie ziehen →
@@ -86,7 +92,8 @@ Step 10.2: 🔋 READINESS (0–100): die SCHON berechneten Aggregate fusionieren
 Step 10.3: 🔋 BODY BATTERY: `python3 .claude/skills/daily-check-skill/scripts/body_battery.py --slice <slice_json> --hrv <hrv_json> --banister <banister_json> --as-of {heute}` → `{bb_start,bb_end,drained,recharged,status}` (§6.5). Heuristik/Surrogat, klar so labeln.
 Step 10.4: 🏃 RUNNING TOLERANCE: `python3 .claude/skills/daily-check-skill/scripts/running_tolerance.py --trainings ./data/Trainings_v5.csv --as-of {heute}` → `{week_km,ceiling_km,acwr,ramp_flag,status}` (Verletzungs-Decke bei 116 kg → §13 Heute-Plan).
 Step 10.5: 📈 HISTORY (T12, best-effort, NON-BLOCKING): Tageszeile nach Drive persistieren —
-         `python3 .claude/skills/daily-check-skill/scripts/readiness_history.py --as-of {heute} --readiness <readiness_json> --body-battery <bb_json> --banister <banister_json> --hrv-baseline <hrv_json>`.
+         `python3 .claude/skills/daily-check-skill/scripts/readiness_history.py --as-of {heute} --readiness <readiness_json> --body-battery <bb_json> --banister <banister_json> --hrv-baseline <hrv_json> --daily <slice_json> --signals <signals_json> --tolerance <tolerance_json>`.
+         (Die erweiterte Zeile trägt jetzt ctl/atl/hrv_ms/rhr/weight/kfa/vo2/week_km — speist den inkrementellen Banister (Step 9) + den Trend-Snapshot.)
          Fehlt `readiness-history.csv` (noch nicht pre-seeded → `drive-seed/`) → Pre-Seed-Hinweis MELDEN, NICHT blockieren (Skript exitet ≠0, unkritisch für den Check).
 Step 11: Wenn Trainingstag-Flag: Wetterochs RSS+JSON.
 Step 12: Berechnungen über gemergtes Schlaf-Fenster + Recovery-Ampel-Komposit (§6).

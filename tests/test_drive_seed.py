@@ -62,11 +62,17 @@ def test_all_required_templates_present():
 
 
 def test_readiness_history_header_only():
-    """readiness-history.csv hat NUR die Header-Zeile (keine Datenzeilen)."""
+    """readiness-history.csv hat NUR die Header-Zeile (keine Datenzeilen) und matcht
+    den kanonischen Header aus readiness_history.HEADER (kein Drift)."""
+    import sys
+    scripts = SEED_DIR.parents[0] / ".claude" / "skills" / "daily-check-skill" / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    import readiness_history as rh
+    header = ",".join(rh.HEADER)
     text = (SEED_DIR / "readiness-history.csv").read_text(encoding="utf-8")
-    header = "date,readiness_score,band,hrv_status,bb_start,bb_end,tsb,top_limiter"
     lines = [ln for ln in text.splitlines() if ln.strip()]
-    assert lines == [header], f"CSV soll nur den Header haben, ist aber: {lines}"
+    assert lines == [header], f"CSV soll nur den (kanonischen) Header haben, ist aber: {lines}"
 
 
 def test_journal_has_example_entry():

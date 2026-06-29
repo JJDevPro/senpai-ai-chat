@@ -59,7 +59,7 @@ Erst nach einem **echten, fehlgeschlagenen Pull-Versuch** gilt: fehlender Wert =
 
 ## 🎯 SoT-Snapshot (Wochen-Messung, Körperwaage)
 - Gewicht: [X,X kg] (Δ [±X,X] vs Vor-KW)
-- KFA: [XX,X%] | Viszeralfett: [X,X] | LBM/Muskel: [X,X]
+- KFA: [XX,X%] | Bauchumfang: [XXX cm] | LBM/Muskel: [X,X]
 - RHR: [XX] | VO2Max: [XX,X] [Ampel]
 
 ## 🏃 Trainings-Absolvierung
@@ -152,4 +152,4 @@ in der KW **abgeschlossene** Vorhaben nach `## Erledigt` mit Datum. Lokal regene
 
 ---
 
-**Ende payload-skill v1.0.** Code-Fence only. Felder vollständig oder `[?]`. V3, nicht V2.
+**Ende payload-skill v1.1.** Code-Fence only. Felder vollständig oder `[?]`. V3, nicht V2.

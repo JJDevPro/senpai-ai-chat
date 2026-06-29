@@ -82,7 +82,7 @@ Die 12:00-Entscheidung ist der Tag-Hebel. Pre-loggen.
 
 ## 5. Casein-Protokoll (bedarfsgesteuert)
 
-**40g Casein (NICHT die 25g Hersteller-Portion!) + 300ml Milch.** Alle ~7 Tage erlaubt. Konkrete Marke siehe Supplements im Athleten-Profil.
+**40g Casein (NICHT die 25g Hersteller-Portion!) + 300ml Milch.** An **allen 7 Wochentagen** erlaubt — bedarfsgesteuert/tageszeit-spezifisch (nicht auf Trainingstage beschränkt), NICHT „nur einmal pro Woche". **Evidenz:** 40 g pre-sleep heben die nächtliche Muskelproteinsynthese (~+22 %, Res et al. 2012); 20–30 g reichen nicht (Trommelen/van Loon) — daher die 40 g statt der 25-g-Portion. Konkrete Marke siehe Supplements im Athleten-Profil.
 
 | Protein-Status | Casein |
 |---|---|

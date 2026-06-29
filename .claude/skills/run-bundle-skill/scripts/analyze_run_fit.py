@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-analyze_run_fit.py — DIE FIT-Analyse-Engine des run-bundle-skill (v3.11).
+analyze_run_fit.py — DIE FIT-Analyse-Engine des run-bundle-skill (v3.12).
 
 ZWECK
 -----
@@ -880,7 +880,7 @@ def analyze(fit_path, as_of):
             "record_count": len(recs),
             "walking_filter": "v3.5 (cad<140 & spd<2.0; stand=cad0&spd<0.5 separat)",
             "parser": "fitparse",
-            "skill": "run-bundle-skill v3.11",
+            "skill": "run-bundle-skill v3.12",
         },
         "summary": summary,
         "splits_km": km_splits(recs),
@@ -898,7 +898,7 @@ def analyze(fit_path, as_of):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="FIT-Lauf-Analyse (run-bundle-skill v3.11) — Aggregate-JSON auf stdout.")
+        description="FIT-Lauf-Analyse (run-bundle-skill v3.12) — Aggregate-JSON auf stdout.")
     ap.add_argument("fit_path", help="Pfad zur .fit-Datei")
     ap.add_argument("--as-of", required=True, metavar="YYYY-MM-DD",
                     help="Bezugsdatum (heute), z.B. 2026-06-28")

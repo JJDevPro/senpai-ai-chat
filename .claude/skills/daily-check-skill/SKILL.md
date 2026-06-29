@@ -416,7 +416,7 @@ Aus `sleep` (§3f) — Totals gelten für die ganze Nacht, egal in welcher Tages
 | Wachphase | <0,5h | 0,5-1h | >1h |
 | Schlaf-Effizienz | ≥90% | 85-90% | <85% (🔴 <75) |
 | Tageslicht | ≥120min | 60-120 (🟠 30-60) | <30 |
-> Apple-Watch unterschätzt Tiefschlaf (die Körperwaage misst 90+ min). Rotes Deep → Sensor-Bias erwähnen, nicht als Defizit framen.
+> Apple-Watch unterschätzt Tiefschlaf (die Körperwaage misst 90+ min). Rotes Deep → Sensor-Bias erwähnen, nicht als Defizit framen. **NIE ein Withings-kalibriertes ≥100-min-Ziel auf Apple-Watch-Tiefschlaf anwenden** — V3 bewertet Tiefschlaf relativ (≥15 %, quell-konsistent), nie Cross-Sensor.
 
 -----
 

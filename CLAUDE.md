@@ -262,6 +262,7 @@ Python ist **real** über das Bash-Tool (matplotlib für echte Diagramme — Lau
 - **Echte Markdown-Tabellen** (`| … |`), keine Code-Fence-ASCII-Tabellen, für metrische Blöcke (HRV/RHR, Schlaf, Makros, Wetter-Stunden) — sie rendern sauber im Chat.
 - **Metrik-Emoji je Zeile** als Scan-Marker (☀️ Tageslicht · 💓 HRV · ❤️ RHR · 🛌 Schlaf · 🫁 Atmung · ⚖️ Gewicht · 🔥 Load), zusätzlich zum Ampel-Emoji in der Wert-Spalte.
 - **Abkürzungen IMMER glossen** (ein Wort in Klammern): **TRIMP (Load) · CTL (Fitness) · ATL (Fatigue) · TSB (Form)** · KFA (Körperfett-%). Gilt in jeder Tabelle/Zeile, nicht nur bei Erstnennung.
+- **Das Coaching-Verdict heißt IMMER „💀 SENPAIS URTEIL"** (Skull + Caps), nie verkürzt zu „Urteil" o. ä.
 
 ---
 

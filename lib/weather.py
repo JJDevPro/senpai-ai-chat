@@ -21,11 +21,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import ssl
 import sys
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 BASE = "https://api.brightsky.dev/weather"
 DEFAULT_TZ = os.environ.get("SENPAI_TZ", "Europe/Berlin")
@@ -70,7 +72,58 @@ def _hhmm(ts: str) -> str | None:
         return None
 
 
-def reduce(raw: dict, slot_start: str | None = None, slot_end: str | None = None) -> dict:
+def _dew_band(dp) -> str | None:
+    """Taupunkt-Band (Schwüle-Empfinden) — Skala aus dem Athleten-Profil."""
+    if not isinstance(dp, (int, float)):
+        return None
+    if dp < 0:
+        return "sehr trocken, angenehm"
+    if dp < 10:
+        return "trocken bis angenehm"
+    if dp < 15:
+        return "angenehm bis leicht feucht"
+    if dp <= 20:
+        return "schwül, unangenehm"
+    return "sehr schwül, drückend"
+
+
+def _sun_times(lat: float, lon: float, date_str: str, tz: str = DEFAULT_TZ) -> dict | None:
+    """Sonnenauf-/-untergang (lokale HH:MM) via NOAA/Almanac-Formel — nur stdlib
+    (astral/ephem sind nicht installiert). Wichtig für Nacht-Lauf/Stirnlampe."""
+    try:
+        y, m, d = (int(x) for x in date_str[:10].split("-"))
+    except Exception:
+        return None
+    N = datetime(y, m, d).timetuple().tm_yday
+    zenith = 90.833  # offizieller Sonnenstand inkl. Refraktion
+
+    def _event(is_rise: bool):
+        lng_hour = lon / 15.0
+        t = N + ((6 if is_rise else 18) - lng_hour) / 24.0
+        M = 0.9856 * t - 3.289
+        L = (M + 1.916 * math.sin(math.radians(M))
+             + 0.020 * math.sin(math.radians(2 * M)) + 282.634) % 360.0
+        RA = math.degrees(math.atan(0.91764 * math.tan(math.radians(L)))) % 360.0
+        RA += (math.floor(L / 90.0) * 90.0) - (math.floor(RA / 90.0) * 90.0)  # gleiche Quadrant wie L
+        RA /= 15.0
+        sin_dec = 0.39782 * math.sin(math.radians(L))
+        cos_dec = math.cos(math.asin(sin_dec))
+        cos_h = ((math.cos(math.radians(zenith)) - sin_dec * math.sin(math.radians(lat)))
+                 / (cos_dec * math.cos(math.radians(lat))))
+        if cos_h < -1 or cos_h > 1:
+            return None  # Polartag/-nacht
+        H = (360.0 - math.degrees(math.acos(cos_h))) if is_rise else math.degrees(math.acos(cos_h))
+        H /= 15.0
+        ut = (H + RA - 0.06571 * t - 6.622 - lng_hour) % 24.0
+        dt = datetime(y, m, d, tzinfo=ZoneInfo("UTC")) + timedelta(hours=ut)
+        return dt.astimezone(ZoneInfo(tz)).strftime("%H:%M")
+
+    return {"sunrise": _event(True), "sunset": _event(False)}
+
+
+def reduce(raw: dict, slot_start: str | None = None, slot_end: str | None = None,
+           lat: float | None = None, lon: float | None = None,
+           date: str | None = None, tz: str = DEFAULT_TZ) -> dict:
     """Roh-JSON → kompaktes Slot-Fenster + Tages-Aggregat. KEIN 24-h-Dump."""
     hours = raw.get("weather", []) or []
     temps = [h["temperature"] for h in hours if h.get("temperature") is not None]
@@ -110,6 +163,9 @@ def reduce(raw: dict, slot_start: str | None = None, slot_end: str | None = None
         if air is not None and ex is not None:
             entry["asphalt_excess_c_est"] = round(ex, 1)
             entry["asphalt_surface_c_est"] = round(float(air) + ex, 1)
+        db = _dew_band(h.get("dew_point"))
+        if db:
+            entry["dew_point_band"] = db
         return entry
 
     # Slot-Fenster: Stunden, deren HH:MM in [slot_start, slot_end] liegt (inkl. Rand).
@@ -145,6 +201,7 @@ def reduce(raw: dict, slot_start: str | None = None, slot_end: str | None = None
         "slot": {"start": slot_start, "end": slot_end} if slot_start else None,
         "slot_window": window,
         "day_summary": day_summary,
+        "sun": (_sun_times(lat, lon, date, tz) if (lat is not None and lon is not None and date) else None),
         "estimates_note": "asphalt_*_est = Heuristik aus solar/sunshine/cloud_cover, KEIN Messwert.",
         "warnings": warnings,
     }
@@ -166,7 +223,8 @@ def main(argv=None):
                           "warnings": ["Fetch fehlgeschlagen → Wetterochs-Fallback nutzen."]},
                          ensure_ascii=False, indent=2))
         return 1
-    out = reduce(raw, args.slot_start, args.slot_end)
+    out = reduce(raw, args.slot_start, args.slot_end,
+                 lat=args.lat, lon=args.lon, date=args.date, tz=args.tz)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     return 0
 

@@ -7,7 +7,7 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 
 > **Primärquelle:** FIT-Datei + Trainings_v5 + Gesundheitsdaten_v5, on-demand via `python3 lib/pull_drive.py` nach `./data` gezogen (Drive bleibt read-only Single Source of Truth, nie geschrieben).
 > **Fallback:** CSV (Apple-Watch HealthFit-Export, gleicher Folder) → lokales ZIP in `./data` (Legacy, siehe §1c).
-> **V3 Protocol v0.4 ist der einzige Bewertungs-Modus.** Alle Läufe — egal welches Datum — werden nach V3 bewertet. Kein V2-Modus, keine Backward-Compatibility.
+> **V3 Protocol v0.5 ist der einzige Bewertungs-Modus.** Alle Läufe — egal welches Datum — werden nach V3 bewertet. Kein V2-Modus, keine Backward-Compatibility.
 
 > **v3.12-Änderungen (gegenüber v3.11):**
 > - **§0h Topo-Feinsampling:** `topography` (analyze_run_fit.py) rechnet jetzt **100m-Primär** (statt 200m) + einen **50m-Fein-Layer (`fine_buckets`) NUR in/um die Steil-Zonen** (Notable |Grade|≥2%, je 1 Nachbar → Anstieg→Abstieg-Paar). Deckt den echten Peak-Grade auf, den die 200m-Mittelung wegglättete (validiert: km3,5-Hügel 50m = +4,9% vs 200m-Mittel 2,9%). Notable-Gate proportional (`dd ≥ bucket·0,75`) → partieller End-Bucket/GPS-Stop-Artefakt bleibt gefiltert. Kompakt: nur Steil-Zonen im Fein-Layer, nie der ganze Lauf in 50m-Zeilen (§0-Kernregel).
@@ -127,7 +127,7 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 
 Header:
 ```
-🕒: HH:MM | 🌤️: [°C/Wetter] | 🔋: [Status] | 🤖: [Modus] | 🧠: [Modell] + Skill v3.11
+🕒: HH:MM | 🌤️: [°C/Wetter] | 🔋: [Status] | 🤖: [Modus] | 🧠: [Modell] + Skill v3.12
 ```
 
 ---
@@ -334,7 +334,7 @@ SCHRITT 8: TREND-HISTORY (best-effort, NON-BLOCKING) — Tageszeile in readiness
 
 **🛡️ VO2max / Cardio-Recovery sind SPORADISCH** (nur bei Messung im Export, nicht jeder Lauf): letzten verfügbaren Wert + Datum nehmen; fehlt ganz → **./data/live.md** (VO2 35,8). Abwesenheit NIE als 0/Verschlechterung im Report. (VO2 nach Hitze-/Abendlauf zusätzlich pace-per-HR-supprimiert → gegen RHR gegenchecken.)
 
-**🦵 walking_asymmetry_percentage = Verletzungs-Trip-Wire:** Normal 0–2 %. Steigt er sustained >3–5 % (über mehrere Tage/Läufe) → Kompensation/Dysbalance flaggen, v. a. nach Gym-Re-Entry + im Volumen-Aufbau bei dem Körpergewicht (~aus Profil). **Nur surfacen, wenn erhöht** — sonst keine Zeile. Kein Einzeltag-Alarm (sparse Daten).
+**🦵 walking_asymmetry_percentage = Verletzungs-Trip-Wire:** Normal 0–2 %. Steigt er sustained >5 % (über mehrere Tage/Läufe) → Kompensation/Dysbalance flaggen, v. a. nach Gym-Re-Entry + im Volumen-Aufbau bei dem Körpergewicht (~aus Profil). **Nur surfacen, wenn erhöht** — sonst keine Zeile. Kein Einzeltag-Alarm (sparse Daten).
 
 ### 2c. CSV-Schema (Apple Watch HealthFit-Export)
 
@@ -671,9 +671,9 @@ RACE-TAG → das ist KEIN Z2-Training. Z3/Z4 ist das Zuhause, Cardiac Drift
 
 ### 8c. Pace@Z2-Tracking (V3-Fortschrittsmetrik)
 
-**Definition:** Durchschnittspace eines Z2-Laufs (HR stabilisiert ≤Z2-Cap), letzte 30 Min, **running-only** (Gehpausen RAUS), temperatur-normalisiert auf 18°C. **Format: M:SS/km.**
+**Definition:** Durchschnittspace eines Z2-Laufs (HR stabilisiert ≤Z2-Cap) über das Steady-Z2-Segment (Surge-frei), **running-only** (Gehpausen RAUS), temperatur-normalisiert auf 18°C. **Format: M:SS/km.**
 
-**🔑 EINE Z2-Pace, überall identisch (Report-SSoT):** Berechne die gemanagte Pace **einmal** als `pace_z2_run` = **running-only** (Walk-Records via v3.5 raus), Ø über den HR-≤147-Teil bzw. letzte 30 Min. Genau dieser Wert speist **identisch** (1) die Hitze-Korrektur (er wird normalisiert), (2) die `📊 Pace@Z2-Update`-Tabelle (Spalte „roh"), (3) den Verdict. Die **as-run-Pace** (inkl. Gehpausen, z.B. Lap-Ø) darf erwähnt werden, MUSS aber „inkl. Gehpausen" gelabelt sein und wird **NIE** normalisiert oder als „roh" geführt. **NIE zwei verschiedene managed-Paces im selben Report** (z.B. 9:13 inkl. Gehen vs 8:58 running-only → EINE wählen: running-only, durchziehen).
+**🔑 EINE Z2-Pace, überall identisch (Report-SSoT):** Berechne die gemanagte Pace **einmal** als `pace_z2_run` = **running-only** (Walk-Records via v3.5 raus), Ø über das Steady-Z2-Segment (Surge-frei, HR ≤147). Genau dieser Wert speist **identisch** (1) die Hitze-Korrektur (er wird normalisiert), (2) die `📊 Pace@Z2-Update`-Tabelle (Spalte „roh"), (3) den Verdict. Die **as-run-Pace** (inkl. Gehpausen, z.B. Lap-Ø) darf erwähnt werden, MUSS aber „inkl. Gehpausen" gelabelt sein und wird **NIE** normalisiert oder als „roh" geführt. **NIE zwei verschiedene managed-Paces im selben Report** (z.B. 9:13 inkl. Gehen vs 8:58 running-only → EINE wählen: running-only, durchziehen).
 
 **Normalisierung (provisorisch):** `pace_z2_run − (Starttemp − 18°C) × 3,5 sek/km`
 
@@ -808,7 +808,7 @@ Aus ./data/live.md (Counter-Stand + #100-Zieldatum). **#100** → Club-100-Shirt
 - Bei Intervall/Tempo/Sprint: 🟡 mit Disclaimer „methodisch nicht aussagekräftig"
 
 **TRIMP:** 🟢 <100 | 🟡 100-140 | 🟠 140-180 | 🔴 >180
-**TSB:** 🟢 +5 bis +25 | 🟢 0-5 | 🟡 -10 bis 0 | 🟠 -25 bis -10 | 🔴 <-25
+**TSB:** 🟢 >+5 | 🟡 -10 bis +5 | 🟠 -30 bis -10 | 🔴 <-30
 **HRR-1 (Cardio Recovery):** 🟢 ≥35 | 🟡 25-35 | 🟠 15-25 | 🔴 <15
 **IF:** Easy 0,65-0,80 | Tempo 0,85-0,95 | Threshold 0,95-1,05
 
@@ -858,7 +858,7 @@ Aus ./data/live.md (Counter-Stand + #100-Zieldatum). **#100** → Club-100-Shirt
 ## 12. Output-Template (Long-Modus)
 
 ```
-🕒: HH:MM | 🌤️: [°C/Wetter] | 🔋: [Status] | 🤖: [Modus] | 🧠: [Modell] + Skill v3.11
+🕒: HH:MM | 🌤️: [°C/Wetter] | 🔋: [Status] | 🤖: [Modus] | 🧠: [Modell] + Skill v3.12
 
 # 🔥 RUN-REPORT — [Wochentag] [Datum] · [Uhrzeit] · [Run-Typ] · [Workout-Name]
 
@@ -1213,6 +1213,6 @@ Bei >5% Divergenz: ⚠️-Hinweis-Zeile.
 
 ---
 
-**Ende der Skill-Definition v3.5.**
+**Ende der Skill-Definition v3.12.**
 
 Senpai liest diese Datei bei Run-Analyse-Trigger. Pull-Workflow ist Default — `python3 lib/pull_drive.py` zieht die FIT nach `./data`, `analyze_run_fit.py` reduziert sie; FIT bevorzugt, CSV-Fallback wenn keine FIT für gewünschtes Datum, lokales ZIP nur als Legacy. Walking-Diskriminator ist Kadenz (§4), Wand-Diagnose via Kardio-vs-Neuromuskulär (§7b).

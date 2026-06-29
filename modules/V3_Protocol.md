@@ -214,7 +214,7 @@ Letzte Full-Body: Do letzte Woche (7 Tage zurück) → Kriterium 4 ✅
 
 ## V3-Fortschrittsmetrik: Pace@Z2
 
-**Definition:** Durchschnittspace eines Z2-Laufs (HR ≤147 stabilisiert), letzte 30 Minuten, temperatur-normalisiert auf 18°C-Äquivalent.
+**Definition:** Durchschnittspace eines Z2-Laufs (HR ≤147 stabilisiert) über das Steady-Z2-Segment (Surge-frei), temperatur-normalisiert auf 18°C-Äquivalent.
 
 **Tracking:** Nach jedem Z2-Lauf im Run-Report. Kein separater monatlicher Check-in — Senpai trackt automatisch per Upload.
 

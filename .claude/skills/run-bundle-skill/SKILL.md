@@ -1061,6 +1061,12 @@ blockieren, NIE selbst anlegen.
 **Pre-Lauf-Kopplung:** `weather-runprep-skill` §5 zeigt die OPEN-Cues des Slot-Typs als „🎯 Mental Cues"
 VOR dem Lauf → Pre-Run nennt das Ziel, Post-Run prüft die Umsetzung. Der Kreis schließt sich.
 
+**Backlog-Kopplung (PR3, best-effort, NON-BLOCKING):** Bleibt ein Form-Defizit über **mehrere gleichartige
+Läufe** offen (Cue carry-forward ≥2×) → daraus ein **Experiment** in `backlog.md` (`## Experimente`) machen
+(`pull_drive.py --match backlog.md`; dedup gegen Bestand; lokal regenerieren + `--upload --name backlog.md`).
+Schließt der heutige Lauf ein Backlog-Experiment (VR-Ziel erreicht) → Item nach `## Erledigt`. Fehlt `backlog.md`
+→ Pre-Seed-Hinweis, nicht blockieren. (`coaching_cues.md` = pro-Lauf-Form-Cues; `backlog.md` = mehrwöchige Vorhaben.)
+
 ---
 
 ## 13. Short-Modus

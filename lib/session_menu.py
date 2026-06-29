@@ -59,6 +59,7 @@ SKILL_INDEX = [
     ('„race" / „HM"', "Race-Projektion"),
     ('„Payload"', "Wochen-Export (So)"),
     ('„Sync"', "Rekalibrierung (KW-Start)"),
+    ('„Backlog" / „was steht offen"', "offene Vorhaben/Experimente"),
     ("/briefing", "proaktiver Morgen-Flow"),
     ("/menu", "diese Übersicht (voll)"),
 ]

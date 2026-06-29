@@ -27,10 +27,11 @@ python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match "at
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match "live.md"       --out ./data
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match "baselines.md"  --out ./data
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match "learnings.md"  --out ./data
+python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match "backlog.md"    --out ./data
 ```
 Lies `./data/athlete.md` + `./data/live.md` → Identität, Anrede-Mapping, **die metabolische
 Gewichts-Schwelle** (für den Weight-Creep-Trip-Wire), VO2-Baseline, Medical/Sensor-Ignore-Regeln.
-Notiere die Schwelle als `{WEIGHT_THRESHOLD_KG}`.
+Notiere die Schwelle als `{WEIGHT_THRESHOLD_KG}`. `./data/backlog.md` = die offenen Coaching-/Ideen-Vorhaben (Schritt 4).
 
 ---
 
@@ -145,7 +146,17 @@ Override (Taper/Deload/„Pause bis…") + jedes Gate-Streichen schlägt den Def
 
 ---
 
+## Schritt 6 — Backlog surfen (PR3, kurz, am Report-Ende)
+
+Aus `./data/backlog.md` die **1–3 schärfsten offenen Items** (`## Aktiv`/`## Experimente`/`## Hypothesen`)
+als knappen „📋 Offen"-Block anhängen — was dran ist + das Abschluss-Signal. Wirkt eins durch die heutigen
+Daten erledigt → kurz nachfragen (User bestätigt → nach `## Erledigt`, `pull_drive.py --upload --name backlog.md`).
+**Kein Lead, kein Drama** — ein Scan-Block, der das Längerfristige im Blick hält. Fehlt `backlog.md` → still überspringen.
+(Den Backlog-WRITE übernimmt die `daily-check-skill` Step 10.7; hier nur surfen + reviewen.)
+
+---
+
 **Kurz:** State ziehen → Daily Check (Skill) → Gate + Sentinel → Garmin-Klon-Layer
 (HRV-Status · Readiness · Body Battery · Running Tolerance) → bei `actionable` mit dem Alert
-führen, sonst normaler Check → Heute-Plan. Nur Aggregate + Verdict erreichen den Kontext (§0).
+führen, sonst normaler Check → Heute-Plan → Backlog surfen. Nur Aggregate + Verdict erreichen den Kontext (§0).
 Verdict am Ende via `python3 lib/archive.py --report - --kind daily --date {heute}` ins Journal (best-effort).

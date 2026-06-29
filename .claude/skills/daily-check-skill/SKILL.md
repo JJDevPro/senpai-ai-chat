@@ -101,6 +101,12 @@ Step 10.6: 📅 TREND-SNAPSHOT (PR2, best-effort, NON-BLOCKING): NACH dem Histor
          **Der Multi-Wochen-/Monats-KW-Trend (§10) liest jetzt DIESEN Snapshot** — kein erneuter Gesundheitsdaten_v5-Replay
          für die zurückliegenden Wochen. HEUTE bleibt frisch gerechnet (Step 9/10.2). Fehlt der Snapshot/CSV → Pre-Seed-Hinweis
          MELDEN, NICHT blockieren; Fallback = Gesundheitsdaten_v5 wie bisher (Escape-Hatch).
+Step 10.7: 📋 BACKLOG (PR3, best-effort, NON-BLOCKING): `backlog.md` aus Drive ziehen
+         (`pull_drive.py --match backlog.md --out ./data`). Feuert heute ein **längerfristiges** Signal
+         (z. B. Protein-Floor-Fail mehrtägig, HRV-Korridor-Drift, Re-Entry-Lücke) → unter `## Aktiv`/`## Hypothesen`
+         ein Item ergänzen (Format = Template; **dedup** gegen Bestand, kein Spam). Wirkt ein offenes Item erledigt
+         → nach `## Erledigt` mit Datum. Datei lokal regenerieren + `pull_drive.py --upload --name backlog.md`.
+         Fehlt `backlog.md` → Pre-Seed-Hinweis MELDEN, NICHT blockieren. (Abgrenzung: Form-Cues → `coaching_cues.md`.)
 Step 11: Wenn Trainingstag-Flag: Wetterochs RSS+JSON.
 Step 12: Berechnungen über gemergtes Schlaf-Fenster + Recovery-Ampel-Komposit (§6).
 Step 13: ANOMALIE-CHECK (§3d) → ggf. CSV (heute, bei Mitternachts-Fenster auch gestern).

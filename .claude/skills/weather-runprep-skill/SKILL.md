@@ -143,6 +143,14 @@ die **OPEN-Cues des heutigen Slot-Typs** (Mo/Mi=Easy/Long, Sa=Parkrun — §1/V3
 Heute auf diese Cues achten; der nächste Run-Report (§12d Cue-Check) prüft, ob sie umgesetzt wurden.
 Fehlt `coaching_cues.md` (noch nicht pre-seeded) → kein Block, kein Drama. KEIN Cue offen → 1 Zeile „🟢 keine offenen Cues".
 
+### 5b. 🅿️ Sa-Parkrun-Anker (Wöhrder See) + Papa-Layer + Schuh-km (Strava §18)
+
+An **Samstag** (Parkrun 09:00, Wöhrder See) zusätzlich zum Wetter proaktiv ankern:
+- **Schuh-km (`gear.md` / Strava `get_gear`):** kurzer Rotations-Check — passt der Schuh zum Slot, Verschleiß ok? (run-bundle §18).
+- **Papa-Layer (`athlete.md`):** Papa + Crew sind FAST immer dabei (Ritual) → als Motivation framen. **Papa-Faktor (KM1-Drossel +18 s/km) NUR ansagen, wenn ihr zusammen lauft** (Papas Plan Easy + Javiers Tempo); sonst NICHT annehmen — **Präsenz ≠ zusammen gelaufen** (Strava bestätigt Co-Runner nicht).
+- **Parkrun-Counter (`live.md`):** der nächste Lauf ist #[N+1] — als kleinen Anker nennen.
+- **Temp = Morgenwert 09:00** (Tagesmin + Rampe, NIE Tagesmax — §2a).
+
 ---
 
 **Ende weather-runprep-skill v1.3.** Wetterochs ist Source of Truth. Wetter = Entscheidungs-Input (vor der Empfehlung, nicht danach). Trainingstage = Mo/Mi/Sa/Do. **Slot-Uhrzeit bestimmt Starttemp — Tagesmax ist fast nie die Starttemp; Parkrun 09:00 = Morgenwert, NIE Tagesmax (§2a).** Hitze-Tax +3–4 s/°C ab 18°C. Do: Gym-Hitze (keine Klimaanlage) + Flex-Regel-Wetter.

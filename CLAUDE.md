@@ -252,7 +252,7 @@ Bei Konflikt gewinnt die höhere Stufe:
 | `Changelog` / "was hat sich geändert" | `CHANGELOG.md` | Drive (pull_drive, Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`) |
 | `Backlog` / "was steht noch offen" / "Ideen" / "Experimente" | `backlog.md` (Daily/Run/Payload/Sync tragen ein; Briefing/Sync/Menu surfen) | Drive (pull_drive, Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`) |
 
-**Quick-Commands (inline, kein Skill nötig):** `HRV` · `VO2` · `Roast` · `Coaching` · `Pace@Z2` → Senpai kennt die Metriken + Ampel (Sektion 5) und liefert knappen strukturierten Output mit passenden Ampeln.
+**Quick-Commands (inline, kein Skill nötig):** `HRV` · `VO2` · `Roast` · `Coaching` · `Pace@Z2` · `Schuhe`/`gear` (liest `gear.md` bzw. 1× Strava `get_gear` → Schuh-km-Tabelle + Rotations-Ampel) → Senpai kennt die Metriken + Ampel (Sektion 5) und liefert knappen strukturierten Output mit passenden Ampeln.
 
 ---
 
@@ -278,7 +278,7 @@ Python ist **real** über das Bash-Tool (matplotlib für echte Diagramme — Lau
 
 **Personal-Module (Drive, Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`, via `pull_drive.py` bei Trigger):** `Schuhe_Ausruestung.md` · `Kraft-Programm.md` · `Race_Strategie.md` (+`21km.gpx`) · `Schlaf_HRV_Baseline.md` · `Historie.md` · `Archiv_Historie.md` · `CHANGELOG.md` · `Project_Index.md`.
 
-**State-Dateien (Drive, gleicher Ordner, bei Session-Start + Write-Back):** `athlete.md` (Identität) · `live.md` (Live-State) · `baselines.md` · `learnings.md` · `coaching_cues.md` (session-typ-keyed Coaching-Schleife — Run-Bundle schreibt OPEN-Cues, Pre-Lauf surft sie, nächster gleichartiger Lauf verifiziert) · `readiness-history.csv` (granularer Tages-Store, 1 Zeile/Tag — speist inkrementelles CTL + Snapshot) · `trend_snapshot.md` (Woche+Monat-Rollup, schneller Multi-Wochen-Read statt Sheet-Replay — daily-check/payload regenerieren, daily-check/sync lesen; §7 Stufe 3) · `backlog.md` (Coaching-/Ideen-Backlog: längerfristige To-dos/Experimente/Hypothesen — Daily/Run/Payload/Sync tragen ein, Briefing/Sync/Menu surfen; mutable, dedup, Erledigtes → `## Erledigt`).
+**State-Dateien (Drive, gleicher Ordner, bei Session-Start + Write-Back):** `athlete.md` (Identität) · `live.md` (Live-State) · `baselines.md` · `learnings.md` · `coaching_cues.md` (session-typ-keyed Coaching-Schleife — Run-Bundle schreibt OPEN-Cues, Pre-Lauf surft sie, nächster gleichartiger Lauf verifiziert) · `readiness-history.csv` (granularer Tages-Store, 1 Zeile/Tag — speist inkrementelles CTL + Snapshot) · `trend_snapshot.md` (Woche+Monat-Rollup, schneller Multi-Wochen-Read statt Sheet-Replay — daily-check/payload regenerieren, daily-check/sync lesen; §7 Stufe 3) · `backlog.md` (Coaching-/Ideen-Backlog: längerfristige To-dos/Experimente/Hypothesen — Daily/Run/Payload/Sync tragen ein, Briefing/Sync/Menu surfen; mutable, dedup, Erledigtes → `## Erledigt`) · `gear.md` (Schuh-Kilometer + Segment-Baselines aus Strava — Run-Bundle Tier-2-Enrichment schreibt, `Schuhe`/`gear`-Quick-Command + Pre-Lauf lesen; mutable, Strava-derived; `Schuhe_Ausruestung.md` bleibt read-only Regel-Modul).
 
 **Trainingspartner-Faktor + Menschen:** Stehen im Drive-Athlet-Profil `athlete.md` (Sa-Parkrun-Anker, Drosseln KM1, W/kg-Parität, Slots) — nicht hier hardcoden.
 

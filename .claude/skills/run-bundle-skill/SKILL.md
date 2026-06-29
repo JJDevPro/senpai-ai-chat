@@ -3,11 +3,14 @@ name: run-bundle-skill
 description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integriert. PFLICHT laden bei jeder Lauf-Analyse: der runanalyse-Command, Phrasen wie analysier den Lauf/Lauf-Report/wie war mein Lauf, oder ein absolvierter Lauf in den letzten 24h. Parst FIT (fitparse, Kadenz x2, enhanced_speed) und HealthAutoExport-JSON, wendet Walking-Filter v3.5 an, liefert Splits, Lauf-Form (GCT/VO/Stride/VR), Decoupling, Pace@Z2, Schuh-Check und Senpai-Verdict. NICHT für Gym (gym-bundle-skill), Ernährung (nutrition-skill) oder reine Tages-Werte (daily-check-skill)."
 ---
 
-# Run-Bundle-Analyse-Skill v3.12 — pull_drive · V3-only · Kadenz-Walking-Filter
+# Run-Bundle-Analyse-Skill v3.13 — pull_drive · V3-only · Kadenz-Walking-Filter · Strava-Enrichment
 
 > **Primärquelle:** FIT-Datei + Trainings_v5 + Gesundheitsdaten_v5, on-demand via `python3 lib/pull_drive.py` nach `./data` gezogen (Drive bleibt read-only Single Source of Truth, nie geschrieben).
 > **Fallback:** CSV (Apple-Watch HealthFit-Export, gleicher Folder) → lokales ZIP in `./data` (Legacy, siehe §1c).
 > **V3 Protocol v0.5 ist der einzige Bewertungs-Modus.** Alle Läufe — egal welches Datum — werden nach V3 bewertet. Kein V2-Modus, keine Backward-Compatibility.
+
+> **v3.13-Änderungen (gegenüber v3.12):**
+> - **§18 NEU: Strava-MCP-Enrichment (MCP-native, §0-konform).** Nach der FIT-Analyse wird die Strava-Aktivität via `list_activities` ZUGEORDNET (kein Trigger — die .fit kommt weiter per HealthFit-Auto-Upload) und um Loot angereichert, das FIT/HAE strukturell NICHT haben: **Schuh-Kilometer + Rotations-Compliance** (`get_gear`), **strecken-normalisierter Segment-Trend** (`get_activity_performance.segment_efforts`), **Titel/Beschreibung** als subjektiver Kontext, **Parkrun-Counter** (aus Titel), **Race-Auto-Detect** (`activity_tags`), **Parkrun/Papa-Sozial-Layer** (Präsenz ≠ zusammen-gelaufen). Dünner FIT-loser Fallback (Tier 3) aus `laps`/`best_efforts`/`segment_efforts`. Neues State-File `gear.md` (§11). **⛔ §0-HART: `get_activity_streams` (Roh-Serie) NIE aufrufen** — nur Aggregat-Tools. Stream-Bridge bewusst out of scope (Backlog).
 
 > **v3.12-Änderungen (gegenüber v3.11):**
 > - **§0h Topo-Feinsampling:** `topography` (analyze_run_fit.py) rechnet jetzt **100m-Primär** (statt 200m) + einen **50m-Fein-Layer (`fine_buckets`) NUR in/um die Steil-Zonen** (Notable |Grade|≥2%, je 1 Nachbar → Anstieg→Abstieg-Paar). Deckt den echten Peak-Grade auf, den die 200m-Mittelung wegglättete (validiert: km3,5-Hügel 50m = +4,9% vs 200m-Mittel 2,9%). Notable-Gate proportional (`dd ≥ bucket·0,75`) → partieller End-Bucket/GPS-Stop-Artefakt bleibt gefiltert. Kompakt: nur Steil-Zonen im Fein-Layer, nie der ganze Lauf in 50m-Zeilen (§0-Kernregel).
@@ -75,6 +78,7 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 ✅ 🔁 Coaching-Cue-Loop (PFLICHT — Cue-Check der offenen Cues dieses Run-Typs + neue OPEN-Cues schreiben + Drive-Upload; §12d)
 ✅ 🚦 Werte am Ende (Status-Ampeln + Bedtime)
 ✅ 📊 Pace@Z2-Tracking (NUR bei Z2-Run, siehe §8c)
+✅ 👟 Strava-Enrichment (NUR wenn Aktivität via §18 aufgelöst — Schuh-km + Rotation, Segment-Δ, Parkrun-Counter, Titel/Beschreibung, Papa-Layer; sonst skip)
 ```
 
 **Self-Check ist INTERN** — nie sichtbar im Output. **Skip > Forced-Sektion** (außer Pflicht). Die Kardio-vs-Neuromuskulär-Diagnose (§7b) ist nur Pflicht, wenn eine Wand/ein Pace-Einbruch/eine Run-Walk-Eskalation vorliegt — sonst skip.
@@ -127,7 +131,7 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 
 Header:
 ```
-🕒: HH:MM | 🌤️: [°C/Wetter] | 🔋: [Status] | 🤖: [Modus] | 🧠: [Modell] + Skill v3.12
+🕒: HH:MM | 🌤️: [°C/Wetter] | 🔋: [Status] | 🤖: [Modus] | 🧠: [Modell] + Skill v3.13
 ```
 
 ---
@@ -200,8 +204,9 @@ Drei Auflösungen aus `topography` (v3.12): **1km-Output** (Übersicht) + **100m
 SCHRITT 0: PERSONEN-State + personenbezogene Module aus dem PRIVATEN Drive-Ordner pullen
   → python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde \
       --match live.md --out ./data        # dann ./data/live.md lesen
-  → bei Bedarf identisch: --match athlete.md / baselines.md / learnings.md (State)
+  → bei Bedarf identisch: --match athlete.md / baselines.md / learnings.md / coaching_cues.md / gear.md (State)
     sowie die personenbezogenen Module --match Schuhe_Ausruestung.md / Race_Strategie.md
+  → gear.md (Schuh-km + Segment-Baselines, §18) für das Strava-Enrichment mitziehen
   → Das Repo enthält KEINE Personendaten mehr — state/* und personenbezogene Module
     (Historie.md, Archiv_Historie.md, Schlaf_HRV_Baseline.md, Kraft-Programm.md,
     Race_Strategie.md, 21km.gpx, Schuhe_Ausruestung.md) leben AUSSCHLIESSLICH im Ordner
@@ -234,6 +239,15 @@ SCHRITT 3: FIT analysieren (REAL ENGINE — v3.5 Walking-Filter, Splits, Form, T
   → --as-of = HEUTE (Datum aus Kontext). Dieses JSON ist die Quelle für §2/§4/§6/§12.
   → CSV-Pfad (Fallback): scripts/analyze_run.py ist die CSV-Engine (importierbares
     Modul, siehe §2c) — nur wenn keine FIT existiert.
+
+SCHRITT 3S/3T2/3T3: STRAVA-ENRICHMENT (NEU v3.13, non-blocking, Detail §18)
+  → Nach der FIT-Analyse die Strava-Aktivität via mcp__Strava__list_activities ZUORDNEN
+    (Startzeit ±5 min UND Distanz ±2 %; KEIN Trigger — .fit kommt per HealthFit-Auto-Upload).
+  → Tier 2 (immer, auch mit FIT): §0-sichere MCP-Aggregate anreichern — Schuh-km + Rotation
+    (get_gear → gear.md), Segment-Δ (get_activity_performance.segment_efforts → gear.md),
+    Titel/Beschreibung, Parkrun-Counter (Titel → live.md), Race-Tag, Parkrun/Papa-Layer (§18.4).
+  → Tier 3 (nur wenn KEINE FIT/CSV): FIT-lite-Report aus laps/best_efforts/segments + hartes
+    „kein-Form"-Label. ⛔ mcp__Strava__get_activity_streams NIE (§0-Bruch). Voller Workflow: §18.
 
 SCHRITT 4: Trainings_v5 für CTL/ATL/TSB pullen
   → python3 lib/pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU \
@@ -858,7 +872,7 @@ Aus ./data/live.md (Counter-Stand + #100-Zieldatum). **#100** → Club-100-Shirt
 ## 12. Output-Template (Long-Modus)
 
 ```
-🕒: HH:MM | 🌤️: [°C/Wetter] | 🔋: [Status] | 🤖: [Modus] | 🧠: [Modell] + Skill v3.12
+🕒: HH:MM | 🌤️: [°C/Wetter] | 🔋: [Status] | 🤖: [Modus] | 🧠: [Modell] + Skill v3.13
 
 # 🔥 RUN-REPORT — [Wochentag] [Datum] · [Uhrzeit] · [Run-Typ] · [Workout-Name]
 
@@ -938,6 +952,9 @@ KEINE Cutoff-Panik aus methodisch ungültigen Metriken oder neuromuskulärer Erm
 
 ## 📊 Pace@Z2-Update (nur bei Z2-Run)
 [Tracking-Tabelle: Datum/Temp/Roh (running-only, M:SS/km)/Normalisiert (M:SS/km)/Schuh/Δ vs Baseline. Roh = pace_z2_run (§8c), identisch zur Hitze-Korrektur, NIE die as-run-Pace.]
+
+## 👟 Strava-Enrichment (§18 — wenn Aktivität aufgelöst, sonst skip)
+[Schuh: Modell (voll) + km (get_gear, /1000) + Rotations-Compliance-Ampel + Verschleiß-Flag. Segment-Δ vs gear.md-Baseline (Parkrun-Marquee). Parkrun-Counter (#NN aus Titel). Titel/Beschreibung als subjektiver Kontext. Parkrun/Papa-Layer: Präsenz (Default) vs. zusammen-gelaufen (nur bei Evidenz → Papa-Faktor). ⛔ keine Streams.]
 
 ## 🚦 Werte am Ende
 [Ampeln + Bedtime-Wache + Allergie-Reminder Mai/Juni]
@@ -1032,6 +1049,8 @@ KEINE Cutoff-Panik aus methodisch ungültigen Metriken oder neuromuskulärer Erm
 - CSV verarbeitet obwohl FIT für gleiches Datum verfügbar = Skill-Bruch
 - Decoupling aus Intervall als HM-Prognose = Skill-Bruch
 - Cutoff-Panik aus neuromuskulärer Ermüdung = Skill-Bruch (§7b)
+- `mcp__Strava__get_activity_streams` aufrufen (Roh-Zeitreihe in den Kontext) = Skill-Bruch (§0/§18) — nur §0-sichere Strava-Aggregat-Tools
+- Schuh-km in `Schuhe_Ausruestung.md` schreiben (read-only Regel-Modul) = Skill-Bruch — Schuh-km gehören in `gear.md` (§18.5)
 - Hitze-Tax mit alter V2-Formel (4,5 sek/km/°C ab 15°C) = V3-Bruch
 
 ---
@@ -1162,6 +1181,8 @@ Weggelassen: Topografie-Detail, Bestwerte, HM-Projektion.
 | „Kadenz kollabiert" (aus geh-gemischten Werten) | Running-only Kadenz prüfen — nur dann Kollaps wenn running-only fällt |
 | „durchgelaufen" ohne Kadenz-Check | Gehanteil via Kadenz-Filter verifizieren |
 | Walking-Wert ungeprüft bei harter Session | gegen User-Erinnerung + Kadenz-Verteilung plausibilisieren |
+| `get_activity_streams` aufrufen (Roh-Serie) | NUR §0-sichere Strava-Aggregat-Tools (get_gear/get_activity_performance/list_activities) — Streams = §0-Bruch (§18) |
+| „mit Papa gelaufen" aus bloßer Parkrun-Präsenz | Präsenz framen; Papa-Faktor nur bei Evidenz (Titel/Beschreibung/Pace-Konvergenz, §18.4) |
 
 ---
 
@@ -1194,6 +1215,12 @@ Weggelassen: Topografie-Detail, Bestwerte, HM-Projektion.
 | `fitparse` nicht installiert | `pip install fitparse --break-system-packages` |
 | Temp >26°C im Lauf | Wetter-Ampel 🔴, „Startzeit verschieben" Empfehlung |
 | HR Ø >Z2-Cap in Easy/Long-Run | V3-Bruch flaggen im Verdict (RACE ausgenommen) |
+| Strava-Aktivität noch nicht synchronisiert | §18 skip, FIT-Report steht, 1 Zeile im Verdict |
+| Strava gear_id fehlt an der Aktivität | Schuh-km skip, „kein Schuh verknüpft", nicht raten |
+| `get_gear` total_distance in Metern | /1000 = km (Einheiten-Falle), so in gear.md schreiben |
+| Strava-Segment nicht auf dieser Strecke | keine Δ-Zeile, nicht erfinden/carry-forwarden |
+| gear.md fehlt in Drive (no-create) | PRE-SEED-Hinweis (drive-seed/gear.md), NICHT blockieren/selbst anlegen |
+| Parkrun-Präsenz ≠ zusammen gelaufen | Papa-Faktor nur bei Evidenz (Titel/Beschreibung/Pace-Konvergenz), nie aus Präsenz (§18.4) |
 
 ---
 
@@ -1213,6 +1240,55 @@ Bei >5% Divergenz: ⚠️-Hinweis-Zeile.
 
 ---
 
-**Ende der Skill-Definition v3.12.**
+## 18. 🟧 STRAVA-MCP-ENRICHMENT (v3.13 — MCP-native, §0-konform)
+
+> **Strava ersetzt FIT NICHT.** Die Lauf-FORM (GCT/VO/Vertical Ratio/Stride/fractional cadence/Runna-Prescription) ist strukturell **FIT-only** — Stravas API liefert sie nicht (auch Streams nicht). Strava reichert den FIT-Report um Loot an, das FIT/HAE gar nicht haben, und liefert einen dünnen FIT-losen Fallback.
+> **Quelle = MCP-Tools** (`mcp__Strava__*`), von Senpai direkt aufgerufen — die Ergebnisse sind bereits Aggregate. **KEIN neuer Python, KEIN Secret, KEINE neue Dependency.**
+
+### 18.0 ⛔ §0-HARTGRENZE (Skill-Bruch)
+- **§0-SICHER (erlaubt):** `list_activities`, `get_activity_performance`, `get_gear`, `get_athlete_zones`, `get_club_info` — liefern Totals/Averages/per-Lap/per-Segment-Aggregate, KEINE Roh-Serie.
+- **§0-BRUCH (NIE aufrufen):** `mcp__Strava__get_activity_streams` (Roh-Zeitreihe per-Sekunde). Es gibt KEINE Stream-Bridge (bewusst out of scope, Backlog). Ohne FIT gibt es daher kein Strava-Decoupling/Walking-Filter — das liefert die FIT (HealthFit-Auto-Upload).
+- **Personal-Data-frei:** Strava-Daten (Schuh-km, Segmente, Parkrun-Counter, Papa-Kontext, Club-/Nachname-Daten) leben NUR in Drive-State (gear.md/live.md/athlete.md) bzw. im Kontext — NIE im git-Repo.
+
+### 18.1 SCHRITT 3S — Activity-Resolution (KEIN Trigger, nur Zuordnung)
+Die .fit kommt per HealthFit-Auto-Upload (Strava ist NICHT der Trigger). Nach SCHRITT 3:
+→ `mcp__Strava__list_activities` (range = Lauf-Datum ±1 Tag, `include_tags:true`)
+→ die analysierte .fit der Strava-Aktivität zuordnen über **Startzeit ±5 min UND Distanz ±2 %**. `{activity_id, gear_id, name, description, activity_tags}` merken.
+→ Kein Match (noch nicht synchronisiert — häufig bei Analyse kurz nach dem Lauf) → Strava-Tiers skip, 1 Zeile im Verdict. FIT-Report steht unverändert. Zwei Läufe gleichen Tags / Ambiguität → FIT bevorzugen, Enrichment skippen.
+
+### 18.2 SCHRITT 3T2 — Tier-2-Enrichment (läuft IMMER wenn aufgelöst, auch MIT FIT)
+**(a) Schuh-km + Rotations-Compliance:** `get_gear(gear_id)` → `total_distance` ist in **METERN** → /1000 = km (Einheiten-Falle!). Modell (voll ausschreiben — NEVER-Liste) vs. Rotations-Regeln (`Schuhe_Ausruestung.md`/§14): richtiger Schuh für den Lauf-Typ (Easy >5 km → ASICS Superblast 3 / ASICS Megablast; Easy ≤5 km → ASICS Novablast 5)? Verschleiß-Flag bei ~600–800 km (relevant bei dem Körpergewicht). → km nach `gear.md` schreiben (`--upload`). Schwelle überschritten → 1 Zeile `backlog.md`.
+**(b) Segment-Trend (strecken-normalisiert):** `get_activity_performance(activity_id).segment_efforts[]` → je Segment Effort-Zeit vs. Baseline in `gear.md` → Δ. PR → neue Baseline. **Sa-Parkrun am Wöhrder See = Marquee** (gleiche Strecke jede Woche → sauberer Fitness/Pace@Z2-Trend als Ganz-Lauf-Vergleich).
+**(c) Titel + Beschreibung (subjektiver Kontext, ersetzt RPE):** `name` + `description` → in den Verdict spiegeln (Athlet pflegt sie aktiv); Workout-Intent aus dem Titel gegen die Ist-Laps cross-checken.
+**(d) Parkrun-Counter + Race-Detect:** Titel `~Parkrun #(\d+)` → Counter in `live.md` fortschreiben (max der Nr.; „Warmup"-Läufe NICHT zählen). `activity_tags` enthält `"Race"` → als Rennen markieren, ggf. race-projection-skill anstoßen.
+**(e) Best-Efforts-PR (Bonus, gratis aus 3T2b):** `best_efforts[]` (Fastest 400/1k/Mile/5k) vs. PRs in `live.md`/`baselines.md`. Neuer PR NUR schreiben, wenn (bei FIT) `best_values` übereinstimmt — sonst „Strava-PR (unbestätigt)" (GPS-Spike-Schutz).
+**(f) Parkrun/Papa-Sozial-Layer:** siehe §18.4.
+
+### 18.3 SCHRITT 3T3 — Tier-3-Fallback (NUR wenn KEINE FIT UND KEINE CSV)
+Dünnes Sicherheitsnetz (selten, da HealthFit auto-uploadet). „FIT-lite"-Report aus §0-sicheren Aggregaten: `laps`→Splits, HR/cadence/watts/calories→Übersicht, `best_efforts`→Bestwerte, `segment_efforts`→Marker, `get_athlete_zones`→HR-Zonen. **HARTES Label PFLICHT:** „⚠️ Kein GCT/VO/VR/Stride — Strava-API liefert die Lauf-Form NICHT. FIT für die Form hochladen." Form-Sektionen NICHT erfinden. no-FIT-Präzedenz: (1) Strava FIT-lite → (2) HAE-JSON nur für Form-Proxys (§2b) → (3) Form „N/A 📡".
+
+### 18.4 Parkrun/Papa-Sozial-Layer (Präsenz ≠ zusammen gelaufen)
+Nur **Parkrun** ist aktiv (NTC + andere Clubs = passive Mitgliedschaft → Events IGNORIEREN, nicht surfacen).
+1. **Parkrun-Erkennung:** Sa-09:00-Lauf am Wöhrder See (Anker `athlete.md`, ~49.4533/11.0998) ODER Titel „Parkrun #NN".
+2. **Präsenz (Default):** „Papa + Crew dabei (Ritual)" — fast immer wahr, als sozialer Kontext/Motivation framen. **Papa-Faktor NICHT allein aus Präsenz.**
+3. **Zusammen gelaufen (bedingt):** nur ableiten, wenn Titel/Beschreibung es sagt ODER das Pace-Profil zu Papas ~25:00/Easy passt (Papa Easy + Javier Tempo → Konvergenz). Sonst **fragen** statt annehmen. **Strava bestätigt Co-Runner NICHT** (kein athlete_count/keine Identitäten).
+4. **Papa-Faktor NUR bei (3):** KM1-Drossel +18 s/km erwartbar, −30 % Pace-Varianz, ~2.52 W/kg-Parität (`learnings.md`) als Auswertungs-Linse; KM1-Schnellstart dann KEIN Fehler.
+
+### 18.5 `gear.md` — State-Schema (Drive-State, §11-registriert)
+Eigenes mutables State-File (wie `coaching_cues.md`). `Schuhe_Ausruestung.md` bleibt read-only Regel-Modul (keine km). Pull in SCHRITT 0; Write-Back via `pull_drive.py --upload --name gear.md`. Fehlt in Drive → PRE-SEED-Hinweis (`drive-seed/gear.md`), NICHT blockieren/selbst anlegen.
+
+| Block | Spalten |
+|---|---|
+| Schuh-Kilometer | gear_id · Modell (voll) · km (=/1000) · Stand (Strava-Sync) · Status |
+| Segment-Baselines | segment_id · Name · Best (MM:SS) · Datum · Letzter Effort · Δ |
+
+### 18.6 Quick-Command + Cross-Skill
+- **`Schuhe`/`gear` (CLAUDE.md §9):** liest `gear.md` (oder 1× `get_gear` bei altem Sync) → km-Tabelle + Rotations-Ampel, ohne vollen Skill-Load.
+- **weather-runprep + /briefing:** verankern den anstehenden Sa-Parkrun proaktiv (09:00-Wetter-Fenster, Papa-Faktor-Pre-Run mit Bedingungs-Caveat).
+- **daily-check bleibt run-only** (kein Schuh-km im Daily; Verschleiß-Schwelle → `backlog.md`).
+
+---
+
+**Ende der Skill-Definition v3.13.**
 
 Senpai liest diese Datei bei Run-Analyse-Trigger. Pull-Workflow ist Default — `python3 lib/pull_drive.py` zieht die FIT nach `./data`, `analyze_run_fit.py` reduziert sie; FIT bevorzugt, CSV-Fallback wenn keine FIT für gewünschtes Datum, lokales ZIP nur als Legacy. Walking-Diskriminator ist Kadenz (§4), Wand-Diagnose via Kardio-vs-Neuromuskulär (§7b).

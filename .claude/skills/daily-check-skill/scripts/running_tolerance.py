@@ -14,9 +14,13 @@ METHODE (ACWR — Acute:Chronic Workload Ratio):
   - Acute   = Last der JÜNGSTEN Woche (7-Tage-Fenster).
   - Chronic = rollender Mittelwert der letzten 4 Wochen (28-Tage-Fenster) =
               die eingeschwungene Gewohnheits-Last.
-  - ACWR    = acute / chronic. Der "Sweet Spot" liegt im Band ~0.8–1.3; über 1.3
-              steigt das Verletzungs-Risiko (etablierte Sportwissenschafts-Heuristik,
-              Gabbett). RAMP_FLAG feuert bei ACWR > RAMP_MAX (1.3).
+  - ACWR    = acute / chronic. Konventioneller "Sweet Spot" ~0.8–1.3; über 1.3 gilt
+              das Verletzungs-Risiko als erhöht. ⚠️ Das ACWR-"Sweet-Spot"-Modell ist
+              methodisch UMSTRITTEN (Mathematical Coupling: Acute steckt in Chronic →
+              Spurious Correlation; Wang et al. 2020: Effekt verschwindet bei sauberer
+              kontinuierlicher Analyse; Retraction des Gabbett-2016-Figures beantragt).
+              Hier als KONSERVATIVE Ramp-Leitplanke, NICHT als validierter Grenzwert.
+              RAMP_FLAG feuert bei ACWR > RAMP_MAX (1.3).
   - Ceiling = CEILING_FACTOR (1.3) × Chronic = empfohlene Obergrenze der nächsten
               Wochen-Last, damit man im Sweet Spot bleibt (1.3 = oberer Rand des Bands).
 
@@ -46,7 +50,7 @@ from datetime import date, datetime, timedelta
 # ── Schwellen (dokumentiert, NICHT willkürlich) ──────────────────────────────
 ACUTE_WEEKS = 1     # Acute-Fenster = jüngste Woche (7 d)
 CHRONIC_WEEKS = 4   # Chronic-Fenster = 4 Wochen (28 d rollender Mittel)
-RAMP_MAX = 1.3      # ACWR-Obergrenze des Sweet Spots (Gabbett); darüber = Ramp-Alarm
+RAMP_MAX = 1.3      # konservative Ramp-Leitplanke (~1.3; ACWR-Sweet-Spot umstritten, kein validierter Grenzwert)
 ACWR_LOW = 0.8      # untere Sweet-Spot-Grenze; darunter = Detraining/Unterlast
 CEILING_FACTOR = 1.3  # Ceiling = Faktor × Chronic (= oberer Rand des Sweet Spots)
 

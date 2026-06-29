@@ -275,7 +275,7 @@ Schwerere Läufer haben höhere Bodenreaktionskräfte pro Schritt. Erhöhte Kade
 | Gewicht | Körpergewicht-SoT (siehe live.md, Körperwaage manuell) | Ausgangsgewicht −~3,5 kg | Ausgangsgewicht −~7,5 kg |
 | KFA | (Live-State / userMemories) | ≤29% | ≤26% |
 | LBM | (Live-State / userMemories) | LBM-Ist +~2 kg | LBM-Ist +~4 kg |
-| Viszeralfett | (Live-State / userMemories) | ≤4,7 | ≤4,3 |
+| Bauchumfang (Proxy) | (Live-State / userMemories, manuell) | ↓ Trend | ↓ Trend |
 
 ### Gesundheit & Recovery
 | KPI | Heute | Ziel |

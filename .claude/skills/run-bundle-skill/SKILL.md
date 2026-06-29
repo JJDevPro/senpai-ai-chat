@@ -815,7 +815,7 @@ Aus ./data/live.md (Counter-Stand + #100-Zieldatum). **#100** → Club-100-Shirt
 **Hitze (V3-rekalibriert):**
 - **Baseline 18°C** (nicht mehr 15°C)
 - Pace-Tax: **+3-4 sek/km pro °C über 18°C** (provisorisch, Kompressionsshirt-Kalibrierung läuft)
-- Bisheriger 4,5 sek/km/°C ab 15°C war Shapewear-konfundiert (siehe Ausrüstung im Profil) → DEPRECATED
+- Bisheriger 4,5 sek/km/°C ab 15°C = ältere, gröbere Kalibrierung → DEPRECATED (separat davon: die Shapewear-Blacklist betrifft den +8-bpm-HR-Drift, NICHT die Hitze-Tax — nicht vermischen)
 
 **Wetter-Ampel V3:**
 
@@ -1083,7 +1083,7 @@ Weggelassen: Topografie-Detail, Bestwerte, HM-Projektion.
 
 > **SSoT-Pointer:** Live-Werte (Gewicht/KFA/Viszeralfett/HRV/PRs/Parkrun-Counter) = **./data/live.md** (aus Personen-Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` gepullt, SCHRITT 0). Schuh-Detail = `./data/Schuhe_Ausruestung.md` (`pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match Schuhe_Ausruestung.md --out ./data`). Race-Pacing = `./data/Race_Strategie.md` (gleicher Pull, `--match Race_Strategie.md`). Rotationsregel = `modules/V3_Protocol.md` (METHOD, bleibt im Repo). Hier nur Analyse-Schnellref — bei Konflikt gewinnt der Live-State.
 
-**Body Comp:** Gewicht + KFA + Viszeralfett **aus ./data/live.md** (nie hier hardcoden). „Jeder kg = +0,025 W/kg" + „−0,9 kcal/km". Post-HM: Recomp-Fokus (Gym-Restart + Casein + Tracking).
+**Body Comp:** Gewicht + KFA (+ Bauchumfang, falls gepostet) **aus ./data/live.md** (nie hier hardcoden). „Jeder kg = +0,025 W/kg" + „−0,9 kcal/km". Post-HM: Recomp-Fokus (Gym-Restart + Casein + Tracking).
 
 **Gym-PRs als Hebel:** Beinpresse→Stride | Waden→GCT | Beinbeuger→Stride-Lever | Beinstrecker→Quad | Adduktion/Abduktion→Hüfte | Core/Rotation→Lauf-Stabilität | Latzug/Rücken→Haltung.
 

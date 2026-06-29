@@ -59,7 +59,7 @@ Erst nach einem **echten, fehlgeschlagenen Pull-Versuch** gilt: fehlender Wert =
 
 ## 🎯 SoT-Snapshot (Wochen-Messung, Körperwaage)
 - Gewicht: [X,X kg] (Δ [±X,X] vs Vor-KW)
-- KFA: [XX,X%] | Viszeralfett: [X,X] | LBM/Muskel: [X,X]
+- KFA: [XX,X%] | Bauchumfang: [XXX cm] | LBM/Muskel: [X,X]
 - RHR: [XX] | VO2Max: [XX,X] [Ampel]
 
 ## 🏃 Trainings-Absolvierung

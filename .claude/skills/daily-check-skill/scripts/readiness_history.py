@@ -111,6 +111,18 @@ def _dig(obj, *path):
     return cur
 
 
+def _num(v):
+    """Entpackt ein `{'value': x, ...}`-Aggregat auf den Skalar; Skalare unverändert.
+
+    Manche slice-Felder (z. B. recovery.rhr) liefern ein `{value,date}`-Dict statt
+    eines nackten Werts. Ohne dieses Unwrapping landete der ganze Dict-String in der
+    CSV-Zelle (`"{'value': 61.0, ...}"`) und der Trend-Snapshot las ihn als leer.
+    """
+    if isinstance(v, dict):
+        return v.get("value")
+    return v
+
+
 def build_row(as_of, readiness=None, body_battery=None, banister=None, hrv_baseline=None,
               daily=None, signals=None, tolerance=None):
     """Reduzierte Upstream-Outputs → eine Trend-Zeile als dict (Schema = HEADER).
@@ -143,11 +155,11 @@ def build_row(as_of, readiness=None, body_battery=None, banister=None, hrv_basel
         "top_limiter": r.get("top_limiter"),
         "ctl": ba.get("ctl"),
         "atl": ba.get("atl"),
-        "hrv_ms": _dig(daily, "hrv_night", "avg"),
-        "rhr": _dig(daily, "recovery", "rhr"),
-        "weight": _dig(daily, "body_comp", "weight_body_mass", "value"),
-        "kfa": _dig(daily, "body_comp", "body_fat_percentage", "value"),
-        "vo2": _dig(signals, "vo2_max", "value"),
+        "hrv_ms": _num(_dig(daily, "hrv_night", "avg")),
+        "rhr": _num(_dig(daily, "recovery", "rhr")),
+        "weight": _num(_dig(daily, "body_comp", "weight_body_mass", "value")),
+        "kfa": _num(_dig(daily, "body_comp", "body_fat_percentage", "value")),
+        "vo2": _num(_dig(signals, "vo2_max", "value")),
         "week_km": (tolerance or {}).get("week_km"),
     }
 

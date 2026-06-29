@@ -104,6 +104,31 @@ def test_build_row_bad_date_raises():
         rh.build_row("28.06.2026", readiness=_readiness())
 
 
+def test_build_row_unwraps_dict_valued_slice_fields():
+    """Echte slice-Felder liefern teils `{value,date}`-Dicts statt Skalaren
+    (recovery.rhr); build_row muss den Skalar entpacken, nicht den Dict-String
+    in die CSV-Zelle schreiben (sonst liest der Trend-Snapshot die Zelle als leer)."""
+    daily = {
+        "recovery": {"rhr": {"value": 61.0, "date": "2026-06-28"}},
+        "hrv_night": {"avg": 65},
+        "body_comp": {
+            "weight_body_mass": {"value": 115.69},
+            "body_fat_percentage": {"value": 33.74},
+        },
+    }
+    row = rh.build_row("2026-06-29", daily=daily)
+    assert row["rhr"] == 61.0          # NICHT "{'value': 61.0, ...}"
+    assert row["hrv_ms"] == 65
+    assert row["weight"] == 115.69
+    assert row["kfa"] == 33.74
+
+
+def test_num_unwraps_value_dict_and_passes_scalars():
+    assert rh._num({"value": 61.0, "date": "x"}) == 61.0
+    assert rh._num(55) == 55
+    assert rh._num(None) is None
+
+
 def _header_only_csv():
     return ",".join(rh.HEADER) + "\n"
 

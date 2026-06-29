@@ -149,7 +149,7 @@ Datum: `"2026-06-16 06:00:00 +0200"` → Stunde = Zeichen 11:13.
 | Trigger | Schwelle |
 |---|---|
 | HRV-Stundenwert kollabiert | Schlaf-Stundenwert < 40 ms |
-| Breathing Disturbances | > 10 |
+| Breathing Disturbances | > 12 (🟠/🔴-Band; Ampel ≤10🟢/>10–12🟡/>12–15🟠/>15🔴, §11) |
 | Schlaf fragmentiert | Wachphase > 1,0 h ODER > 3 Wach-Spikes |
 | HRV-Schlaf-Ø rot 2 Tage | < 50 ms heute UND gestern |
 | SpO2-Dip | Stundenwert < 90 % |
@@ -402,26 +402,26 @@ Aus `sleep` (§3f) — Totals gelten für die ganze Nacht, egal in welcher Tages
 ## 9. 💓 HRV-FEINVERLAUF (15-Min) + RHR (immer voll)
 
 **Primäre Anzeige = `hrv_night.fine[]` (15-Min-Feinserie, §3f), NICHT mehr die Stundentabelle.** Die Stunden-Mittel glätten die nächtliche Volatilität künstlich weg (Audit: roh σ ~33 / Range ~117 vs hourly σ ~21 / Range ~63) — die 15-Min-Raster zeigen die echten Einbrüche/Peaks, die ein Stunden-Schnitt verschluckt. `fine[]` liefert sauberes `HH:MM`-Label (z. B. `04:30`), ist klein (≤~36 Punkte/Nacht) und verletzt NIE die §0-Kernregel (kein Roh-Minuten-Array). Alle gemergten 15-Min-Buckets sleepStart→sleepEnd (auch Vor-Mitternacht aus der Gestern-Datei):
-```
-💓 HRV-Feinverlauf (Schlaf, 15-Min)
-Zeit    HRV     Ampel
-04:15   81      🟢
-04:30   23      🔴
-[…]
-─────────────────
-Ø Schlaf: XX ms [Ampel] · Min XX · Max XX · Range XX · σ XX   (aus ROH-Punkten, n=NN)
-Stunden-Rollup: [HH Ø · HH Ø · …]   (1-Zeilen-Scan-Ansicht aus hourly[])
-[1 Satz: hohe σ = unruhig; später Peak = Recovery-Zeichen]
-```
-> **Volatilität aus ROH-Punkten:** `Min/Max/Range/σ` IMMER aus `hrv_night.{min,max,range,std}` zitieren (rohe In-Window-Punkte, nicht Stunden-/15-Min-Mittel — auch die `fine[]`-Buckets sind gemittelt, nur feiner). Die `hourly[]`-Serie bleibt als **kompakter Stunden-Rollup** verfügbar (1-Zeilen-Scan), ist aber nicht mehr die Haupt-Tabelle.
-```
+**HRV-Feinverlauf = echte Markdown-Tabelle** (alle 15-Min-Buckets sleepStart→sleepEnd; lange Liste darf als „Auszug (Extreme)" gekürzt werden, dann so labeln):
 
-- Ruhepuls: [XX bpm] (resting_heart_rate, Heute-Datei) [vs. Baseline]
-- Min-HR-Tiefpunkt: [XX bpm] um [HH:MM]
-- Cardio Recovery: [XX bpm] (>40 Excellent / 30-40 Above Avg / <30 Below) — letzte Lesung; fehlt → `live.md` (privater Drive-Ordner: `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data` → `./data/live.md`), NIE als Verschlechterung
-- 🌡️ Schlaf-Handgelenk-Temp: [XX,X °C] (Δ Baseline [±0,XX], Flag bei >+0,4 °C — daily_signals §3i, ab ≥5 Nächten)
-- VO2max: [XX,X] (letzte Lesung [Datum]) — sporadisch; fehlt im Export → `live.md`-Baseline (aus dem Athleten-Profil) aus privatem Drive-Ordner (`python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data` → `./data/live.md`), Abwesenheit ≠ Verschlechterung
-```
+| 🕒 Zeit | 💓 HRV (ms) | Ampel |
+|---|---|---|
+| 04:15 | 81 | 🟢 |
+| 04:30 | 23 | 🔴 |
+| … | … | … |
+
+**Summary (aus ROH-Punkten):** Ø Schlaf XX ms [Ampel] · Min XX · Max XX · Range XX · σ XX (n=NN) · Stunden-Rollup: [HH Ø · HH Ø · …].
+> **Volatilität IMMER aus `hrv_night.{min,max,range,std}`** (rohe In-Window-Punkte, nicht die gemittelten Buckets). `hourly[]` = kompakter 1-Zeilen-Rollup, nicht die Haupttabelle. 1 Satz Einordnung (hohe σ = unruhig; später Peak = Recovery-Zeichen).
+
+**RHR & Recovery-Metriken = Markdown-Tabelle** (Metrik-Emoji je Zeile; fehlende Werte „N/A 📡", NIE 0):
+
+| Metrik | Wert | Kontext |
+|---|---|---|
+| ❤️ Ruhepuls | [XX bpm] | vs. Baseline (resting_heart_rate, Heute-Datei) |
+| 📉 Min-HR-Tiefpunkt | [XX bpm] | um [HH:MM] |
+| 🫀 Cardio Recovery | [XX bpm] | >40 Excellent / 30–40 Above / <30 Below — fehlt → `live.md`-Fallback, NIE als Verschlechterung |
+| 🌡️ Handgelenk-Temp (Schlaf) | [XX,X °C] | Δ Baseline [±0,XX], Flag >+0,4 °C (§3i, ab ≥5 Nächten) |
+| 🫁 VO2max | [XX,X] | letzte Lesung [Datum]; fehlt → `live.md`-Baseline, Abwesenheit ≠ Verschlechterung |
 **HRV-Ampel (Safety):** 🟢 ≥60 · 🟡 50-59 (2+ Tage: Bedtime/Mg/-10%) · 🔴 <50 (2+ Tage: Deload) · 🔴🔴 <40 + Schlaf <6h: **Training STREICHEN**. Schlaf-Ø nur aus Stunden im Schlaf-Fenster.
 
 -----
@@ -444,7 +444,7 @@ Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
 -----
 
 ## 11. 🫁 ATMUNG & SpO2 / WALKING-HR
-- **Atemstörungen:** >10 + Allergie-Saison (saisonaler Trigger, siehe Medical-Notes im Athleten-Profil) → "Medikation vergessen?" + CSV-Auto-Load. Sonst 1 Zeile 🟢.
+- **Atemstörungen (abgestufte Ampel):** ≤10 🟢 (narrativ ignorieren) · >10–12 🟡 · >12–15 🟠 · >15 🔴. Ab 🟡 + Allergie-Saison (saisonaler Trigger, siehe Medical-Notes im Athleten-Profil) → "Medikation vergessen?"; ab 🟠 CSV-Auto-Load; >15 = CRITICAL. Wert immer mit Band-Emoji zeigen (geteilte Schwellen: `sentinel.py`/`athlete.md`).
 - **SpO2:** Dip <90% flaggen → bekanntes positionelles Schlaf-Muster (siehe Medical-Notes im Athleten-Profil), Nasenstrip; CSV-Forensik anbieten.
 - **Walking-HR:** <95 = Fitness-grün (kleine Belohnung).
 

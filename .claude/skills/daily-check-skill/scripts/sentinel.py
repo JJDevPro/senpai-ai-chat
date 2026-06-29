@@ -46,7 +46,7 @@ TRIP-WIRES (jeweils an CLAUDE.md §5/§6 gebunden — KEINE neuen Schwellen erfu
        Schonhaltungs-KONTEXT, NIE als Befund framen).
 
   7. Breathing-Disturbances  (§3c/§11: Schwelle 10/h)
-       --daily recovery.breathing_disturbances > 10 → WARN (Medikation/Allergie prüfen).
+       --daily recovery.breathing_disturbances: ≤10🟢 / >10–12🟡 / >12–15🟠 / >15🔴 (>10 WARN, >15 CRITICAL).
 
 CLI:  sentinel.py [--health-csv CSV] [--daily JSON|-] [--weight-csv CSV]
                   [--weight-threshold-kg N] [--weight-approach-kg N]
@@ -75,7 +75,11 @@ import unicodedata
 HRV_RED = 50            # §5: 🔴 unter diesem Wert (Deload/Cap bei 2+ Tagen)
 HRV_CRITICAL = 40       # §5/§6: 🔴🔴 unter diesem Wert (Gate-Territorium)
 RHR_OVER_BASELINE = 5   # §6 Recovery-Komposit: "RHR Baseline+5"
-BREATHING_MAX = 10      # §3c/§11: Atemstörungen actionable über diesem Wert
+# Atemstörungen — abgestufte Bänder (athlete.md Medical / CLAUDE.md §5):
+#   ≤10 🟢 · >10–12 🟡 · >12–15 🟠 · >15 🔴 . >10 = actionable, >15 = CRITICAL.
+BREATHING_GREEN = 10     # bis hier 🟢 (narrativ ignorieren)
+BREATHING_YELLOW = 12    # >10–12 🟡
+BREATHING_ORANGE = 15    # >12–15 🟠 · darüber 🔴
 BEDTIME_TARGET_MIN = 30  # §8: Bedtime-Ziel 00:30 = 30 min nach Mitternacht
 SUSTAINED_DAYS = 2      # §5/§6: "2+ Tage" / "≥2 days" = anhaltendes Muster
 WEIGHT_APPROACH_KG = 2.0  # operatives Annäherungs-Band (kein Körper-Fakt)
@@ -169,23 +173,30 @@ def _rhr_elevation(health_rows):
 
 
 def _weight_creep(daily, weight_rows, threshold, approach):
-    """§1: Gewicht steigt Richtung metabolischer Schwelle (Wert aus athlete.md)."""
-    series, src = [], None
-    if weight_rows:
-        series = [(r["date"], r["weight_kg"]) for r in weight_rows
-                  if r.get("date") and r.get("weight_kg") is not None]
-        series.sort()
-        src = "weight_csv"
-    if not series and daily:
-        bc = (daily.get("body_comp") or {}).get("weight_body_mass")
-        if bc and bc.get("value") is not None:
-            series = [(bc.get("date") or daily.get("as_of") or "?", bc["value"])]
-            src = "daily_body_comp" + (" (off-protocol, NICHT SoT)" if bc.get("off_protocol") else "")
-    if not series:
+    """§1: Gewicht steigt Richtung metabolischer Schwelle (Wert aus athlete.md).
+
+    Frische-Logik (Fix KW27): den NEUESTEN Wert aus BEIDEN Quellen nehmen — die
+    Gewicht-CSV (Sheet, hängt oft 1-2 Tage nach) UND HAE-body_comp (Withings-Auto-
+    Sync, meist tagesaktuell). Früher gewann die CSV stur, sobald sie irgendeine
+    Zeile hatte → das Trip-Wire feuerte auf einem veralteten Wert (z. B. 116,6 vom
+    Vortag statt 115,7 von heute). Jetzt: pro Datum den Punkt mergen (body_comp
+    gewinnt für SEIN Datum), nach Datum sortieren, der jüngste Punkt zählt."""
+    pts = {}  # date -> (weight_kg, src)
+    for r in (weight_rows or []):
+        if r.get("date") and r.get("weight_kg") is not None:
+            pts[r["date"]] = (r["weight_kg"], "weight_csv")
+    bc = ((daily or {}).get("body_comp") or {}).get("weight_body_mass")
+    if bc and bc.get("value") is not None:
+        bdate = bc.get("date") or (daily or {}).get("as_of") or "?"
+        bsrc = "HAE body_comp" + (" (off-protocol, NICHT SoT)" if bc.get("off_protocol") else "")
+        pts[bdate] = (bc["value"], bsrc)   # frischer/präziser als ein Sheet-Eintrag desselben Tags
+    if not pts:
         return None, False
 
+    series = sorted((d, v) for d, (v, _s) in pts.items())
     window = series[-5:]                       # letzte N Wiegungen
     latest = window[-1][1]
+    src = f"{pts[series[-1][0]][1]}, {series[-1][0]}"   # Quelle + Datum des FRISCHESTEN Punkts
     net = latest - window[0][1]
     trending_up = len(window) >= 2 and net > 0
     trend_txt = f"{window[0][1]:.1f}→{latest:.1f} kg (+{net:.1f})"
@@ -252,18 +263,25 @@ def _walking_asymmetry(daily):
 
 
 def _breathing(daily):
-    """§3c/§11: Atemstörungen >10/h → WARN (Medikation/Allergie prüfen)."""
+    """§3c/§11: Atemstörungen — abgestufte Ampel ≤10🟢 / >10–12🟡 / >12–15🟠 / >15🔴.
+    ≤10 = narrativ ignorieren; >10 actionable (Medikation/Allergie); >15 = CRITICAL."""
     if not daily:
         return None, False
     bd = (daily.get("recovery") or {}).get("breathing_disturbances")
     if not bd or bd.get("value") is None:
         return None, False
     v = bd["value"]
-    if v > BREATHING_MAX:
-        return ({"signal": "breathing_disturbances", "level": "WARN",
-                 "detail": f"Atemstörungen {round(v)}/h >{BREATHING_MAX} (§3c/§11) — "
-                           f"Medikation/Allergie prüfen, CSV-Forensik anbieten."}, True)
-    return None, True
+    if v <= BREATHING_GREEN:
+        return None, True
+    if v > BREATHING_ORANGE:
+        amp, lvl = "🔴", "CRITICAL"
+    elif v > BREATHING_YELLOW:
+        amp, lvl = "🟠", "WARN"
+    else:
+        amp, lvl = "🟡", "WARN"
+    return ({"signal": "breathing_disturbances", "level": lvl,
+             "detail": f"Atemstörungen {round(v)}/h {amp} (Band ≤10🟢/10–12🟡/12–15🟠/>15🔴, §3c/§11) — "
+                       f"Medikation/Allergie prüfen, CSV-Forensik anbieten."}, True)
 
 
 # ================================================================ orchestrator (pure)

@@ -79,7 +79,7 @@ MAX_LOAD_DRAIN = 45         # max. zusätzliche Last-Entladung (Training/Aktiv/S
 ACTIVE_KCAL_FULL = 900      # Aktiv-Energie, ab der die Aktivitäts-Last voll zieht
 EFFORT_FULL = 7.0           # physical_effort-Peak, ab dem die Effort-Last voll zieht
 ATL_FULL = 80               # Banister-ATL, ab der die Ermüdungs-Last voll zieht
-BREATHING_DRAIN_AT = 10     # §3c/§11-Schwelle: ab hier zählt Atemstörung als Stress-Last
+BREATHING_DRAIN_AT = 10     # §3c/§11: grünes Ceiling der Bänder (≤10🟢); >10 zählt als Stress-Last
 
 # HRV-Status (aus hrv_baseline) → Lade-Modulator: balanced lädt voll, low/unbalanced dämpft.
 HRV_RECHARGE_FACTOR = {

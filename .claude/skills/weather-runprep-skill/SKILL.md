@@ -1,15 +1,15 @@
 ---
 name: weather-runprep-skill
-description: "AI Coach Wetter- und Pre-Lauf-Engine für den Athleten (Heimatstadt aus Athleten-Profil). PFLICHT laden an jedem Trainingstag (Mo/Mi/Sa/Do) und sobald Wetter, Lauf-Vorbereitung, Pace-Planung, Schuhwahl oder Gym-Hitze im Spiel sind — auch ohne explizites Stichwort. Trigger: Wochentag Mo/Mi/Sa/Do, Keywords lauf/laufen/wetter/regen/hitze/temp/kalt/warm/pace/schuhe/rennen/race/draussen, Pre-Lauf-Fenster vor festen Slots, Daily-Check an Trainingstag, Race-Strategie-Frage, Flex-Regel-Prüfung am Donnerstag. Holt Wetterochs (RSS + Delphi-JSON), baut die Lauf-Impact-Matrix, rechnet Pace-Korrektur und Hitze-Tax, gibt GO/ADJUST/SHIFT-Risiko. Donnerstag zusätzlich: Gym-Hitze (Gym ohne Klimaanlage, siehe Ausrüstung/Profil) plus Flex-Regel-Input (Do unter 22 Grad). Wetter ist Entscheidungs-Input, nicht Nachgang. Slot-Uhrzeit bestimmt die Starttemp (Parkrun 09:00 = Morgenwert, nie Tagesmax). NICHT für Lauf-/Gym-Performance-Analyse (run-bundle-skill/gym-bundle-skill)."
+description: "AI Coach Wetter- und Pre-Lauf-Engine für den Athleten (Heimatstadt aus Athleten-Profil). PFLICHT laden an jedem Trainingstag (Mo/Mi/Sa/Do) und sobald Wetter, Lauf-Vorbereitung, Pace-Planung, Schuhwahl oder Gym-Hitze im Spiel sind — auch ohne explizites Stichwort. Trigger: Wochentag Mo/Mi/Sa/Do, Keywords lauf/laufen/wetter/regen/hitze/temp/kalt/warm/pace/schuhe/rennen/race/draussen, Pre-Lauf-Fenster vor festen Slots, Daily-Check an Trainingstag, Race-Strategie-Frage, Flex-Regel-Prüfung am Donnerstag. Holt PRÄZISE Stundenwerte via Bright Sky/DWD (lib/weather.py: Slot-Starttemp + Verlauf WÄHREND des Laufs + Asphalt-Schätzung) plus Wetterochs (RSS + Delphi-JSON) fürs Narrativ/Gewitter/Fallback, baut die Lauf-Impact-Matrix, rechnet Pace-Korrektur und Hitze-Tax, gibt GO/ADJUST/SHIFT-Risiko. Donnerstag zusätzlich: Gym-Hitze (Gym ohne Klimaanlage, siehe Ausrüstung/Profil) plus Flex-Regel-Input (Do unter 22 Grad). Wetter ist Entscheidungs-Input, nicht Nachgang. Slot-Uhrzeit bestimmt die Starttemp (Parkrun 09:00 = Morgenwert, nie Tagesmax). NICHT für Lauf-/Gym-Performance-Analyse (run-bundle-skill/gym-bundle-skill)."
 ---
 
-# Weather-Runprep-Skill v1.2 — Senpai Wetter- & Pre-Lauf-Engine
+# Weather-Runprep-Skill v1.3 — Senpai Wetter- & Pre-Lauf-Engine
 
 > Senpai lädt diese Datei bei Trainingstag/Lauf-/Wetter-Triggern.
 > **Trainingstage = Mo / Mi / Sa / Do.** Mo/Mi/Sa = Lauf-Slots. **Do = Gym (KEINE Klimaanlage, siehe Ausrüstung im Profil) + Flex-Regel-Tag** → auch hier wetterrelevant (§4).
 > **🎯 Kern-Prinzip: Wetter ist ENTSCHEIDUNGS-INPUT, kein Nachgang.** An einem Trainingstag wird die Vorhersage **VOR** der Rest-vs-Lauf-/Gym-Empfehlung gezogen — nicht erst, wenn der User „doch Lauf" sagt. Auch wenn Rest empfohlen wird: Wetter zuerst, dann Empfehlung (38°C stützt Rest; überraschend kühl kippt die Rechnung / triggert die Flex-Regel).
 > **Wochentag + Uhrzeit = echte VM-Uhr** (`lib/clock.py`, CLAUDE.md §3). Slot-Zeiten sind fest (Sa 09:00, Mo/Mi 20:00, Do-Gym ≤21:30); der Clock sagt, ob ein Slot JETZT ansteht → Pre-Lauf-Fenster feuert verlässlich.
-> **Wetter-Source-Priorität:** User-Angabe (Apple-Weather-Screenshot/Temp) > Wetterochs > `[kein Wetter]`.
+> **Wetter-Source-Priorität:** User-Angabe (Apple-Weather-Screenshot/Temp) > **Bright Sky/DWD (`lib/weather.py`, präzise Stundenwerte)** > Wetterochs (Narrativ/Gewitter/Fallback) > `[kein Wetter]`.
 
 ---
 
@@ -27,18 +27,25 @@ description: "AI Coach Wetter- und Pre-Lauf-Engine für den Athleten (Heimatstad
 
 ---
 
-## 2. Wetterochs-Fetch (sole authorized source)
+## 2. Wetter-Quellen (Dual-Source: Bright Sky/DWD präzise + Wetterochs Narrativ)
 
-Trigger erfüllt → BEIDE Endpoints mit dem **WebFetch-Tool** ziehen:
-- **RSS-Mail (Prosa, heutiger Tag + 6 Tage):** `https://www.wetterochs.de/wetter/current/WettermailRssInHtml.html`
-- **Delphi-JSON (strukturiert, ab morgen, 9 Tage):** `https://www.wetterochs.de/wetter/delphi/gen/WetterRegnitz.json`
+**PRIMÄR — präzise Stundenwerte: Bright Sky / DWD via `lib/weather.py`** (deterministischer Pull wie `pull_drive.py`, KEIN WebFetch):
+```bash
+python3 lib/weather.py --lat <LAT> --lon <LON> --date {heute} --slot-start HH:MM --slot-end HH:MM --tz Europe/Berlin
+```
+- **lat/lon aus `athlete.md`** (Wohnort; Repo bleibt personal-data-frei — NIE hier hardcoden). tz-Default Europe/Berlin (Slot-Zeiten sind dann lokal).
+- Liefert kompakt: `slot_window` (eine Zeile je Stunde über das Lauf-Fenster: `temperature`, `precipitation`, `precipitation_probability`, `wind_speed`/`wind_gust_speed` [km/h], `dew_point`, `cloud_cover`, `condition` **+ `asphalt_surface_c_est` / `asphalt_excess_c_est`**), `day_summary` (min/max/mean, max_precip_prob, **day_sunshine_min, mean_cloud_cover, asphalt_residual_c_est**), `warnings`. **NIE das rohe 24-h-Array** (§0).
+- **Einheiten:** °C · mm · % · km/h. **`asphalt_*_est` = Heuristik aus solar/sunshine/cloud (KEIN Messwert)** — so labeln (sonniger Tag → mehr gespeicherte Hitze; Regen kühlt den Belag → ~Lufttemp).
 
-> **Netz-Hinweis:** `wetterochs.de` muss in der Netzwerk-Allowlist der Umgebung stehen, sonst schlägt WebFetch fehl → Fallback greift.
+**NARRATIV + Gewitter/Glatteis + Fallback: Wetterochs** (WebFetch, BEIDE Endpoints):
+- **RSS-Prosa (heute + 6 Tage):** `https://www.wetterochs.de/wetter/current/WettermailRssInHtml.html`
+- **Delphi-JSON (ab morgen, 9 Tage):** `https://www.wetterochs.de/wetter/delphi/gen/WetterRegnitz.json`
+- Wetterochs-JSON ist nur **tages-granular** (Min/Max) → NICHT für exakte Slot-Zahlen. Nutzen: Prosa-Kontext, Gewitter/Glatteis-Warnung, Fallback wenn Bright Sky fehlt.
 
-**Fallback:** Beide fail → `[kein Wetter]` im Header, nach Apple-Weather-Screenshot fragen, wenn trainingsrelevant.
+> **Netz/Fallback:** `api.brightsky.dev` + `wetterochs.de` müssen in der Allowlist sein. Bright Sky fail (`error`/`warnings` im JSON) → auf Wetterochs (§2a-Heuristik) zurückfallen. Beide fail → `[kein Wetter]`, nach Apple-Weather-Screenshot fragen, wenn trainingsrelevant.
 
-### 2a. ⏰ Slot-Uhrzeit → Starttemp (HART — Tagesmax ist fast NIE die Starttemp)
-Wetterochs liefert i.d.R. **Tagesmin + Tagesmax**. Die für den Lauf relevante Temp hängt an der **Slot-Uhrzeit**, NICHT am Tagesmax (der fällt nachmittags ~15–17 Uhr). Immer beide Werte ziehen und so ableiten:
+### 2a. ⏰ Slot-Uhrzeit → Starttemp (Fallback-Heuristik, wenn Bright Sky fehlt)
+**Wenn `lib/weather.py` (Bright Sky) läuft, ist die Slot-Starttemp DIREKT der `slot_window`-Stundenwert** — diese Heuristik dann NICHT nötig. Nur als **Fallback** (Bright Sky nicht erreichbar, nur Wetterochs Min/Max vorhanden): Die relevante Temp hängt an der **Slot-Uhrzeit**, NICHT am Tagesmax (der fällt nachmittags ~15–17 Uhr) — so ableiten:
 
 | Slot | Sommer-Starttemp ≈ | Quelle/Regel |
 |---|---|---|
@@ -51,13 +58,19 @@ Wetterochs liefert i.d.R. **Tagesmin + Tagesmax**. Die für den Lauf relevante T
 
 ---
 
-## 3. 🌦️ Lauf-Impact-Matrix (PFLICHT bei Wetterochs-Input)
+## 3. 🌦️ Lauf-Impact-Matrix (PFLICHT bei Wetter-Input)
 
+| Tag | Startzeit | 🌤️ Wetter | 🌡️ Temp (Slot) | 🛣️ Asphalt (Schätzung) | 💨 Wind | 🌧️ Regen | Pace-Korr | Risiko |
+|---|---|---|---|---|---|---|---|---|
 
-| Tag | Startzeit | Wetter | Temp | Wind | Regen | Pace-Korr | Risiko |
-|---|---|---|---|---|---|---|---|
+Eine Zeile pro relevantem Trainingstag. **Temp (Slot) + Asphalt kommen direkt aus `lib/weather.py`** (`slot_window`), NICHT aus dem Tagesmax.
 
-Eine Zeile pro relevantem Trainingstag ausfüllen.
+**🕒 Stunden-Fenster (PFLICHT bei Lauf >1 h oder spürbarem Bedingungs-Drift):** zusätzlich eine Zeile je überlappter Stunde aus `slot_window` — zeigt, wie Temp/Regen/Wind sich WÄHREND des Laufs ändern (claude.ai konnte nur den Startwert):
+
+| 🕒 Stunde | 🌡️ Luft | 🛣️ Asphalt (Schätz.) | 🌧️ Regen / P(%) | 💨 Wind km/h | Risiko |
+|---|---|---|---|---|---|
+| 20:00 | 23,6 °C | ~24,6 °C | 0,9 mm / 37 % | 11 (Böen 22) | 🟡 |
+| 21:00 | … | … | … | … | … |
 
 **Pace-Korrekturen (Z2):**
 | Bedingung | Korrektur |
@@ -69,7 +82,7 @@ Eine Zeile pro relevantem Trainingstag ausfüllen.
 | Regen + Wind | +10–15 s/km |
 | <15°C | Cold-Doping (leicht unterkühlt starten) |
 
-**Asphalt-Effekt:** Nach 28°C+ Tag abends +3–5°C effektiv zur Lufttemperatur (Belastungskalkulation).
+**Asphalt-Effekt (datengetrieben):** `lib/weather.py` schätzt den Belag-Aufschlag aus solar/sunshine/cloud_cover (`asphalt_excess_c_est`) — **sonniger Tag = mehr gespeicherte Hitze in den Abend, bewölkt/Regen = ~0** (Regen kühlt den Belag nass). Die `asphalt_surface_c_est` für die Belastungskalkulation nutzen, **klar als Schätzung labeln**. **Fallback** ohne Bright Sky: pauschal +3–5 °C nach einem 28 °C+-Tag.
 
 **Risiko-Ampel:**
 | Starttemp (geschätzt) | Ampel | Aktion |

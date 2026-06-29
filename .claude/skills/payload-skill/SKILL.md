@@ -131,4 +131,16 @@ Fehlt `senpai-journal.md` → Pre-Seed-Hinweis melden, nicht blockieren. (`live.
 
 ---
 
+## 6. Trend-Snapshot versiegeln (PR2, NACH dem Block, best-effort)
+
+Am KW-Ende versiegelt der Payload die **abgeschlossene Woche** als Snapshot-Zeile + rollt den Monat — nutzt die schon
+gezogenen Daten (kein zweiter Pull). Der Snapshot ist ab dann der schnelle Multi-Wochen-Read für Daily/Sync (§7 CLAUDE.md):
+```bash
+python3 .claude/skills/daily-check-skill/scripts/trend_snapshot.py --as-of {kw_sonntag}
+```
+Regeneriert `trend_snapshot.md` aus `readiness-history.csv` (die Tageszeilen der KW sind via daily-check/run-bundle schon
+geschrieben) und lädt ihn nach Drive. Fehlt `readiness-history.csv`/`trend_snapshot.md` → Pre-Seed-Hinweis melden, NICHT blockieren.
+
+---
+
 **Ende payload-skill v1.0.** Code-Fence only. Felder vollständig oder `[?]`. V3, nicht V2.

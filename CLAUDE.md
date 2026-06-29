@@ -194,9 +194,10 @@ Diese Regeln können in JEDER Runde greifen und stehen deshalb hier, nicht in Sk
 
 Bei Konflikt gewinnt die höhere Stufe:
 1. **User-Input im Chat** (inkl. Körperwaage-SoT, manuell gepostet) — IMMER Vorrang.
-2. **Per `pull_drive.py` gezogene Truth-Daten nach `./data/`** (HealthAutoExport-JSON, Lauf-/Gym-`.fit`/-Zips, Trainings_v5/Gesundheitsdaten_v5-CSV) aus den read-only Truth-Ordnern.
-3. **State-Dateien aus dem Personal-Drive-Ordner** (`live.md`, `athlete.md`, `baselines.md`, `learnings.md`) — persistenter Live-State + Identität: Gewicht, KFA, PRs, HRV/VO2-Trend, Streaks, Anrede-Mapping. Bei Session-Start gezogen + gelesen, autoritativer Seed.
-4. **Methoden-Module lokal** (`modules/*.md`) + **Personal-Module** (Drive, bei Trigger gezogen) — statische Referenzen.
+2. **HEUTE frisch gerechnet** aus den per `pull_drive.py` gezogenen Truth-Daten nach `./data/` (HealthAutoExport-JSON, Lauf-/Gym-`.fit`/-Zips, Trainings_v5/Gesundheitsdaten_v5-CSV) aus den read-only Truth-Ordnern — Recovery/Readiness/heutiges CTL kommen IMMER frisch, nie aus dem Snapshot.
+3. **Trend-Snapshot (`trend_snapshot.md`, Drive)** für die **abgeschlossene Vergangenheit** (letzte ~8 Wochen + ~12 Monate) + den inkrementellen CTL/ATL-Anker aus `readiness-history.csv` — schneller Read statt Sheet-Replay. Für *abgeschlossene* Wochen/Monate so genau wie die Neurechnung, **nie für heute**. **Escape-Hatch:** bei Lücke (>1 Tag fehlt) / Anomalie / veraltetem Snapshot / Deep-Dive → volle Neuberechnung aus den Roh-Sheets (Stufe 2). Snapshot ist Beschleuniger, nicht Ersatz.
+4. **State-Dateien aus dem Personal-Drive-Ordner** (`live.md`, `athlete.md`, `baselines.md`, `learnings.md`) — persistenter Live-State + Identität: Gewicht, KFA, PRs, HRV/VO2-Trend, Streaks, Anrede-Mapping. Bei Session-Start gezogen + gelesen, autoritativer Seed.
+5. **Methoden-Module lokal** (`modules/*.md`) + **Personal-Module** (Drive, bei Trigger gezogen) — statische Referenzen.
 
 **Körperwaage-Werte (SoT, manuell) sind NIE in HealthAutoExport-JSONs** — der Nutzer postet sie manuell im Chat (Mo-SoT, fasted, vor 09:00). Solche manuellen SoT-Werte werden in `live.md` festgehalten (lokal regeneriert + via `pull_drive.py --upload` nach Drive). Wenn ein Payload-Block am Chat-Anfang steht → autoritativer State-Seed, Priorität über die Drive-State-Dateien.
 
@@ -274,7 +275,7 @@ Python ist **real** über das Bash-Tool (matplotlib für echte Diagramme — Lau
 
 **Personal-Module (Drive, Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`, via `pull_drive.py` bei Trigger):** `Schuhe_Ausruestung.md` · `Kraft-Programm.md` · `Race_Strategie.md` (+`21km.gpx`) · `Schlaf_HRV_Baseline.md` · `Historie.md` · `Archiv_Historie.md` · `CHANGELOG.md` · `Project_Index.md`.
 
-**State-Dateien (Drive, gleicher Ordner, bei Session-Start + Write-Back):** `athlete.md` (Identität) · `live.md` (Live-State) · `baselines.md` · `learnings.md` · `coaching_cues.md` (session-typ-keyed Coaching-Schleife — Run-Bundle schreibt OPEN-Cues, Pre-Lauf surft sie, nächster gleichartiger Lauf verifiziert).
+**State-Dateien (Drive, gleicher Ordner, bei Session-Start + Write-Back):** `athlete.md` (Identität) · `live.md` (Live-State) · `baselines.md` · `learnings.md` · `coaching_cues.md` (session-typ-keyed Coaching-Schleife — Run-Bundle schreibt OPEN-Cues, Pre-Lauf surft sie, nächster gleichartiger Lauf verifiziert) · `readiness-history.csv` (granularer Tages-Store, 1 Zeile/Tag — speist inkrementelles CTL + Snapshot) · `trend_snapshot.md` (Woche+Monat-Rollup, schneller Multi-Wochen-Read statt Sheet-Replay — daily-check/payload regenerieren, daily-check/sync lesen; §7 Stufe 3).
 
 **Trainingspartner-Faktor + Menschen:** Stehen im Drive-Athlet-Profil `athlete.md` (Sa-Parkrun-Anker, Drosseln KM1, W/kg-Parität, Slots) — nicht hier hardcoden.
 

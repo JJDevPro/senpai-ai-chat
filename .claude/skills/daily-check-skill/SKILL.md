@@ -95,6 +95,12 @@ Step 10.5: 📈 HISTORY (T12, best-effort, NON-BLOCKING): Tageszeile nach Drive 
          `python3 .claude/skills/daily-check-skill/scripts/readiness_history.py --as-of {heute} --readiness <readiness_json> --body-battery <bb_json> --banister <banister_json> --hrv-baseline <hrv_json> --daily <slice_json> --signals <signals_json> --tolerance <tolerance_json>`.
          (Die erweiterte Zeile trägt jetzt ctl/atl/hrv_ms/rhr/weight/kfa/vo2/week_km — speist den inkrementellen Banister (Step 9) + den Trend-Snapshot.)
          Fehlt `readiness-history.csv` (noch nicht pre-seeded → `drive-seed/`) → Pre-Seed-Hinweis MELDEN, NICHT blockieren (Skript exitet ≠0, unkritisch für den Check).
+Step 10.6: 📅 TREND-SNAPSHOT (PR2, best-effort, NON-BLOCKING): NACH dem History-Write den Woche+Monat-Rollup
+         regenerieren + lesen — `python3 .claude/skills/daily-check-skill/scripts/trend_snapshot.py --as-of {heute}`.
+         Baut/aktualisiert `trend_snapshot.md` aus `readiness-history.csv` (laufende Woche eingeschlossen) und lädt ihn nach Drive.
+         **Der Multi-Wochen-/Monats-KW-Trend (§10) liest jetzt DIESEN Snapshot** — kein erneuter Gesundheitsdaten_v5-Replay
+         für die zurückliegenden Wochen. HEUTE bleibt frisch gerechnet (Step 9/10.2). Fehlt der Snapshot/CSV → Pre-Seed-Hinweis
+         MELDEN, NICHT blockieren; Fallback = Gesundheitsdaten_v5 wie bisher (Escape-Hatch).
 Step 11: Wenn Trainingstag-Flag: Wetterochs RSS+JSON.
 Step 12: Berechnungen über gemergtes Schlaf-Fenster + Recovery-Ampel-Komposit (§6).
 Step 13: ANOMALIE-CHECK (§3d) → ggf. CSV (heute, bei Mitternachts-Fenster auch gestern).
@@ -195,7 +201,9 @@ Aus der JSON-Ausgabe: `heute_sleep` = Record der LETZTEN Nacht (`sleepEnd == heu
 
 **Performance:** 23-MB-Monat ≈ 11k HR- + 2k HRV-Punkte. Die Scripts parsen einmal, slicen früh, geben nur Ziel-Nacht/Zieltag-Aggregate auf stdout — nie Rohdaten in den Output kippen.
 
-**KW-Trend (§10)** bleibt aus Gesundheitsdaten_v5 (aktuelle ISO-KW) — der Multi-Day-JSON ändert daran nichts.
+**KW-Trend (§10):** die **aktuelle ISO-KW** kommt frisch aus Gesundheitsdaten_v5 (Multi-Day-JSON ändert daran nichts).
+Der **Multi-Wochen-/Monats-Trend** (zurückliegende Wochen/Monate) kommt aus `trend_snapshot.md` (Step 10.6) statt aus
+einem erneuten Sheet-Replay — schneller Read, abgeschlossene Vergangenheit. Bei Lücke/Anomalie/Deep-Dive → Roh-Sheets (Escape-Hatch).
 
 ### 3g. 🧹 DEDUP — Trainings_v5 (PFLICHT vor JEDER CTL/ATL/TSB-Rechnung)
 

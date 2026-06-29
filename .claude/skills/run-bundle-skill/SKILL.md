@@ -72,6 +72,7 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 ✅ 🏁 HM/Race-Projektion 4 Szenarien + Decoupling-Quellen-Hierarchie (PFLICHT bei Race-Bezug)
 ✅ 💀 Senpai-Verdict 3 Absätze (Lob/Aber/Heute)
 ✅ 🎯 Coaching — 2 Actionables im §11c-Fließtext-Format (PFLICHT)
+✅ 🔁 Coaching-Cue-Loop (PFLICHT — Cue-Check der offenen Cues dieses Run-Typs + neue OPEN-Cues schreiben + Drive-Upload; §12d)
 ✅ 🚦 Werte am Ende (Status-Ampeln + Bedtime)
 ✅ 📊 Pace@Z2-Tracking (NUR bei Z2-Run, siehe §8c)
 ```
@@ -926,6 +927,9 @@ KEINE Cutoff-Panik aus methodisch ungültigen Metriken oder neuromuskulärer Erm
 ## 🎯 Coaching
 [2 Actionables im §11c-Fließtext-Format mit 🔍/🎯/💪/⚡/📏]
 
+## 🔁 Coaching-Cue-Loop (§12d)
+[CUE-CHECK: offene Cues dieses Run-Typs aus coaching_cues.md vs heutige run_form — je Cue ✅ getroffen (→ CLOSED) / ❌ verfehlt (carry-forward, 1 Satz warum). NEUE OPEN-Cues: je Form-Metrik 🟡/🟠/🔴 vs V3-Ziel max 3 notiert. Datei regeneriert + nach Drive hochgeladen. Ein verfehlter Cue gehört auch ins 💀 Senpai-Verdict (Aber-Absatz).]
+
 ## 📊 Pace@Z2-Update (nur bei Z2-Run)
 [Tracking-Tabelle: Datum/Temp/Roh (running-only, M:SS/km)/Normalisiert (M:SS/km)/Schuh/Δ vs Baseline. Roh = pace_z2_run (§8c), identisch zur Hitze-Korrektur, NIE die as-run-Pace.]
 
@@ -1023,6 +1027,33 @@ KEINE Cutoff-Panik aus methodisch ungültigen Metriken oder neuromuskulärer Erm
 - Decoupling aus Intervall als HM-Prognose = Skill-Bruch
 - Cutoff-Panik aus neuromuskulärer Ermüdung = Skill-Bruch (§7b)
 - Hitze-Tax mit alter V2-Formel (4,5 sek/km/°C ab 15°C) = V3-Bruch
+
+---
+
+## 12d. 🔁 COACHING-CUE-LOOP (session-übergreifend)
+
+Geschlossene Schleife über `coaching_cues.md` (Drive-State, §11-registriert; pull via
+`pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match coaching_cues.md --out ./data`).
+Run-Typ-Sektionen: **Easy/Z2 · Long · Race-Sim · Parkrun · Tempo/Intervalle**.
+
+**1. CUE-CHECK (Verify):** die OPEN-Cues des HEUTIGEN Run-Typs gegen die heutigen `run_form`-Werte
+prüfen. Getroffen → Cue auf `CLOSED <heute>` (✅); verfehlt → OPEN lassen (carry-forward) + 1 Satz
+warum, und in den 💀-Verdict-Aber-Absatz ziehen. (Aktiv-Coaching: VR ist der primäre Dauer-Cue.)
+
+**2. CUE-WRITE (Generate):** je Form-Metrik mit Ampel 🟡/🟠/🔴 vs V3-Ziel (`modules/V3_Protocol.md`
+Form-Ziel-Tabelle + Cue-Spalte; **VR-Ziel <11 %** aus `learnings.md`) einen OPEN-Cue für den Run-Typ
+schreiben/auffrischen — **max ~3 offene/Typ** (schärfste Defizite); vorhandenen Cue derselben Metrik
+NICHT duplizieren, nur Datum/Ist aktualisieren.
+
+**3. WRITE-BACK:** `coaching_cues.md` lokal regenerieren + `pull_drive.py --upload … --name coaching_cues.md`
+(sichtbar, wie State-Files). Fehlt die Datei in Drive → PRE-SEED-Hinweis (`drive-seed/`), NICHT
+blockieren, NIE selbst anlegen.
+
+**Format:** `- [YYYY-MM-DD → OPEN] <Metrik> <Ist> vs Ziel <Ziel> (Ref). Cue: "<Phrase>". Verify: <KPI> nächster <Typ>.`
+· `- [YYYY-MM-DD → CLOSED YYYY-MM-DD] <Metrik> <Ist→Neu> ✅`
+
+**Pre-Lauf-Kopplung:** `weather-runprep-skill` §5 zeigt die OPEN-Cues des Slot-Typs als „🎯 Mental Cues"
+VOR dem Lauf → Pre-Run nennt das Ziel, Post-Run prüft die Umsetzung. Der Kreis schließt sich.
 
 ---
 

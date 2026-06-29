@@ -77,6 +77,15 @@ def test_build_row_maps_to_seed_header():
         "bb_end": 42,
         "tsb": -4.2,
         "top_limiter": "sleep",
+        # v2-Spalten: ctl/atl aus banister; daily/signals/tolerance hier nicht übergeben → None
+        "ctl": 45.8,
+        "atl": 50.0,
+        "hrv_ms": None,
+        "rhr": None,
+        "weight": None,
+        "kfa": None,
+        "vo2": None,
+        "week_km": None,
     }
 
 

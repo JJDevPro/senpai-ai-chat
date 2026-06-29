@@ -1,1 +1,1 @@
-date,readiness_score,band,hrv_status,bb_start,bb_end,tsb,top_limiter
+date,readiness_score,band,hrv_status,bb_start,bb_end,tsb,top_limiter,ctl,atl,hrv_ms,rhr,weight,kfa,vo2,week_km

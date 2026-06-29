@@ -33,8 +33,9 @@ Flow (gespiegelt von lib/archive.py):
   3. zurück-uploaden (lib/pull_drive.py --upload → Drive files.update auf die
      bereits existierende Datei)
 
-CSV-SCHEMA (matcht den Drive-Seed-Header EXAKT):
-  date,readiness_score,band,hrv_status,bb_start,bb_end,tsb,top_limiter
+CSV-SCHEMA (matcht den Drive-Seed-Header EXAKT; v2 = +8 Trend-/Inkrement-Spalten):
+  date,readiness_score,band,hrv_status,bb_start,bb_end,tsb,top_limiter,
+  ctl,atl,hrv_ms,rhr,weight,kfa,vo2,week_km
 
 CLI:
   python3 readiness_history.py --as-of YYYY-MM-DD \
@@ -66,8 +67,12 @@ DEFAULT_FOLDER_ID = "1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde"
 DEFAULT_CSV = "readiness-history.csv"
 
 # Spalten-Reihenfolge = Drive-Seed-Header (EXAKT, nicht umsortieren).
+# v2: ctl/atl (für inkrementelles Banister) + hrv_ms/rhr/weight/kfa/vo2/week_km
+# (Trend-Snapshot-Quelle). Neue Spalten ANGEHÄNGT → alte Zeilen bleiben gültig
+# (csv.DictReader füllt fehlende Felder mit None → leere Zelle).
 HEADER = ["date", "readiness_score", "band", "hrv_status",
-          "bb_start", "bb_end", "tsb", "top_limiter"]
+          "bb_start", "bb_end", "tsb", "top_limiter",
+          "ctl", "atl", "hrv_ms", "rhr", "weight", "kfa", "vo2", "week_km"]
 
 
 def _eprint(*a):
@@ -96,15 +101,28 @@ def _cell(value):
     return str(value)
 
 
-def build_row(as_of, readiness=None, body_battery=None, banister=None, hrv_baseline=None):
+def _dig(obj, *path):
+    """Sicher durch verschachtelte dicts greifen; None bei jedem Fehltritt."""
+    cur = obj
+    for k in path:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
+def build_row(as_of, readiness=None, body_battery=None, banister=None, hrv_baseline=None,
+              daily=None, signals=None, tolerance=None):
     """Reduzierte Upstream-Outputs → eine Trend-Zeile als dict (Schema = HEADER).
 
-    Liest NUR die kompakten Aggregat-Keys der Sibling-Skripte:
-      readiness.py     → {"score", "band", "top_limiter"}
-      body_battery.py  → {"bb_start", "bb_end"}
-      banister.py      → {"tsb"}
-      hrv_baseline.py  → {"status"}   (Fallback: readiness.meta.safety_gate_level? nein —
-                         nur der echte HRV-Status; sonst leer)
+    Liest NUR kompakte Aggregat-Keys der Sibling-Skripte:
+      readiness.py     → score, band, top_limiter
+      body_battery.py  → bb_start, bb_end
+      banister.py      → tsb, ctl, atl          (ctl/atl: inkrementeller Pfad-Anker)
+      hrv_baseline.py  → status
+      daily (slice)    → hrv_night.avg, recovery.rhr, body_comp.{weight,kfa}
+      signals          → vo2_max.value
+      tolerance        → week_km
     Fehlt eine Quelle, bleibt die Zelle leer (kein Crash, kein erfundener Wert).
     Wirft ValueError bei kaputtem --as-of (CLI fängt → JSON-Error + non-zero Exit).
     """
@@ -123,6 +141,14 @@ def build_row(as_of, readiness=None, body_battery=None, banister=None, hrv_basel
         "bb_end": bb.get("bb_end"),
         "tsb": ba.get("tsb"),
         "top_limiter": r.get("top_limiter"),
+        "ctl": ba.get("ctl"),
+        "atl": ba.get("atl"),
+        "hrv_ms": _dig(daily, "hrv_night", "avg"),
+        "rhr": _dig(daily, "recovery", "rhr"),
+        "weight": _dig(daily, "body_comp", "weight_body_mass", "value"),
+        "kfa": _dig(daily, "body_comp", "body_fat_percentage", "value"),
+        "vo2": _dig(signals, "vo2_max", "value"),
+        "week_km": (tolerance or {}).get("week_km"),
     }
 
 
@@ -163,6 +189,28 @@ def append_row(csv_text, row_dict):
         writer.writerow([_cell(r.get(c)) for c in header])
     writer.writerow([_cell(row_dict.get(c)) for c in header])
     return out.getvalue()
+
+
+# --------------------------------------------------------------------------- #
+# Reader (der Trend-Reader, den der Docstring immer versprach — jetzt aktiviert)
+# --------------------------------------------------------------------------- #
+def read_history(csv_text):
+    """CSV-Text → [row_dict] in Datei-Reihenfolge (= chronologisch, append-only). Leer → []."""
+    _, rows = _read_rows(csv_text)
+    return rows
+
+
+def last_row(csv_text):
+    """Jüngste Zeile als dict (oder None). Speist den inkrementellen Banister-Pfad
+    (gestriger ctl/atl/date) + den Frische-Check (Lücke → Fallback auf Vollrechnung)."""
+    rows = read_history(csv_text)
+    return rows[-1] if rows else None
+
+
+def tail(csv_text, n):
+    """Letzte n Zeilen (Trend-Reader / Rollup-Quelle). n<=0 → alle."""
+    rows = read_history(csv_text)
+    return rows[-n:] if (n and n > 0) else rows
 
 
 # --------------------------------------------------------------------------- #
@@ -236,6 +284,9 @@ def main(argv=None):
     ap.add_argument("--banister", help="banister.py-Output (Datei oder '-' für stdin).")
     ap.add_argument("--hrv-baseline", dest="hrv_baseline",
                     help="hrv_baseline.py-Output (Datei oder '-' für stdin).")
+    ap.add_argument("--daily", help="slice_hae_day-Output (hrv_night/recovery/body_comp; Datei oder '-').")
+    ap.add_argument("--signals", help="daily_signals.py-Output (vo2_max; Datei oder '-').")
+    ap.add_argument("--tolerance", help="running_tolerance.py-Output (week_km; Datei oder '-').")
     ap.add_argument("--csv", default=DEFAULT_CSV, help=f"CSV-Dateiname (Default: {DEFAULT_CSV}).")
     ap.add_argument("--folder", default=DEFAULT_FOLDER_ID, help="Drive-Ordner-ID (Default: Senpai-AI-Chat).")
     ap.add_argument("--out", default="./data", help="lokaler Scratch-Ordner für die gezogene CSV.")
@@ -244,7 +295,8 @@ def main(argv=None):
 
     # Höchstens EIN '-'-Input (stdin lässt sich nur einmal lesen).
     stdin_args = [v for v in (args.readiness, args.body_battery, args.banister,
-                              args.hrv_baseline) if v == "-"]
+                              args.hrv_baseline, args.daily, args.signals, args.tolerance)
+                  if v == "-"]
     try:
         if len(stdin_args) > 1:
             raise ValueError("Nur EIN Input darf '-' (stdin) sein.")
@@ -254,6 +306,9 @@ def main(argv=None):
             body_battery=_load_json_arg(args.body_battery, "--body-battery"),
             banister=_load_json_arg(args.banister, "--banister"),
             hrv_baseline=_load_json_arg(args.hrv_baseline, "--hrv-baseline"),
+            daily=_load_json_arg(args.daily, "--daily"),
+            signals=_load_json_arg(args.signals, "--signals"),
+            tolerance=_load_json_arg(args.tolerance, "--tolerance"),
         )
     except (ValueError, OSError) as e:
         print(json.dumps({"error": str(e)}, ensure_ascii=False, separators=(",", ":")))

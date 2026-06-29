@@ -64,3 +64,33 @@ def test_as_of_before_any_session_degrades_gracefully(trainings_csv_text):
 def test_empty_sheet_returns_none():
     # No parsable sessions at all -> banister returns None (caller shows "no data").
     assert bb.compute_from_sheet("Datum,TRIMP\n", as_of="2026-06-25") is None
+
+
+# --------------------------------------------------------------------------- #
+# v2: inkrementeller Pfad (step / compute_incremental + Fallback)
+# --------------------------------------------------------------------------- #
+def test_step_matches_full_recompute_last_day(trainings_csv_text):
+    # Ein step() vom Vortags-Stand muss den letzten Tag der Vollrechnung treffen.
+    full = bb.compute_from_sheet(trainings_csv_text, as_of="2026-06-25")  # Reihe bis 24.06
+    # Stand FÜR 24.06 = Vollrechnung mit as_of=24.06 (Reihe bis 23.06)
+    prev = bb.compute_from_sheet(trainings_csv_text, as_of="2026-06-24")
+    # TRIMP des 24.06 aus dem tail7 der Vollrechnung holen (Datum, TRIMP, …)
+    trimp_24 = {row[0]: row[1] for row in full["tail7"]}["2026-06-24"]
+    inc = bb.compute_incremental(prev["ctl"], prev["atl"], "2026-06-24", trimp_24, "2026-06-25")
+    assert inc is not None and inc["mode"] == "incremental"
+    assert abs(inc["ctl"] - full["ctl"]) < 0.15
+    assert abs(inc["atl"] - full["atl"]) < 0.15
+    assert abs(inc["tsb"] - full["tsb"]) < 0.2
+
+
+def test_compute_incremental_falls_back_on_gap():
+    # prev_date ist NICHT as_of-1 (Lücke) -> None -> Caller rechnet voll.
+    assert bb.compute_incremental(40.0, 30.0, "2026-06-22", 0.0, "2026-06-25") is None
+    # fehlende ctl/atl -> None
+    assert bb.compute_incremental(None, 30.0, "2026-06-24", 0.0, "2026-06-25") is None
+
+
+def test_step_pure():
+    s = bb.step(0.0, 0.0, 100.0)
+    assert s["ctl"] == round(100.0 * bb.CTL_LAMBDA, 1)
+    assert s["atl"] == round(100.0 * bb.ATL_LAMBDA, 1)

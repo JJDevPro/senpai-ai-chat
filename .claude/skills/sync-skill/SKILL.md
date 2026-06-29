@@ -14,9 +14,11 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 > ```
 > python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data
 > python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match athlete.md --out ./data
+> python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match trend_snapshot.md --out ./data
 > ```
-> Danach `./data/live.md` (aktueller Live-State, Overrides, Persona-Modus) und
-> `./data/athlete.md` (Stammdaten, Race-Kalender) lesen.
+> Danach `./data/live.md` (aktueller Live-State, Overrides, Persona-Modus),
+> `./data/athlete.md` (Stammdaten, Race-Kalender) und — für den **Multi-Wochen-/Monats-Trend** —
+> `./data/trend_snapshot.md` lesen (schneller Read statt Sheet-Replay, CLAUDE.md §7; bei Lücke/Deep-Dive → Roh-Sheets).
 > Falls für eine Frage doch frische Werte nötig sind, werden sie on-demand via
 > `lib/pull_drive.py` geholt — Standard für diesen Skill ist aber State-Re-Anchoring, kein Pull.
 
@@ -43,6 +45,7 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 5. **Protokoll-Anker** — **V3 Heavy Hybrid Polarized** (NICHT V2). Die-Eine-Regel: HR steuert Z2, Pace ist Ergebnis.
 6. **Persona-State** — Modus (SCHARF/STOLZ) aus letztem Stand, Default-Anrede {Anrede} (reale Anrede-Stufen aus `./data/athlete.md`).
 7. **Offene Learnings** — aus Vor-KW-Payload übernehmen.
+8. **Multi-Wochen-Trend** — die letzten ~8 Wochen aus `./data/trend_snapshot.md` kurz anreißen (Gewicht/KFA-Richtung, HRV-Korridor, CTL/ATL/TSB-Verlauf) — schneller Read, kein Sheet-Replay. Fehlt der Snapshot → Pre-Seed-Hinweis, nicht blockieren.
 
 ---
 

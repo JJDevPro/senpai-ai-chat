@@ -246,7 +246,7 @@ Schwerere Läufer haben höhere Bodenreaktionskräfte pro Schritt. Erhöhte Kade
 | **GCT** | ~285–300 ms | ≤280 ms | >315 ms → Flag | "Füße rollen ab, nicht stampfen" |
 | **Stride** | ~680–710 mm | ≥710 mm | <640 mm → Flag | "Stride folgt Kadenz — nie Stride erzwingen" |
 | **VO** | ~88–93 mm | 85–92 mm | >96 mm = Bouncing | "Vorwärts, nicht hoch" |
-| **Vertical Ratio** | ~12–13% | ≤12% | >14% → Bouncing | "Horizontale Energie, kein Trampolin" |
+| **Vertical Ratio** | ~12–13% | **<11% (aktives Ziel, `learnings.md`)** | >12% → Bouncing | "Horizontale Energie, kein Trampolin" |
 
 > **Coaching-Regel Z2:** Kadenz ist aktiv zu halten, auch wenn alles andere langsamer wird. Bei Anstiegen: Kadenz halten, Pace fällt — korrekt. Kadenz kollabieren lassen ist die gefährlichste Z2-Falle bei hohem Körpergewicht.
 

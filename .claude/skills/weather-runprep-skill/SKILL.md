@@ -133,6 +133,16 @@ Wetter ist **Kriterium 2** der Flex-Regel (`modules/V3_Protocol.md`, alle 4 müs
 8. **Pace@Z2-Erwartung** temperatur-normalisiert.
 9. Bei Hitze/Schwüle: Wasser-/Elektrolyt-Hinweis (→ `nutrition-skill` §6).
 
+### 5a. 🎯 Mental Cues (eigener Block — VOR dem Lauf, getrennt vom Wetter)
+Die session-übergreifende Coaching-Schleife (run-bundle §12d schreibt sie): `coaching_cues.md` ziehen
+(`pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match coaching_cues.md --out ./data`),
+die **OPEN-Cues des heutigen Slot-Typs** (Mo/Mi=Easy/Long, Sa=Parkrun — §1/V3) als eigenen Block zeigen:
+> 🎯 **Mental Cues — letzter [Typ]-Lauf:** [1–3 OPEN-Cues, je „Metrik war X 🟡, heute Ziel Y → Cue-Phrase"].
+> Primär-Dauer-Cue: **Vertical Ratio <11 %** („Vorlage aus den Knöcheln, kein Trampolin") aktiv coachen.
+
+Heute auf diese Cues achten; der nächste Run-Report (§12d Cue-Check) prüft, ob sie umgesetzt wurden.
+Fehlt `coaching_cues.md` (noch nicht pre-seeded) → kein Block, kein Drama. KEIN Cue offen → 1 Zeile „🟢 keine offenen Cues".
+
 ---
 
-**Ende weather-runprep-skill v1.2.** Wetterochs ist Source of Truth. Wetter = Entscheidungs-Input (vor der Empfehlung, nicht danach). Trainingstage = Mo/Mi/Sa/Do. **Slot-Uhrzeit bestimmt Starttemp — Tagesmax ist fast nie die Starttemp; Parkrun 09:00 = Morgenwert, NIE Tagesmax (§2a).** Hitze-Tax +3–4 s/°C ab 18°C. Do: Gym-Hitze (keine Klimaanlage) + Flex-Regel-Wetter.
+**Ende weather-runprep-skill v1.3.** Wetterochs ist Source of Truth. Wetter = Entscheidungs-Input (vor der Empfehlung, nicht danach). Trainingstage = Mo/Mi/Sa/Do. **Slot-Uhrzeit bestimmt Starttemp — Tagesmax ist fast nie die Starttemp; Parkrun 09:00 = Morgenwert, NIE Tagesmax (§2a).** Hitze-Tax +3–4 s/°C ab 18°C. Do: Gym-Hitze (keine Klimaanlage) + Flex-Regel-Wetter.

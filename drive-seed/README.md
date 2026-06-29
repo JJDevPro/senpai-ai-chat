@@ -31,6 +31,7 @@ Alle IDs stammen aus `CLAUDE.md` (§0).
 | `live.md` | Senpai-AI-Chat (privat) | `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` | State |
 | `baselines.md` | Senpai-AI-Chat (privat) | `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` | State |
 | `learnings.md` | Senpai-AI-Chat (privat) | `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` | State |
+| `coaching_cues.md` | Senpai-AI-Chat (privat) | `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` | State (Coaching-Schleife) |
 | `senpai-journal.md` | Senpai-AI-Chat (privat) | `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` | Journal |
 | `readiness-history.csv` | Senpai-AI-Chat (privat) | `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` | History |
 | `Schlaf_HRV_Baseline.md` | Senpai-AI-Chat (privat) | `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` | Personal-Modul |

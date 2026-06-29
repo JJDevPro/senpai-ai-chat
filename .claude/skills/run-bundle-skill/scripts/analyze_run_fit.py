@@ -264,8 +264,10 @@ def km_splits(recs):
                     desc += -dh
             prev = a
         grade = None
-        if len(alts) >= 2 and d1 != d0 and d0 is not None:
-            grade = (alts[-1] - alts[0]) / (d1 - d0) * 100.0
+        seg_dist = (d1 - d0) if (d0 is not None and d1 is not None) else 0.0
+        # Partieller Schluss-KM (<300 m Daten) → Grade aus GPS-End-Glitch unterdrücken (Fix v3.13)
+        if len(alts) >= 2 and seg_dist >= 300.0:
+            grade = (alts[-1] - alts[0]) / seg_dist * 100.0
 
         out.append({
             "km": km + 1,
@@ -629,12 +631,17 @@ def decoupling(seg_run, label=None):
 
 # ── Pace@Z2 (steady Z2-Segment, HR<=147, hitze-normalisiert) ────────────────
 def pace_at_z2(seg_run, session, recs=None, label=None,
-               decoupling_pct=None, walk_pct=None):
+               decoupling_pct=None, walk_pct=None, z4z5_pct=None):
     """
     Ø-Pace bei HR<=147 über das STEADY-Z2-Segment (Surge-frei), normalisiert
     auf 18 °C (3.5 s/km/°C). Das Fenster ist NICHT „letzte 30 min" — ein harter
     Schluss-KM darf den Easy-Pace-Benchmark nicht verfälschen.
     """
+    # Race/Parkrun (Z4+Z5-dominant): es gibt keinen echten Z2-Abschnitt — eine
+    # Pace@Z2 aus den paar Warmup-Samples <=147 wäre Unsinn → unterdrücken (Fix v3.13).
+    if z4z5_pct is not None and z4z5_pct > 50.0:
+        return {"note": f"Race-Effort (Z4+Z5 {z4z5_pct:.0f}% > 50%) — kein Z2-Lauf, Pace@Z2 N/A",
+                "race_effort": True, "baseline_eligible": False}
     z2 = [r for r in seg_run if r["hr"] is not None and r["hr"] <= HR_Z2_CAP]
     window = label or "steady Z2-Segment, running-only, HR<=147"
     if not z2:   # Fallback: ganzes Segment running-only (kein HR<=147 darin)
@@ -695,6 +702,9 @@ def _bucketize(pts, size_m):
         dh = grp[-1]["alt"] - grp[0]["alt"]
         dd = grp[-1]["dist"] - grp[0]["dist"]
         grade = (dh / dd * 100.0) if dd else None
+        # Partieller Bucket (Track-Ende/GPS-Stop, <50% voll) → Grade-Artefakt unterdrücken (Fix v3.13)
+        if dd is not None and dd < size_m * 0.5:
+            grade = None
         rows.append({
             "idx": b,
             "km_start": _r(grp[0]["dist"] / 1000.0, 2),
@@ -862,17 +872,26 @@ def analyze(fit_path, as_of):
         break
 
     # Steady-Z2-Segment (Surge-frei) — gemeinsame Basis für Pace@Z2 + Decoupling
+    hrz = hr_zone_distribution(recs)
     seg_run, seg_label = steady_z2_segment(recs, fit)
     dec = decoupling(seg_run, seg_label)
     pz2 = pace_at_z2(seg_run, session, recs=recs, label=seg_label,
                      decoupling_pct=dec.get("decoupling_pct"),
-                     walk_pct=summary.get("walk_pct"))
+                     walk_pct=summary.get("walk_pct"),
+                     z4z5_pct=hrz.get("z4_z5_pct"))
+
+    # V3-Ära beginnt 27.05.2026 (post-Japan). Läufe davor = historische Referenz,
+    # NICHT an V3-Compliance/-Cues/-Baselines messen (Fix v3.13).
+    run_date = (summary.get("start_time_utc") or "")[:10] or (as_of or "")
+    pre_v3 = bool(run_date) and run_date < "2026-05-27"
 
     return {
         "ok": True,
         "meta": {
             "fit_path": fit_path,
             "as_of": as_of,
+            "run_date": run_date or None,
+            "pre_v3": pre_v3,
             "sport": sport,
             "sub_sport": sub_sport,
             "workout_name": workout_name,
@@ -880,12 +899,12 @@ def analyze(fit_path, as_of):
             "record_count": len(recs),
             "walking_filter": "v3.5 (cad<140 & spd<2.0; stand=cad0&spd<0.5 separat)",
             "parser": "fitparse",
-            "skill": "run-bundle-skill v3.12",
+            "skill": "run-bundle-skill v3.13",
         },
         "summary": summary,
         "splits_km": km_splits(recs),
         "splits_lap": lap_splits(fit, recs),
-        "hr_zones": hr_zone_distribution(recs),
+        "hr_zones": hrz,
         "hr_source_warn": hr_source_warn(recs),
         "run_form": run_form(recs, session),
         "best_values": best_values(recs),

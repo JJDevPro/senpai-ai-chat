@@ -11,6 +11,7 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 
 > **v3.13-Änderungen (gegenüber v3.12):**
 > - **§18 NEU: Strava-MCP-Enrichment (MCP-native, §0-konform).** Nach der FIT-Analyse wird die Strava-Aktivität via `list_activities` ZUGEORDNET (kein Trigger — die .fit kommt weiter per HealthFit-Auto-Upload) und um Loot angereichert, das FIT/HAE strukturell NICHT haben: **Schuh-Kilometer + Rotations-Compliance** (`get_gear`), **strecken-normalisierter Segment-Trend** (`get_activity_performance.segment_efforts`), **Titel/Beschreibung** als subjektiver Kontext, **Parkrun-Counter** (aus Titel), **Race-Auto-Detect** (`activity_tags`), **Parkrun/Papa-Sozial-Layer** (Präsenz ≠ zusammen-gelaufen). Dünner FIT-loser Fallback (Tier 3) aus `laps`/`best_efforts`/`segment_efforts`. Neues State-File `gear.md` (§11). **⛔ §0-HART: `get_activity_streams` (Roh-Serie) NIE aufrufen** — nur Aggregat-Tools. Stream-Bridge bewusst out of scope (Backlog).
+> - **Engine-Härtung (analyze_run_fit.py) + Pre-V3-Regel:** (1) **Pace@Z2 bei Race/Parkrun unterdrückt** — Z4+Z5 >50 % → `pace_at_z2.race_effort=true`, „N/A — kein Z2-Lauf" statt einer Pseudo-Pace aus Warmup-Resten. (2) **GPS-End-Artefakt geklemmt** — partieller Schluss-KM (<300 m) bzw. Teil-Bucket (<50 %) → `grade_pct=None` statt absurder −33 %. (3) **`meta.pre_v3`/`meta.run_date`** — Läufe vor dem 27.05.2026 (post-Japan-V3-Start) werden als historische Referenz geflaggt, NICHT V3-bewertet (§0i). (4) **Marquee-Segment** = Voll-Strecken-Segment „Wöhrder See parkrun" (§18.2b).
 
 > **v3.12-Änderungen (gegenüber v3.11):**
 > - **§0h Topo-Feinsampling:** `topography` (analyze_run_fit.py) rechnet jetzt **100m-Primär** (statt 200m) + einen **50m-Fein-Layer (`fine_buckets`) NUR in/um die Steil-Zonen** (Notable |Grade|≥2%, je 1 Nachbar → Anstieg→Abstieg-Paar). Deckt den echten Peak-Grade auf, den die 200m-Mittelung wegglättete (validiert: km3,5-Hügel 50m = +4,9% vs 200m-Mittel 2,9%). Notable-Gate proportional (`dd ≥ bucket·0,75`) → partieller End-Bucket/GPS-Stop-Artefakt bleibt gefiltert. Kompakt: nur Steil-Zonen im Fein-Layer, nie der ganze Lauf in 50m-Zeilen (§0-Kernregel).
@@ -181,6 +182,18 @@ Drei Auflösungen aus `topography` (v3.12): **1km-Output** (Übersicht) + **100m
 **Hügel-Pattern-Regel:** Wenn ein +2%-Anstieg innerhalb von ≤400m von einem -2%-Abstieg gefolgt wird, MÜSSEN beide Buckets im Topo-Detail erscheinen. Der Abstieg erklärt das Pace-Pattern in den folgenden KMs (Free-Speed-Recovery) — ohne ihn ist der Coaching-Output unvollständig.
 
 **Topografie immer aus dem VOLLEN Datensatz** (nicht walking-gefiltert) — Höhen-Deltas brauchen alle GPS-Punkte.
+
+> **🩹 End-Artefakt-Klemme (v3.13):** Der partielle Schluss-KM bzw. Teil-Bucket am Track-Ende (GPS-Stop-Glitch) liefert sonst absurde Grades (z. B. −33 %). Die Engine setzt `grade_pct=None`, wenn ein KM <300 m bzw. ein Bucket <50 % Daten hat → solche „Gefälle" NIE im Report zitieren.
+
+---
+
+## 0i. ⏳ PRE-V3-REGEL (Läufe vor dem 27.05.2026)
+
+V3 gilt erst **seit 27.05.2026** (post-Japan-Rückkehr). Die Engine setzt `meta.pre_v3=True`, wenn das Lauf-Datum davor liegt. Bei `pre_v3=True`:
+- **NICHT an V3-Compliance messen** — kein „HR-Cap-Bruch"-Roast, keine V3-Cue-Checks/-Writes (§12d), keine Pace@Z2-Baseline-Aktualisierung. Der Lauf war zu seiner Zeit korrekt.
+- Als **historische Referenz** rahmen (PB / Ceiling / Form-Beleg), NICHT als heutigen Ist-Zustand.
+- **PRE-V3-Banner** direkt unter dem RUN-REPORT-Titel setzen.
+- Bei `pre_v3=False` (Standard, Lauf ab 27.05.2026): volle V3-Bewertung wie gehabt.
 
 ---
 
@@ -952,6 +965,7 @@ KEINE Cutoff-Panik aus methodisch ungültigen Metriken oder neuromuskulärer Erm
 
 ## 📊 Pace@Z2-Update (nur bei Z2-Run)
 [Tracking-Tabelle: Datum/Temp/Roh (running-only, M:SS/km)/Normalisiert (M:SS/km)/Schuh/Δ vs Baseline. Roh = pace_z2_run (§8c), identisch zur Hitze-Korrektur, NIE die as-run-Pace.]
+[Race/Parkrun (Z4+Z5 >50 %): Engine liefert `pace_at_z2.race_effort=true` → „N/A — Race-Effort, kein Z2-Lauf", KEINE Baseline-Aktualisierung (v3.13).]
 
 ## 👟 Strava-Enrichment (§18 — wenn Aktivität aufgelöst, sonst skip)
 [Schuh: Modell (voll) + km (get_gear, /1000) + Rotations-Compliance-Ampel + Verschleiß-Flag. Segment-Δ vs gear.md-Baseline (Parkrun-Marquee). Parkrun-Counter (#NN aus Titel). Titel/Beschreibung als subjektiver Kontext. Parkrun/Papa-Layer: Präsenz (Default) vs. zusammen-gelaufen (nur bei Evidenz → Papa-Faktor). ⛔ keine Streams.]
@@ -1258,7 +1272,7 @@ Die .fit kommt per HealthFit-Auto-Upload (Strava ist NICHT der Trigger). Nach SC
 
 ### 18.2 SCHRITT 3T2 — Tier-2-Enrichment (läuft IMMER wenn aufgelöst, auch MIT FIT)
 **(a) Schuh-km + Rotations-Compliance:** `get_gear(gear_id)` → `total_distance` ist in **METERN** → /1000 = km (Einheiten-Falle!). Modell (voll ausschreiben — NEVER-Liste) vs. Rotations-Regeln (`Schuhe_Ausruestung.md`/§14): richtiger Schuh für den Lauf-Typ (Easy >5 km → ASICS Superblast 3 / ASICS Megablast; Easy ≤5 km → ASICS Novablast 5)? Verschleiß-Flag bei ~600–800 km (relevant bei dem Körpergewicht). → km nach `gear.md` schreiben (`--upload`). Schwelle überschritten → 1 Zeile `backlog.md`.
-**(b) Segment-Trend (strecken-normalisiert):** `get_activity_performance(activity_id).segment_efforts[]` → je Segment Effort-Zeit vs. Baseline in `gear.md` → Δ. PR → neue Baseline. **Sa-Parkrun am Wöhrder See = Marquee** (gleiche Strecke jede Woche → sauberer Fitness/Pace@Z2-Trend als Ganz-Lauf-Vergleich).
+**(b) Segment-Trend (strecken-normalisiert):** `get_activity_performance(activity_id).segment_efforts[]` → je Segment Effort-Zeit vs. Baseline in `gear.md` → Δ. PR → neue Baseline. **Marquee = das Voll-Strecken-Segment „Wöhrder See parkrun"** (NICHT ein Teil-Segment wie „over the bridge"/„Bridge over Wöhrder See") — gleiche 5-km-Strecke jeden Samstag → der sauberste strecken-normalisierte Fitness/Pace@Z2-Trend. PR-Gold-Cluster an einem Tag = Peak-Beleg. Teil-Segmente nur als Zusatz-Marker.
 **(c) Titel + Beschreibung (subjektiver Kontext, ersetzt RPE):** `name` + `description` → in den Verdict spiegeln (Athlet pflegt sie aktiv); Workout-Intent aus dem Titel gegen die Ist-Laps cross-checken.
 **(d) Parkrun-Counter + Race-Detect:** Titel `~Parkrun #(\d+)` → Counter in `live.md` fortschreiben (max der Nr.; „Warmup"-Läufe NICHT zählen). `activity_tags` enthält `"Race"` → als Rennen markieren, ggf. race-projection-skill anstoßen.
 **(e) Best-Efforts-PR (Bonus, gratis aus 3T2b):** `best_efforts[]` (Fastest 400/1k/Mile/5k) vs. PRs in `live.md`/`baselines.md`. Neuer PR NUR schreiben, wenn (bei FIT) `best_values` übereinstimmt — sonst „Strava-PR (unbestätigt)" (GPS-Spike-Schutz).

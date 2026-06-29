@@ -204,7 +204,7 @@ Letzte Full-Body: Do letzte Woche (7 Tage zurück) → Kriterium 4 ✅
 |---|---|---|
 | **Z2-Primärschuh** (Modell siehe Ausrüstung im Profil / Drive) | Easy Z2, Long Z2, alle HR≤Z2 Sessions | Primärschuh V3-Volumen. Breiter Vorderfuß = komfortabler bei langen Z2 |
 | **Tempo/Race-Schuh** (Modell siehe Profil / Drive) | Tempo, Race-Sim, Intervalle, Parkrun-Effort | Pflicht bei expliziter Pace-Session. Rotation: nicht 2× in Folge ohne Z2-Primärschuh dazwischen |
-| **Kurzstrecken-Z2-Schuh** (Modell siehe Profil / Drive) | Z2-Läufe ≤6km | Vorbehalt: Feedback-Session steht aus. Erst freigeben nach explizitem Test |
+| **Kurzstrecken-Z2-Schuh** (Modell siehe Profil / Drive) | Easy/Z2 **≤5 km** (selten) | Freigegeben (Athleten-Feedback KW27): NUR Kurzstrecke ≤5 km; ab >5 km der Z2-Primärschuh (Modelle in `athlete.md` / `Schuhe_Ausruestung.md`) |
 
 > **HM-Schuh (Race-Tag, siehe Renn-Kalender live.md):** Wahrscheinlich der Z2-Primärschuh. Entscheidung nach dem letzten Renntraining vor dem Race. Wenn die bekannte Druckstelle wieder auftritt (siehe Medical-Notes im Athleten-Profil) → Z2-Primärschuh für Race Day. Keine Überraschungen auf der Strecke.
 

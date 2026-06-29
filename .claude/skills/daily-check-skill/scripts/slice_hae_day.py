@@ -280,8 +280,10 @@ def _hrv_night(metrics, sleep_rec):
 def _body_comp(metrics, as_of):
     """Letzte Körper-Mess-Werte (≤ as_of) je Metrik mit Protokoll-Flag.
 
-    off_protocol = Quelle ist NICHT die Protokoll-Körperwaage ODER gemessen nach 09:00
-    (claude.ai flaggt das Withings-Spät-Wiegen; wir hatten es übersehen)."""
+    off_protocol = Quelle ist KEINE nüchtern-fähige Waage (Körperwaage/Withings) ODER
+    gemessen ab 09:00. Eine **Withings-Lesung VOR 09:00 ist die gültige Mo-nüchtern-SoT**
+    — früher fälschlich off-protocol, weil nur 'körperwaage' als Quelle zählte (die Waage
+    des Athleten meldet sich aber als 'Withings')."""
     out = {}
     for name in ("weight_body_mass", "body_fat_percentage", "lean_body_mass", "body_mass_index"):
         pts = [r for r in _series(metrics, name)
@@ -293,7 +295,8 @@ def _body_comp(metrics, as_of):
         rec = pts[-1]
         src = rec.get("source") or ""
         t = _hhmm(rec.get("date"))
-        off = (src.lower() != "körperwaage") or (t is not None and t > "09:00")
+        on_src = src.lower() in ("körperwaage", "withings")   # Withings = die SoT-Waage des Athleten
+        off = (not on_src) or (t is not None and t >= "09:00")
         out[name] = {
             "value": round(_val(rec), 2),
             "date": _day(rec.get("date")),

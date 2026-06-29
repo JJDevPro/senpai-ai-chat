@@ -123,12 +123,15 @@ Wetter ist **Kriterium 2** der Flex-Regel (`modules/V3_Protocol.md`, alle 4 müs
 
 ## 5. Pre-Lauf-Output
 
-1. **Lauf-Impact-Matrix** (Zeile für den/die Trainingstag/e).
-2. **Slot-Empfehlung** (Mi: 17:00 vs 20:00 je nach Hitze + Asphalt-Effekt).
-3. **Schuh-Call:** intensitätsbasiert → Schuhe_Ausruestung.md (PERSONAL, aus Drive-Privatordner ziehen: `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match Schuhe_Ausruestung.md --out ./data` → `./data/Schuhe_Ausruestung.md`) / `modules/V3_Protocol.md` (Easy/Z2 = Easy-Schuh, Intensität = Intensitäts-Schuh; konkrete Modelle siehe Ausrüstung im Profil / Drive).
-4. **HR-Ziel:** Z2 ≤147 (Easy/Long) oder Runna-Pace (Race-Sim/Tempo).
-5. **Pace@Z2-Erwartung** temperatur-normalisiert.
-6. Bei Hitze: Wasser-Hinweis (→ `nutrition-skill` §6).
+1. **Lauf-Impact-Matrix** (+ Stunden-Fenster bei Lauf >1 h, §3).
+2. **Slot-Empfehlung** (Mi: 17:00 vs 20:00 je nach Hitze + Asphalt).
+3. **💧 Taupunkt:** [XX °C] ([Band aus `lib/weather.py` `dew_point_band`: <0 sehr trocken · 0–10 trocken bis angenehm · 10–15 leicht feucht · 15–20 **schwül, unangenehm** · >20 sehr schwül, drückend]) — sagt, wie schwül es wird; hoher Taupunkt → Verdunstungskühlung sinkt, HR läuft heiß → unteren Z2-Rand starten.
+4. **🌅 Sonnenuntergang:** [HH:MM] (aus `sun.sunset`) — bei Abend-Slots: noch [X] min Tageslicht zum Start; **Stirnlampe** ja/nein (Dämmerung/Winter) + ggf. beleuchtete Strecke wählen.
+5. **👕 Bekleidung** (Präferenzen aus `athlete.md`, temp+taupunkt+regen-bewusst): ~20–25 °C → kurze Hose + Kompressionsshirt; **Regen** → Cap (hält die Brille trocken) ODER Kontaktlinsen, Regenjacke bei milder Schwüle eher NEIN; **kalt/Winter → Schichten, aber NICHT überbekleiden** (Hitzestau-Fallstrick: lieber kühl starten — der Körper heizt beim Laufen stark auf).
+6. **👟 Schuh-Call:** Easy >5 km → **ASICS Superblast 3** (+ ASICS Megablast als Alternative); Easy ≤5 km → **ASICS Novablast 5**; Tempo/Race → Intensitäts-Schuh. Detail/Pre-Hab → `Schuhe_Ausruestung.md` (Drive) / `modules/V3_Protocol.md`.
+7. **HR-Ziel:** Z2 ≤147 (Easy/Long) oder Runna-Pace (Race-Sim/Tempo).
+8. **Pace@Z2-Erwartung** temperatur-normalisiert.
+9. Bei Hitze/Schwüle: Wasser-/Elektrolyt-Hinweis (→ `nutrition-skill` §6).
 
 ---
 

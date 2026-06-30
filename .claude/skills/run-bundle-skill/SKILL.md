@@ -1285,7 +1285,7 @@ Dünnes Sicherheitsnetz (selten, da HealthFit auto-uploadet). „FIT-lite"-Repor
 Nur **Parkrun** ist aktiv (NTC + andere Clubs = passive Mitgliedschaft → Events IGNORIEREN, nicht surfacen).
 1. **Parkrun-Erkennung:** Sa-09:00-Lauf am Wöhrder See (Anker `athlete.md`, ~49.4533/11.0998) ODER Titel „Parkrun #NN".
 2. **Präsenz (Default):** „Papa + Crew dabei (Ritual)" — fast immer wahr, als sozialer Kontext/Motivation framen. **Papa-Faktor NICHT allein aus Präsenz.**
-3. **Zusammen gelaufen (bedingt):** nur ableiten, wenn Titel/Beschreibung es sagt ODER das Pace-Profil zu Papas ~25:00/Easy passt (Papa Easy + Javier Tempo → Konvergenz). Sonst **fragen** statt annehmen. **Strava bestätigt Co-Runner NICHT** (kein athlete_count/keine Identitäten).
+3. **Zusammen gelaufen (bedingt):** nur ableiten, wenn Titel/Beschreibung es sagt ODER das Pace-Profil zu Papas ~25:00/Easy passt (Papa Easy + Athlet Tempo → Konvergenz). Sonst **fragen** statt annehmen. **Strava bestätigt Co-Runner NICHT** (kein athlete_count/keine Identitäten).
 4. **Papa-Faktor NUR bei (3):** KM1-Drossel +18 s/km erwartbar, −30 % Pace-Varianz, ~2.52 W/kg-Parität (`learnings.md`) als Auswertungs-Linse; KM1-Schnellstart dann KEIN Fehler.
 
 ### 18.5 `gear.md` — State-Schema (Drive-State, §11-registriert)

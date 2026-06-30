@@ -65,6 +65,22 @@ def is_bedtime_window(dt: datetime) -> bool:
     return dt.hour >= 22
 
 
+# Trainingstage (CLAUDE.md §4 Wochen-Rhythmus): Mo=Run+Core · Mi=Long Run ·
+# Do=Gym · Sa=Parkrun. Di/Fr/So = Rest. weekday(): Mo=0 … So=6.
+TRAINING_DAYS = {0, 2, 3, 5}   # Mo, Mi, Do, Sa
+RUN_DAYS = {0, 2, 5}           # Mo, Mi, Sa (Do = Pure-Gym, Lauf nur bei Flex-Regel)
+
+
+def is_training_day(dt: datetime) -> bool:
+    """Trainingstag (Mo/Mi/Do/Sa) — triggert Wetter/Pre-Lauf im Daily Check (§4/§12.5)."""
+    return dt.weekday() in TRAINING_DAYS
+
+
+def is_run_day(dt: datetime) -> bool:
+    """Lauftag (Mo/Mi/Sa) — Pre-Lauf-Briefing rendert hier (Do nur bei aktiver Flex-Regel)."""
+    return dt.weekday() in RUN_DAYS
+
+
 def parse_now(s: str | None) -> datetime | None:
     """ISO8601 → datetime (für --now / Tests). None bei leerem Wert."""
     if not s:
@@ -81,7 +97,8 @@ def main(argv=None):
     print(
         f"{dt.strftime('%A %d.%m. %H:%M %Z')} · KW{dt.isocalendar().week}"
         f" · window={time_window(dt)} · roast_morning={is_roast_morning(dt)}"
-        f" · bedtime={is_bedtime_window(dt)}"
+        f" · bedtime={is_bedtime_window(dt)} · training_day={is_training_day(dt)}"
+        f" · run_day={is_run_day(dt)}"
     )
     return 0
 

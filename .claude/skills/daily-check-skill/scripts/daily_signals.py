@@ -22,6 +22,7 @@ CLI:  python daily_signals.py <healthautoexport.json>
 API:  from daily_signals import all_signals; sig = all_signals(json_path_or_obj)
 """
 import json
+import os
 import sys
 from collections import defaultdict
 from datetime import date, timedelta
@@ -105,6 +106,23 @@ def _prev_key(keys, today_key):
         return y
     earlier = [k for k in keys if _date(k) and _date(k) < td]
     return earlier[-1] if earlier else None
+
+
+def _yesterday(as_of):
+    """Kalender-Vortag von as_of (YYYY-MM-DD) oder None bei ungültigem as_of."""
+    d = _date(as_of)
+    return (d - timedelta(days=1)).isoformat() if d else None
+
+
+def _present_days(merged):
+    """Alle Kalendertage (YYYY-MM-DD), die irgendeine Metrik im gemergten Dict trägt."""
+    days = set()
+    for blk in merged.values():
+        for p in blk.get("data", []):
+            d = _day(p.get("date", ""))
+            if d:
+                days.add(d)
+    return days
 
 
 def _daylight_ampel(mins):
@@ -231,8 +249,80 @@ def dietary_water(metrics):
     return r["value"] if r else None
 
 
-def all_signals(json_obj, as_of=None):
-    m = _load(json_obj)
+# Health Auto Export liefert dietary_energy in KILOJOULE — Umrechnung auf kcal.
+_KJ_PER_KCAL = 4.184
+
+# out_key → (HAE-Metrik-Name, Faktor). ⚠️ ECHTE HAE-Feldnamen (an KW26-Daten verifiziert):
+# protein/carbohydrates/total_fat/fiber/dietary_sugar (g), dietary_energy (kJ!), dietary_water (mL).
+# NICHT dietary_protein/dietary_fat_total/dietary_carbohydrates — die existieren in HAE nicht.
+_DIETARY_FIELDS = {
+    "protein_g": ("protein", 1.0),
+    "carbs_g": ("carbohydrates", 1.0),
+    "fat_g": ("total_fat", 1.0),
+    "fiber_g": ("fiber", 1.0),
+    "sugar_g": ("dietary_sugar", 1.0),
+    "kcal": ("dietary_energy", 1.0 / _KJ_PER_KCAL),   # HAE-Einheit kJ → kcal
+    "water_ml": ("dietary_water", 1.0),
+}
+
+
+def dietary_macros(metrics, as_of=None):
+    """Tages-Makros für HEUTE + GESTERN aus den HAE-dietary_*-Feldern.
+
+    Per-Tag-Summe via `_daily(sum)` (mehrere Meal-Einträge/Tag → Tagessumme).
+    **`today`/`yesterday` sind EXAKTE Kalendertage** (as_of bzw. as_of−1) — kein
+    „nächst-früherer" Fallback: ist der Tag nicht geloggt, kommt `None` zurück
+    (Logging ist intermittent, oft Fr–So leer). NIE 0 annehmen. `logged_days`
+    listet, an welchen Tagen überhaupt Makros existieren (für „zuletzt geloggt").
+    """
+    sums, daykeys = {}, set()
+    for out_key, (hae_name, factor) in _DIETARY_FIELDS.items():
+        d = _daily(metrics, hae_name, "sum")
+        sums[out_key] = (d, factor)
+        daykeys |= set(d.keys())
+    if not daykeys:
+        return None
+    keys = sorted(daykeys)
+    today_key = str(as_of)[:10] if as_of else keys[-1]
+    y_key = _yesterday(as_of) if as_of else (keys[-2] if len(keys) >= 2 else None)
+
+    def pack(k):
+        if k is None:
+            return None
+        rec, any_val = {"day": k}, False
+        for out_key, (d, factor) in sums.items():
+            if k in d:
+                rec[out_key] = round(d[k] * factor, 1)
+                any_val = True
+            else:
+                rec[out_key] = None
+        return rec if any_val else None
+
+    return {"today": pack(today_key), "yesterday": pack(y_key), "logged_days": keys}
+
+
+def all_signals(json_obj, as_of=None, data_dir=None):
+    """Alle Tag-Signale. **Vortag-Härtung (Daylight-/Audio-Glitch):** ist as_of gesetzt
+    und der Kalender-Vortag fehlt in den geladenen Daten, wird automatisch
+    `<data_dir>/HealthAutoExport-<gestern>.json` nachgeladen + gemergt (nicht-fatal,
+    wenn die Datei fehlt). `data_dir` default = Verzeichnis des ersten String-Pfads.
+    So resolved `yesterday` auch dann, wenn der Aufrufer nur die Heute-Datei übergibt."""
+    objs = list(json_obj) if isinstance(json_obj, (list, tuple)) else [json_obj]
+    m = _load(objs)
+    if as_of:
+        y = _yesterday(as_of)
+        if y and y not in _present_days(m):
+            dd = data_dir
+            if dd is None:
+                for o in objs:
+                    if isinstance(o, str):
+                        dd = os.path.dirname(o) or "."
+                        break
+            if dd is not None:
+                cand = os.path.join(dd, f"HealthAutoExport-{y}.json")
+                if os.path.exists(cand) and cand not in objs:
+                    objs = objs + [cand]
+                    m = _load(objs)
     return {
         "daylight": daylight_minutes(m, as_of),
         "sleep_efficiency": sleep_efficiency(m),
@@ -241,6 +331,7 @@ def all_signals(json_obj, as_of=None):
         "vo2_max": latest_reading(m, "vo2_max"),
         "cardio_recovery": latest_reading(m, "cardio_recovery"),
         "dietary_water_ml": dietary_water(m),
+        "dietary": dietary_macros(m, as_of),
     }
 
 
@@ -253,8 +344,11 @@ def main():
     ap.add_argument("hae", nargs="+", help="HAE-JSON-Pfad(e): HEUTE zuerst, dann optional GESTERN bzw. ein Range-Export")
     ap.add_argument("--as-of", dest="as_of", default=None,
                     help="Bezugstag YYYY-MM-DD (pinnt today/yesterday); Default = letzter Tag im Export")
+    ap.add_argument("--data-dir", dest="data_dir", default=None,
+                    help="Verzeichnis für den Vortag-Auto-Nachzug (default = Ordner der ersten HAE-Datei)")
     args = ap.parse_args()
-    print(json.dumps(all_signals(args.hae, as_of=args.as_of), ensure_ascii=False, indent=2))
+    print(json.dumps(all_signals(args.hae, as_of=args.as_of, data_dir=args.data_dir),
+                     ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 ---
 name: daily-check-skill
-description: "AI Coach Daily Check für den Athleten — WHOOP-artiges Tages-Dashboard. PFLICHT laden bei: dem dailycheck-Command, Daily Check/Morgen-Check/Status/wie war die Nacht/wie sehen die Werte aus, sowie weichen Triggern wie was geht ab/was steht an/wie läufts/Update und Begrüßung ohne Aufgabe (Hi Senpai/Moin). Liefert: Recovery-Ampel, Schlaf-Score, Gestern-Load (TRIMP + CTL/ATL/TSB), stündliche HRV-Tabelle, KW-Trend, Heute-Plan, Senpais Urteil. Zieht zwei Tages-JSONs (heute+gestern, Mitternachts-Merge) lokal nach ./data via pull_drive.py und reduziert sie deterministisch per slice_hae_day.py. NICHT bei spezifischen Aufgaben wie Lauf-/Gym-Analyse, Was soll ich essen, oder Einzeldaten-Fragen."
+description: "AI Coach Daily Check für den Athleten — WHOOP-artiges Tages-Dashboard. PFLICHT laden bei: dem dailycheck-Command, Daily Check/Morgen-Check/Status/wie war die Nacht/wie sehen die Werte aus, sowie weichen Triggern wie was geht ab/was steht an/wie läufts/Update und Begrüßung ohne Aufgabe (Hi Senpai/Moin). Liefert: Recovery-Ampel, Schlaf-Score, Gestern-Load (TRIMP + CTL/ATL/TSB), HRV-Feinverlauf (15-Min) + KW-Heatmap, kompakte Makro-Compliance (gestern), KW-Trend, Pre-Lauf-Briefing an Trainingstagen, Heute-Plan, Senpais Urteil. Zieht zwei Tages-JSONs (heute+gestern, Mitternachts-Merge) lokal nach ./data via pull_drive.py und reduziert sie deterministisch per slice_hae_day.py. NICHT bei spezifischen Aufgaben wie Lauf-/Gym-Analyse, Was soll ich essen, oder Einzeldaten-Fragen."
 ---
 
-# Daily-Check-Skill v0.15 — "Senpai-WHOOP"
+# Daily-Check-Skill v0.16 — "Senpai-WHOOP"
 
 > Modul-Datei. Senpai liest sie automatisch beim Daily-Check-Trigger oder per `/dailycheck`.
 >
@@ -25,6 +25,8 @@ description: "AI Coach Daily Check für den Athleten — WHOOP-artiges Tages-Das
 **Weiche Trigger (Daily Check wird Standard-Antwort):** "Was geht ab" · "Was steht an" · "Wie läuft's" · "Update?" · Begrüßung ohne Aufgabe ("Hi Senpai", "Moin"). → Immer voll, keine Dämpfung mehr.
 
 **KEINE Trigger:** Spezifische Aufgaben ("Analysiere meinen Lauf", "Was soll ich essen?") · lokale Datei in `./data` ohne Frage (Datei-/Bundle-Skill greift) · direkte Einzeldaten-Frage ("Wie ist mein VO2Max-Trend?") · Coaching-Folgefragen.
+
+> **🥗 Ernährung IM Daily Check (v0.16):** Der Daily Check enthält selbst einen **kompakten Gestern-Makro-Block** (§7b — Protein-Floor + kcal/Fett/Carbs/Wasser) als vierte gleichwertige Säule (CLAUDE.md §1). Das ist KEIN „Was soll ich essen?"-Trigger — die **Voll-Engine** (Casein, Mittag-12:00, Supplements, Whitelist) bleibt `nutrition-skill` (/makro). Daily = Gestern-Compliance auf einen Blick; /makro = Tiefe.
 
 -----
 
@@ -48,7 +50,7 @@ Step 4:  ZWEI Tages-JSONs nach `./data` ziehen (Muster YYYY-MM-DD, NIE YYYY-MM; 
 Step 5:  Beide lokalen JSON-Pfade + den Mitternachts-Merge + Ziel-Tag-Slicing in EINEM Aufruf:
          `python3 .claude/skills/daily-check-skill/scripts/slice_hae_day.py <heute_json> [<gestern_json>] --as-of {heute}` → JSON von stdout lesen (§3f).
          [Multi-Day: §3f-bis — EIN Range-File als `<heute_json>`, kein zweites Argument.]
-Step 6:  slice_hae_day mergt die stündlichen Serien (HRV/HR/SpO2/Atmung) gestern+heute und slict auf die
+Step 6:  slice_hae_day mergt die minuten-granularen Serien (HRV/HR/SpO2/Atmung) gestern+heute und slict auf die
          Ziel-Nacht (§3f / §3f-bis bei Multi-Day). Kein manuelles base64/json — die JSON-Ausgabe lesen.
 Step 7:  sleep_analysis aus der slice_hae_day-JSON (sleepEnd == heute; §3f / §3f-bis bei Multi-Day).
 Step 8:  GESTERN-LOAD aus der slice_hae_day-JSON: active_energy (Tagessumme), step_count, physical_effort (Ø/Peak),
@@ -58,8 +60,9 @@ Step 8:  GESTERN-LOAD aus der slice_hae_day-JSON: active_energy (Tagessumme), st
          (Gang-Trip-Wire — NUR surfacen wenn `flag=True` = erhöht → Verletzungs-/Ermüdungs-Kontext).
          **Multi-Day: slice_hae_day filtert ZWINGEND auf den Vortag** (`day==gestern`), sonst Wochen-/Monats-Summe (§3f-bis).
 Step 8.5: TAG-SIGNALE: `python3 .claude/skills/daily-check-skill/scripts/daily_signals.py <heute_json> <gestern_json> --as-of {heute}` (§3i) —
-         **BEIDE Tagesdateien übergeben** (heute + gestern) ODER den Multi-Day-Export — daily_signals mergt sie, damit der **Vortag (`daylight`/`audio` `yesterday`) nie verhungert**. NUR die Heute-Datei → `yesterday=null` → die Gestern-Retro hat kein Tageslicht/Audio (Daylight-Vortag-Glitch). `--as-of {heute}` pinnt today/yesterday (PFLICHT, sonst = letzter Tag im Export).
-         Liefert Tageslicht, Schlaf-Effizienz, Wrist-Temp+Baseline, Audio-Tag-Kontext, VO2max/cardio_recovery-Fallback, Wasser.
+         **BEIDE Tagesdateien übergeben** (heute + gestern) ODER den Multi-Day-Export — daily_signals mergt sie, damit der **Vortag (`daylight`/`audio` `yesterday`) nie verhungert**. `--as-of {heute}` pinnt today/yesterday (PFLICHT, sonst = letzter Tag im Export).
+         🛡️ **Vortag-Härtung (Glitch strukturell behoben):** Wird versehentlich NUR die Heute-Datei übergeben und fehlt der Kalender-Vortag, zieht daily_signals ihn via `--data-dir` (Default = Ordner der ersten Datei) selbst aus `./data` nach (`HealthAutoExport-<gestern>.json`) — nicht-fatal, wenn die Datei wirklich fehlt.
+         Liefert Tageslicht, Schlaf-Effizienz, Wrist-Temp+Baseline, Audio-Tag-Kontext, VO2max/cardio_recovery-Fallback, Wasser **+ `dietary`** (Makros gestern+heute: Protein/kcal/Fett/Carbs/Ballaststoffe/Zucker/Wasser → §7b Ernährung).
 Step 8.6: ⛔ SAFETY-GATE (deterministisch, NICHT verhandelbar — CLAUDE.md §6):
          `python3 .claude/skills/daily-check-skill/scripts/safety_gate.py <slice_json> [--injury] [--opt-out] [--prev-hrv N]`
          `<slice_json>` = die slice_hae_day-Ausgabe (Datei oder '-' via Pipe). Liefert
@@ -107,7 +110,10 @@ Step 10.7: 📋 BACKLOG (PR3, best-effort, NON-BLOCKING): `backlog.md` aus Drive
          ein Item ergänzen (Format = Template; **dedup** gegen Bestand, kein Spam). Wirkt ein offenes Item erledigt
          → nach `## Erledigt` mit Datum. Datei lokal regenerieren + `pull_drive.py --upload --name backlog.md`.
          Fehlt `backlog.md` → Pre-Seed-Hinweis MELDEN, NICHT blockieren. (Abgrenzung: Form-Cues → `coaching_cues.md`.)
-Step 11: Wenn Trainingstag-Flag: Wetterochs RSS+JSON.
+Step 11: Wenn Trainingstag (Mo/Mi/Sa/Do, `lib/clock.is_training_day`): **`weather-runprep-skill` automatisch laden + ausführen**
+         (voller Workflow: präzise Bright Sky/DWD-Stundenwerte via `lib/weather.py` + Wetterochs RSS/Delphi-JSON fürs Narrativ).
+         An **Lauftagen** (Mo/Mi/Sa, `lib/clock.is_run_day`; Do nur bei aktiver Flex-Regel) daraus zusätzlich das
+         **Pre-Lauf-Briefing** (§12.5: Schuh + Runna-Session + Pace@HR147) bauen — Subset aus dem weather-runprep-Output, keine Duplikation.
 Step 12: Berechnungen über gemergtes Schlaf-Fenster + Recovery-Ampel-Komposit (§6).
 Step 13: ANOMALIE-CHECK (§3d) → ggf. CSV (heute, bei Mitternachts-Fenster auch gestern).
 Step 14: Persona-Modus aus HRV+Bedtime (§16).
@@ -126,7 +132,7 @@ Step 16: 📓 ARCHIV (T7, NACH dem Output, best-effort, NON-BLOCKING): das ferti
 |---|---|---|---|
 | **Gesundheitsdaten_v5** (Sheet) | 1 Wert/Tag | `pull_drive.py --sheet … --out ./data/Gesundheitsdaten_v5.csv` | KW-Trend, Wochenvergleich |
 | **Trainings_v5** (Sheet) | 1 Zeile/Session | `pull_drive.py --sheet … --out ./data/Trainings_v5.csv` | **TRIMP, CTL/ATL/TSB, Session-Typ** |
-| **HealthAutoExport-YYYY-MM-DD.json** (~18-50 KB) | 24 Werte/Tag (stündlich) | `pull_drive.py --folder … --match "HealthAutoExport-{tag}" --out ./data` → `slice_hae_day.py` | Schlaf, HRV/HR-Kurven, Tages-Load, Recovery |
+| **HealthAutoExport-YYYY-MM-DD.json** (~20-600 KB) | bis ~1440 Werte/Tag (minutengenau) | `pull_drive.py --folder … --match "HealthAutoExport-{tag}" --out ./data` → `slice_hae_day.py` | Schlaf, HRV/HR-Kurven, Tages-Load, Recovery |
 | **HealthMetrics-YYYY-MM-DD.csv** (~220 KB) | bis 1440/Tag (minutengenau) | `pull_drive.py --folder … --match "HealthMetrics-{tag}" --ext .csv --out ./data` | Forensik, Atemstörungs-/SpO2-Peaks |
 
 **⛔ NIEMALS `HealthAutoExport-YYYY-MM.json`** (Monats-Aggregat, tages-granular). Tagesdatei MUSS `YYYY-MM-DD` sein.
@@ -152,15 +158,16 @@ Existieren mehrere Kandidaten → `--list` zum Sichten (`name<TAB>id<TAB>modifie
 ### 3c. JSON-Struktur (Parsing-Referenz)
 ```
 data.metrics[] → { name, units, data[] }
-  heart_rate {Min,Avg,Max,date}(stündl.) · heart_rate_variability {qty,date}(stündl., ms)
-  resting_heart_rate {qty,date}(1×/Tag) · blood_oxygen_saturation {qty,date}(stündl., %)
+  heart_rate {Min,Avg,Max,date}(minutengenau) · heart_rate_variability {qty,date}(minutengenau, ms; sporadisch ~30-80/Nacht)
+  resting_heart_rate {qty,date}(1×/Tag) · blood_oxygen_saturation {qty,date}(minutengenau, %)
   respiratory_rate{qty,date} · breathing_disturbances {qty,date}(1×/Tag, Schwelle 10)
-  active_energy {qty,date}(stündl., kcal) · step_count{qty,date} · physical_effort{qty,date}
+  active_energy {qty,date}(minutengenau, kcal) · step_count{qty,date} · physical_effort{qty,date}
   walking_heart_rate_average {qty,date} · walking_running_distance{qty,date}
   sleep_analysis {inBedStart,sleepStart,sleepEnd,inBedEnd,totalSleep,deep,core,rem,awake}(h)
   weight_body_mass / body_fat_percentage / lean_body_mass / body_mass_index → KANN via Withings IM JSON liegen → slice_hae_day `body_comp`
 ```
-Datum: `"2026-06-16 06:00:00 +0200"` → Stunde = Zeichen 11:13.
+Datum: `"2026-06-16 06:23:00 +0200"` (minutengenau, Sekunden stets `:00`) → Stunde = Zeichen 11:13, Minute = 14:16.
+> **⏱️ Granularität (verifiziert an Echtdaten):** Die **`YYYY-MM-DD`-Tagesdatei ist MINUTEN-aggregiert** (bis ~1440 Pkt/Tag; HRV/SpO2 sporadischer), **NICHT stündlich.** Die **`YYYY-MM`-Monatsdatei ist TAGES-aggregiert** (1 Wert/Tag) → nie für den Daily Check. Der Slicer ist **granularitäts-sicher**: er bucketet selbst (`dt[:13]` = Stunde fürs `hourly`-Rollup, `dt[14:16]` = 15-Min fürs `fine[]`), egal wie dicht die Rohpunkte liegen.
 
 **🩻 Körper-Komposition (`body_comp`, korrigierte Annahme):** Anders als früher angenommen liegt Gewicht/Körperfett/Lean/BMI **manchmal DOCH im HAE-JSON** — via Withings-Sync (real beobachtet: 116,56 kg, Sa 11:29). `slice_hae_day` gibt sie als `body_comp.{weight_body_mass|body_fat_percentage|lean_body_mass|body_mass_index} = {value,date,time,source,in_json,off_protocol}`. **Wenn vorhanden → explizit zeigen, aber als OFF-PROTOCOL markieren** (Datum/Uhrzeit/Source nennen) — es ist **NICHT die SoT**. Die echte SoT bleibt das **Mo-früh-nüchtern**-Wiegen (manuell gepostet); alles andere (Quelle ≠ Körperwaage ODER nach 09:00 gemessen) kommt mit `off_protocol=True`. NIE „Wert fehlt im JSON" annehmen, ohne `body_comp` gelesen zu haben; Abwesenheit NIE als 0/Verschlechterung zeigen.
 
@@ -186,7 +193,7 @@ Heute/Gestern 🟢 · 2 Tage 🟡 "Sync prüfen" · 3+ 🟠 · keine 🔴 "Watch
 ```bash
 python3 .claude/skills/daily-check-skill/scripts/slice_hae_day.py ./data/HealthAutoExport-{heute}.json ./data/HealthAutoExport-{gestern}.json --as-of {heute}
 ```
-Das Script mergt die stündlichen Serien (HRV/HR/SpO2/Atmung) aus beiden Dateien (gestern+heute, dedupt nach Zeitstempel), wählt den `sleep_analysis`-Record mit `sleepEnd == heute` (prüft beide Dateien — bei früher Bedtime liegt er in der Gestern-Datei) und slict die HRV-Serie auf das Schlaf-Fenster `sleepStart → sleepEnd`. Die JSON-Ausgabe von stdout lesen (`heute_sleep`, `hrv_night`, `gestern.*`, `recovery.*`).
+Das Script mergt die minuten-granularen Serien (HRV/HR/SpO2/Atmung) aus beiden Dateien (gestern+heute, dedupt nach Zeitstempel), wählt den `sleep_analysis`-Record mit `sleepEnd == heute` (prüft beide Dateien — bei früher Bedtime liegt er in der Gestern-Datei) und slict die HRV-Serie auf das Schlaf-Fenster `sleepStart → sleepEnd`. Die JSON-Ausgabe von stdout lesen (`heute_sleep`, `hrv_night`, `gestern.*`, `recovery.*`).
 
 **RHR** kommt aus der Heute-Datei (`recovery.rhr`, `on_or_before=as_of`). **Gestern-Tagesdaten** (active_energy etc.) liefert der `gestern`-Block (Step 8).
 
@@ -248,9 +255,9 @@ print(format_block(res))   # CTL/ATL/TSB-Zeile, TSB = heutige Readiness
 
 Gebündelter Helper `scripts/daily_signals.py`, EIN Aufruf liefert alle Zusatz-Signale deterministisch — den lokalen HAE-Pfad (Heute-Datei ODER Range-Export) übergeben:
 ```bash
-python3 .claude/skills/daily-check-skill/scripts/daily_signals.py ./data/HealthAutoExport-{heute}.json --as-of {heute}
+python3 .claude/skills/daily-check-skill/scripts/daily_signals.py ./data/HealthAutoExport-{heute}.json ./data/HealthAutoExport-{gestern}.json --as-of {heute}
 ```
-Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` + `history`** (Gestern-Retro nutzt `yesterday`, Morgenlicht-Reminder nutzt `today` — NIE den Teil-Tag „heute“ in den Retro ziehen), `sleep_efficiency`, `wrist_temp` (Baseline = rollende letzte 28 Vornächte, Flag ab ≥5 Nächten), `vo2_max`/`cardio_recovery` (letzte Lesung + Datum), `dietary_water_ml`. **Fehlt eine Metrik → None.** `--as-of YYYY-MM-DD` (heute) pinnt den Bezugstag; Default = letzter Tag im Export. **daily_signals nimmt mehrere HAE-Pfade** (heute + gestern bzw. Range) und mergt sie — IMMER mind. heute+gestern füttern, damit `yesterday` resolved.
+Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` + `history`** (Gestern-Retro nutzt `yesterday`, Morgenlicht-Reminder nutzt `today` — NIE den Teil-Tag „heute“ in den Retro ziehen), `sleep_efficiency`, `wrist_temp` (Baseline = rollende letzte 28 Vornächte, Flag ab ≥5 Nächten), `vo2_max`/`cardio_recovery` (letzte Lesung + Datum), `dietary_water_ml`, **`dietary`** (Tages-Makros `today`+`yesterday`, exakte Kalendertage → §7b). **Fehlt eine Metrik → None.** `--as-of YYYY-MM-DD` (heute) pinnt den Bezugstag; Default = letzter Tag im Export. **daily_signals nimmt mehrere HAE-Pfade** (heute + gestern bzw. Range) und mergt sie — IMMER mind. heute+gestern füttern, damit `yesterday` resolved. 🛡️ **Auto-Nachzug:** fehlt der Vortag dennoch, lädt das Script `<data-dir>/HealthAutoExport-<gestern>.json` selbst nach (`--data-dir`, Default = Ordner der ersten Datei) — der Daylight-/Audio-Glitch ist damit strukturell behoben, nicht nur per Aufruf-Disziplin.
 
 > **⛔ Vortag-Defensive (der Daylight-/Audio-Glitch):** Ist `daylight.yesterday`/`audio.yesterday` trotzdem `null` (Vortag-Datei fehlt), in der Gestern-Retro **„n/a (Vortag-Datei fehlt)" rendern — NIEMALS auf den Teil-Tag `today` zurückfallen.** Sonst erscheint der „heute-bisher"-Wert als „gestern" (real beobachtet: angezeigt „3 min 🔴" = 28.06-Teiltag statt korrekt „72 min 🟡" = 27.06-Volltag).
 
@@ -279,12 +286,14 @@ Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` +
 ✅ 🎯 TAGES-ÜBERSICHT (WHOOP-Card)      — Recovery + Schlaf + Gestern-Load auf einen Blick
 ✅ 🔋 READINESS & ENERGIE (Garmin-Klon) — Readiness-Score + HRV-Status + Body Battery + Running Tolerance (§6.5)
 ✅ 📆 GESTERN-RETRO                      — Load, Tages-Herz, TRIMP/CTL/ATL/TSB, Tag-Kontext, Recovery-Link
+✅ 🥗 ERNÄHRUNG (gestern, kompakt)       — Protein-Floor + kcal/Fett/Carbs/Wasser-Ampel (§7b) → /makro für Tiefe
 ✅ 🛌 SCHLAF                              — voll (Bedtime/Total/Deep/REM/Wach + Effizienz + Tageslicht)
-✅ 💓 HRV-FEINVERLAUF (15-Min) + RHR     — voll, 15-Min-fine[]-Serie + Stunden-Rollup + Wrist-Temp
+✅ 💓 HRV-FEINVERLAUF (15-Min) + RHR     — voll, 15-Min-fine[]-Serie + Stunden-Rollup + Wrist-Temp + KW-Heatmap (rollende 7 Nächte, §9)
 ✅ 🫁 ATMUNG & SpO2 / WALKING-HR          — bei Anomalie/Allergie-Saison, sonst 1 Zeile
 ✅ 🔬 CSV-FORENSIK                        — nur wenn Anomalie-Trigger
 ✅ 📈 KW-TREND
-✅ 🌦️ WETTER-BRIEFING                    — PROAKTIV an Trainingstag Mo/Mi/Sa/Do (Entscheidungs-Input)
+✅ 🌦️ WETTER-BRIEFING                    — PROAKTIV an Trainingstag Mo/Mi/Sa/Do (weather-runprep auto-run, §12)
+✅ 🏃 PRE-LAUF-BRIEFING                   — an Lauftagen Mo/Mi/Sa: Schuh + Runna-Session + Pace@HR147 (§12.5)
 ✅ 🗓️ HEUTE-PLAN
 ✅ ⚠️ REMINDERS
 ✅ 💀 SENPAIS URTEIL
@@ -373,8 +382,9 @@ Direkt nach der Tages-Übersicht: der nachgebaute Firstbeat-Layer (Steps 10.1–
 - Ø-HR wach: [XX] · Peak [XXX] um [HH:MM]
 - Walking-HR: [XX] [<95 = Fitness-grün]
 
-🌗 Tag-Kontext (optional — NUR bei Auffälligkeit, §3i; vorsichtig vermuten, NIE urteilen)
-- [Audio-Peak + Tageslicht + Schritte übereinander → MÖGLICHES Tag-Muster, neutral: „viel los — unterwegs/sozial?" / Wochenende = ein Leben]
+🌗 Tag-Kontext (§3i — fester Retro-Block aus `daylight.yesterday` + `audio.yesterday`; Muster-Ableitung, vorsichtig vermuten, NIE urteilen)
+- Tageslicht gestern [XX min, Ampel] + Audio-Peak [XX dB] + Schritte übereinander → MÖGLICHES Tag-Muster (neutral: „viel los — unterwegs/sozial?" / Wochenende = ein Leben). Tageslicht trägt IMMER zum Bild bei (Circadian); die Audio-Zeile NUR bei Peak ≥82 dB o. Tageslicht-Ausreißer.
+- ⛔ `daylight.yesterday`/`audio.yesterday`=null → „n/a (Vortag-Datei fehlt)" rendern, NIE auf den `today`-Teiltag zurückfallen. Der Vortag-Auto-Nachzug (daily_signals `--data-dir`, §3i) hält den Block i.d.R. gefüttert.
 
 🔗 Recovery-Link (1-2 Sätze)
 [Wie der gestrige Load die heutige Nacht + HRV/RHR erklärt — der kausale Bogen]
@@ -391,6 +401,31 @@ Direkt nach der Tages-Übersicht: der nachgebaute Firstbeat-Layer (Steps 10.1–
 - **Ruhetag:** Load-Block zeigt Ruhe + Rest-CTL/ATL/TSB-Drift (Erholung sichtbar machen). Kein Drama bei niedrigem TRIMP.
 - **Abgrenzung Run-Bundle-Skill:** Retro nennt LOAD + Recovery-Kosten, **keine Splits/Laufdynamik**. Tiefe Lauf-Analyse → "/runanalyse".
 - **Zusatz-Last (`load_extra`, Step 8 — nur surfacen wenn vorhanden):** `true_tdee_kcal` (Grundumsatz + Aktiv) rahmt die **Energie-Bilanz** ohne separates Nutrition-Sheet; `exercise_min` + `flights_climbed` sind **Load-Proxys** neben TRIMP. **Gang-Trip-Wire** (`gait.asymmetry_pct`/`double_support_pct`): **NUR zeigen, wenn das `flag` True ist** (Asymmetrie >5 % bzw. Doppelstand außerhalb 20–40 % = veränderte Gangmechanik) → vorsichtiger Verletzungs-/Ermüdungs-Hinweis, NIE als Befund framen. Flag False / nicht gemessen → komplett weglassen.
+
+-----
+
+## 7b. 🥗 ERNÄHRUNG (gestern, kompakt — Makro-Compliance)
+
+**Vierte gleichwertige Säule** (CLAUDE.md §1: Schlaf/HRV/Training/Ernährung). **Kompakter Gestern-Block, KEINE Voll-Engine** — Casein, Mittag-12:00-Gate, Supplements, Whitelist bleiben in `nutrition-skill` (/makro). Quelle: `daily_signals.dietary.yesterday` (Step 8.5; **exakter** Kalender-Vortag, kein „nächst-früherer" Fallback). Caps + Schwellen = **SSoT `nutrition-skill` §2**, hier NICHT neu definieren.
+
+```
+🥗 ERNÄHRUNG — gestern [Wochentag DD.MM.]
+- 🥩 Protein: [XXX g] [Ampel vs. 150 g Floor]        ← KERN-Signal, IMMER zeigen
+- 🔥 kcal: [X.XXX] / [Cap] [Ampel]                    ← Cap = Tagestyp von gestern
+- 🧈 Fett: [XX g] / 85 g Hard-Cap [Ampel]
+- 🍞 Carbs: [XXX g] / [Cap] [Ampel]   ·   🥤 Wasser: [X,X L] / [Ziel] [Ampel]
+- [Gesamt-Ampel §5: 🟢🟢🟢🟢 → Lob · 🟡🟡 → „mittelmäßig, kein Drama" · 🟠🟠 → Pattern-Check · 🔴(≥1) → System-Fix]
+→ Tiefe Analyse, Casein & Mittag-Entscheidung: /makro
+```
+
+**Caps pro Tagestyp (gestern) — aus `nutrition-skill` §2:** Mo/Sa 2.700 · Di/Fr/So 2.000 · Mi 2.800 · Do 2.300 kcal. **Protein-Floor 150 g (jeder Tag).** Fett Hard-Cap **85 g**.
+**Protein-Ampel:** 🟢 ≥150 · 🟡 135–149 · 🟠 105–134 · 🔴 <105 g. **kcal/Carbs/Fett:** 🟢 ≤Cap · 🟡 +≤10 % · 🟠 +11–30 % · 🔴 >+30 %. **Wasser-Ziel:** Rest 3,5–4 L · Do 4 L · Mo/Sa 4,5 L · Mi 5 L (über 20 °C +0,5 L).
+> `dietary_energy` kommt aus HAE in **kJ** — `daily_signals` rechnet bereits auf **kcal** um (`/4,184`); `dietary.yesterday.kcal` ist schon kcal.
+
+**⛔ Daten-Disziplin (Hol-Pflicht §0):**
+- `dietary.yesterday=null` ODER ein Feld `null` → **„nicht geloggt"** schreiben, **NIE 0 annehmen**, nie als Compliance-Fail/Verschlechterung framen. Logging ist intermittent (oft Fr–So leer); `dietary.logged_days` nennt den letzten geloggten Tag → „zuletzt geloggt: [Datum]".
+- **Einzeltag <Floor ≠ Reverse-Recomp** (CLAUDE.md §8) — das Reverse-Recomp-Flag feuert erst bei **5+ Tagen in Folge** <150 g. Ein einzelner schwacher/ungeloggter Tag ist kein Alarm.
+- Heute (`dietary.today`) ist ein **Teil-Tag** → höchstens als „bisher geloggt" erwähnen, nie als Tageswertung.
 
 -----
 
@@ -445,6 +480,15 @@ Aus `sleep` (§3f) — Totals gelten für die ganze Nacht, egal in welcher Tages
 | 🫁 VO2max | [XX,X] | letzte Lesung [Datum]; fehlt → `live.md`-Baseline, Abwesenheit ≠ Verschlechterung |
 **HRV-Ampel (Safety):** 🟢 ≥60 · 🟡 50-59 (2+ Tage: Bedtime/Mg/-10%) · 🔴 <50 (2+ Tage: Deload) · 🔴🔴 <40 + Schlaf <6h: **Training STREICHEN**. Schlaf-Ø nur aus Stunden im Schlaf-Fenster.
 
+**📊 Sampling-Realität (v0.16):** Die HAE-`YYYY-MM-DD`-Datei ist **minutengenau**, HRV aber **sporadisch** (~30–80 Readings/Nacht, unregelmäßig getaktet). `min`/`max`/`σ`/`range` kommen aus diesen rohen Einzel-Readings → die Spanne (z. B. 26↔114) ist **zu großen Teilen Apple-Watch-Sampling-Rauschen, KEIN Volatilitäts-Alarm.** Lead mit dem **gemittelten Trend** (`fine[]` 15-Min + `hourly`-Rollup + Nacht-Ø); σ/Range nur als Kontext nennen, klar als Sampling-Spread gelabelt. Einen einzelnen Tief-Wert (z. B. 23 ms um 04:30) NIE isoliert als Einbruch werten — erst ein **anhaltender Block** niedriger 15-Min-Buckets ist ein Signal.
+
+**💓 KW-HRV-Heatmap (rollende 7 Nächte, Stunde × Tag — best-effort, NON-BLOCKING):**
+`python3 .claude/skills/daily-check-skill/scripts/hrv_heatmap.py --as-of {heute} --data-dir ./data` → Markdown-Tabelle (Ampel-Emoji je Zelle, leere Nacht = „—", „N/7 Nächte"-Label).
+- **PROGRESSIV:** nutzt NUR die schon in `./data` gecachten HAE-Tagesdateien — **keine 7-fach-Pulls.** Früh in der Woche/bei Lücken → partiell mit „N/7"-Label (ehrlich, nie erfinden).
+- **Voll-Backfill nur auf Zuruf** („HRV-Heatmap voll"): vorher die fehlenden Tage via `pull_drive.py --match "HealthAutoExport-<tag>"` ziehen, dann das Script erneut.
+- **PNG nur auf expliziten Wunsch** (`--chart out.png`): Ampel-Hex (#2ecc71/#f1c40f/#e74c3c + grau #95a5a6), deutsche Achsen/Titel **+ 1 Satz sarkastische Einordnung** (CLAUDE.md §10, „nie stumme Diagramme"). Default bleibt Markdown; fehlt matplotlib → Script fällt automatisch auf Markdown zurück.
+- Sub-Block unter dem nächtlichen Feinverlauf, klar als „KW-Übersicht" gelabelt (≠ die Heute-Nacht-Tabelle).
+
 -----
 
 ## 10. 📈 KW-TREND (nur laufende ISO-KW, Reset Montag)
@@ -472,7 +516,7 @@ Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
 -----
 
 ## 12. 🌦️ WETTER-BRIEFING (Trainingstag — PROAKTIV als Entscheidungs-Input)
-**Trainingstage = Mo / Mi / Sa / Do.** An diesen Tagen Wetterochs **proaktiv ziehen** (RSS heute qualitativ + Delphi-JSON ab morgen) — **auch wenn Rest erwogen/empfohlen wird.** Wetter ist **Input** für die Empfehlung, NICHT ein Briefing danach. Details/Matrix → `weather-runprep-skill`.
+**Trainingstage = Mo / Mi / Sa / Do** (`lib/clock.is_training_day`). An diesen Tagen **lädt + führt der Daily Check den `weather-runprep-skill` automatisch aus** (voller Workflow: präzise Bright Sky/DWD-Stundenwerte via `lib/weather.py` + Wetterochs RSS/Delphi-JSON fürs Narrativ/Gewitter) — **auch wenn Rest erwogen/empfohlen wird.** Wetter ist **Input** für die Empfehlung, NICHT ein Briefing danach. Gilt auch fürs `/briefing` (Daily-Check-Superset). Details/Matrix/Pace-Logik → `weather-runprep-skill` (SSoT, hier nicht duplizieren).
 - **Mo/Mi/Sa (Lauf-Slots):** Lauf-Impact-Matrix für den Slot. **Sa-Parkrun = 09:00 → Morgenwert verwenden (Tagesmin+Rampe), NIE den Tagesmax — auch nicht im Urteil/Reminder** (weather-runprep §2a). Bsp: Min 23/Max 36 → Parkrun ~25–27 °C, nicht 36 °C.
 - **Do (Gym Full Body):** das Gym hat **KEINE Klimaanlage** → >28°C outdoor = heiße Halle → Hydration ↑, Intensität/PR-Erwartung ↓. UND: Do ≤22°C = Flex-Regel-Kriterium 2 (Do-Lauf statt Gym) → bei kühlem Do proaktiv auf Flex-Regel hinweisen.
 
@@ -484,6 +528,25 @@ Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
 - Do — Gym-Hitze (das Gym, keine AC): [Temp]°C → [🟢 normal / 🟡 warm / 🟠 heiß: Hydration↑, keine PR-Jagd]
   - Flex-Regel: Do [≤/>]22°C → [Lauf-Override wetterseitig möglich/blockiert]
 ```
+
+-----
+
+## 12.5 🏃 PRE-LAUF-BRIEFING (Lauftag — Schuh + Runna-Session + Pace@HR147)
+
+**Nur an Lauftagen Mo/Mi/Sa** (`lib/clock.is_run_day`; **Do = Pure-Gym → keine Pre-Lauf-Sektion**, außer die Flex-Regel macht Do zum Lauftag). Kompaktes 3-Zeilen-Karten-Subset aus dem schon gelaufenen `weather-runprep-skill`-Output (§12) — **Reuse, KEINE Duplikation** (weather-runprep ist SSoT für Schuhwahl + Pace@HR147 + Slot).
+
+```
+🏃 PRE-LAUF-BRIEFING — [Wochentag, Slot HH:MM]
+- 👟 Schuh:      [ASICS Superblast 3 / ASICS Megablast / ASICS Novablast 5 / Intensitäts-Schuh] ([XX km, Verschleiß-Ampel])
+- 📋 Runna:      [Session-Typ: Easy/Long/Race-Sim/Parkrun + ggf. Distanz/Pace-Vorgabe]
+- 🎯 Pace@HR147: [MM:SS/km] (auf 18 °C normalisiert; heute ~[MM:SS] bei [X °C Slot +Y s/km Hitze-Tax])
+```
+
+- **Schuh:** Rotations-Regel + km aus `gear.md`/`Schuhe_Ausruestung.md` (weather-runprep §5 Punkt 6 / §5b). Schuhnamen IMMER voll ausschreiben (CLAUDE.md NEVER-Liste).
+- **Runna-Session:** Typ aus dem Wochenrhythmus (CLAUDE.md §4 / `athlete.md`): Mo Easy+Core · Mi Long Run/Race-Sim · Sa Parkrun. „Nicht schneller als X" = Decke, nicht Ziel (V3).
+- **Pace@HR147:** temperatur-normalisierte Erwartung aus weather-runprep §5 Punkt 8 (+3–4 s/km pro °C >18 °C); Baseline `live.md`/`baselines.md`. Bei Easy/Long steuert **HR ≤147**, Pace ist Ergebnis.
+- **Sa-Parkrun:** Papa/Crew-Präsenz als sozialer Anker (athlete.md) — **Papa-Faktor nur bei nachweislich Zusammen-gelaufen**, nie aus bloßer Präsenz annehmen.
+- Fehlt ein Baustein (gear.md nicht geseeded, keine Pace-Baseline) → die Zeile ehrlich als „[?] — Quelle/Grund nennen" zeigen (Hol-Pflicht §0), nicht raten.
 
 -----
 
@@ -561,6 +624,7 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 ## 19. VERSIONS-LOG
 | Version | Datum | Änderung |
 |---|---|---|
+| **v0.16** | **30.06.2026** | **Daily-Check-Härtung (5 Pakete): (1) Granularitäts-Doku korrigiert — die `YYYY-MM-DD`-HAE-Datei ist MINUTEN-aggregiert (nicht stündlich), `YYYY-MM` tages-aggregiert; der Slicer war schon granularitäts-sicher (§3a/§3c/§3f, verifiziert an Echtdaten). (2) Daylight-/Audio-Vortag-Glitch strukturell behoben: `daily_signals.py --data-dir` zieht den Kalender-Vortag selbst aus `./data` nach, wenn nur die Heute-Datei übergeben wird (§3i/Step 8.5); §3i-Code-Beispiel auf beide Dateien gefixt; §7 „Tag-Kontext" als fester Retro-Block aus `daylight.yesterday`+`audio.yesterday`. (3) NEU 🥗 ERNÄHRUNG (§7b): kompakter Gestern-Makro-Block (Protein-Floor + kcal/Fett/Carbs/Wasser) via neuer `daily_signals.dietary_macros()` — ECHTE HAE-Feldnamen (protein/carbohydrates/total_fat/dietary_energy[kJ→kcal]/dietary_water, an KW26 verifiziert), Caps aus nutrition-skill (SSoT), „nicht geloggt" transparent, Voll-Engine bleibt /makro. (4) NEU 🏃 PRE-LAUF-BRIEFING (§12.5) + `weather-runprep-skill` läuft an Trainingstagen automatisch im Daily Check (Step 11/§12); `lib/clock.is_training_day`/`is_run_day`. (5) NEU 💓 KW-HRV-Heatmap (`hrv_heatmap.py`, rollende 7 Nächte, progressiv/keine Extra-Pulls, Markdown default / `--chart` PNG, §9) + Sampling-Interp-Guard (rohe Minuten-σ = Rauschen, kein Alarm). §20-Backlog bereinigt (Körperwaage-Auto-Anbindung verworfen).** |
 | **v0.15** | **28.06.2026** | **15-Min-Feinraster als Default-HRV-Anzeige (§9): `hrv_night.fine[]` ist jetzt die primäre Tabelle statt der Stundentabelle — die Stunden-Mittel glätteten die nächtliche Volatilität weg (Audit roh σ ~33/Range ~117 vs hourly σ ~21/Range ~63). Engine (`slice_hae_day.py`) emittiert die `fine[]`-Buckets jetzt mit sauberem `HH:MM`-Label (vorher interner Key `…HH:Q`). `hourly[]` bleibt als kompakter Stunden-Rollup. Verifiziert an Nacht 27.→28.06. (30 fine-Buckets, deckt 04:30→23 / 05:00→19 auf, die das Stundenmittel auf ~41 glättete). σ/Min/Max/Range weiter aus ROH-Punkten. Keine Schwellen geändert.** |
 | v0.1-v0.2 | 26.-27.05.2026 | Drive-Konzept, Time-API, Wetterochs, Tageszeit-Adaption, Trigger. |
 | v0.3 | 28.05.2026 | Deferred-Tool-Pipeline, 3-Ebenen, stündliche HRV-Tabelle, CSV-Auto-Load, KW-Trend. |
@@ -581,10 +645,13 @@ Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?
 -----
 
 ## 20. ZUKUNFTSPLANUNG (Backlog — ungeplante künftige Versionen)
-- Pre-Lauf-Briefing-Sektion (Schuhe + Runna-Session + Pace@HR147-Erwartung) an Trainingstagen.
-- Multi-Tag-HRV-Heatmap (Stunde × KW-Tag).
-- Körperwaage-Drive-Auto-Anbindung für SoT.
+- _(offen — aktuell keine geplanten Punkte; neue Ideen hier eintragen.)_
+
+### Erledigt
+- ✅ **Pre-Lauf-Briefing-Sektion** (Schuh + Runna-Session + Pace@HR147) an Lauftagen → §12.5 (v0.16).
+- ✅ **Multi-Tag-HRV-Heatmap** (rollende 7 Nächte, Stunde × Tag) → `scripts/hrv_heatmap.py` + §9 (v0.16).
+- ❌ **Körperwaage-Drive-Auto-Anbindung für SoT** — VERWORFEN (v0.16): `body_comp` aus dem HAE-JSON deckt den Datenpfad bereits (§3c); die echte SoT bleibt das manuelle Mo-nüchtern-Wiegen. Keine Auto-Anbindung nötig.
 
 -----
 
-**Ende v0.15. Senpai liefert bei jedem Daily-Check-Trigger das volle WHOOP-Dashboard mit Gestern-Retro und Urteil.**
+**Ende v0.16. Senpai liefert bei jedem Daily-Check-Trigger das volle WHOOP-Dashboard mit Gestern-Retro, Ernährung, Pre-Lauf-Briefing und Urteil.**

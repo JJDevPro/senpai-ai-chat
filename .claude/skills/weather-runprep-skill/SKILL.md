@@ -147,7 +147,7 @@ Fehlt `coaching_cues.md` (noch nicht pre-seeded) → kein Block, kein Drama. KEI
 
 An **Samstag** (Parkrun 09:00, Wöhrder See) zusätzlich zum Wetter proaktiv ankern:
 - **Schuh-km (`gear.md` / Strava `get_gear`):** kurzer Rotations-Check — passt der Schuh zum Slot, Verschleiß ok? (run-bundle §18).
-- **Papa-Layer (`athlete.md`):** Papa + Crew sind FAST immer dabei (Ritual) → als Motivation framen. **Papa-Faktor (KM1-Drossel +18 s/km) NUR ansagen, wenn ihr zusammen lauft** (Papas Plan Easy + Javiers Tempo); sonst NICHT annehmen — **Präsenz ≠ zusammen gelaufen** (Strava bestätigt Co-Runner nicht).
+- **Papa-Layer (`athlete.md`):** Papa + Crew sind FAST immer dabei (Ritual) → als Motivation framen. **Papa-Faktor (KM1-Drossel +18 s/km) NUR ansagen, wenn ihr zusammen lauft** (Papas Plan Easy + Athleten-Tempo); sonst NICHT annehmen — **Präsenz ≠ zusammen gelaufen** (Strava bestätigt Co-Runner nicht).
 - **Parkrun-Counter (`live.md`):** der nächste Lauf ist #[N+1] — als kleinen Anker nennen.
 - **Temp = Morgenwert 09:00** (Tagesmin + Rampe, NIE Tagesmax — §2a).
 

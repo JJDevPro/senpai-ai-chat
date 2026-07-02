@@ -33,6 +33,6 @@
 |------------|------|--------------|-------|----------------|-----|
 | s000001 | {{Segment-Name}} | 0:00 | {{YYYY-MM-DD}} | 0:00 ({{YYYY-MM-DD}}) | — |
 
-> Sa-Parkrun am Wöhrder See = Marquee-Segment-Vergleich (gleiche Strecke jede Woche →
+> Sa-Heim-Parkrun = Marquee-Segment-Vergleich (gleiche Strecke jede Woche →
 > strecken-normalisierter Fitness/Pace@Z2-Trend). Segment nicht auf der Strecke → keine
 > Δ-Zeile, nicht erfinden.

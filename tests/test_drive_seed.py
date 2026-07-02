@@ -36,15 +36,17 @@ REQUIRED_FILES = [
     "Archiv_Historie.md",
     "Project_Index.md",
     "CHANGELOG.md",
+    # PR-7-Sync: neue State-Files brauchen ebenfalls Seeds (CLAUDE.md §11)
+    "gear.md",
+    "coaching_cues.md",
 ]
 
-# Verbotene echte Marker (Identität/Equipment/Gewichts-Token). "116.0" wird als
-# eigenständiges Token geprüft (nicht als Teilstring von z. B. "1116.0").
+# Verbotene echte Marker: Identitäts-Tokens via gesalteter Denylist (tests/denylist.py
+# — Klartext existiert nicht mehr im Repo, PR-7); Equipment-Marker bleiben Klartext.
+# "116.0" wird als eigenständiges Token geprüft (nicht als Teilstring von "1116.0").
+from denylist import denied_words  # noqa: E402
+
 FORBIDDEN_SUBSTRINGS = [
-    "Javier",
-    "Garcell",
-    "Nürnberg",
-    "Janna",
     "Withings Body Scan",
 ]
 FORBIDDEN_TOKEN = "116.0"
@@ -91,6 +93,8 @@ def test_no_forbidden_real_markers_anywhere():
         for marker in FORBIDDEN_SUBSTRINGS:
             if marker in text:
                 offenders.append((path.name, marker))
+        for w in denied_words(text):
+            offenders.append((path.name, f"Identitaets-Token {w!r}"))
         # Standalone-Token-Check für "116.0": durch Nicht-Zahl-/Nicht-Punkt-Grenzen.
         import re
         if re.search(r"(?<![\d.])" + re.escape(FORBIDDEN_TOKEN) + r"(?![\d])", text):

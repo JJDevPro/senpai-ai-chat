@@ -184,7 +184,7 @@ data.metrics[] → { name, units, data[] }
 Datum: `"2026-06-16 06:23:00 +0200"` (minutengenau, Sekunden stets `:00`) → Stunde = Zeichen 11:13, Minute = 14:16.
 > **⏱️ Granularität (verifiziert an Echtdaten):** Die **`YYYY-MM-DD`-Tagesdatei ist MINUTEN-aggregiert** (bis ~1440 Pkt/Tag; HRV/SpO2 sporadischer), **NICHT stündlich.** Die **`YYYY-MM`-Monatsdatei ist TAGES-aggregiert** (1 Wert/Tag) → nie für den Daily Check. Der Slicer ist **granularitäts-sicher**: er bucketet selbst (`dt[:13]` = Stunde fürs `hourly`-Rollup, `dt[14:16]` = 15-Min fürs `fine[]`), egal wie dicht die Rohpunkte liegen.
 
-**🩻 Körper-Komposition (`body_comp`, korrigierte Annahme):** Anders als früher angenommen liegt Gewicht/Körperfett/Lean/BMI **manchmal DOCH im HAE-JSON** — via Withings-Sync (real beobachtet: 116,56 kg, Sa 11:29). `slice_hae_day` gibt sie als `body_comp.{weight_body_mass|body_fat_percentage|lean_body_mass|body_mass_index} = {value,date,time,source,in_json,off_protocol}`. **Wenn vorhanden → explizit zeigen, aber als OFF-PROTOCOL markieren** (Datum/Uhrzeit/Source nennen) — es ist **NICHT die SoT**. Die echte SoT bleibt das **Mo-früh-nüchtern**-Wiegen (manuell gepostet); alles andere (Quelle ≠ Körperwaage ODER nach 09:00 gemessen) kommt mit `off_protocol=True`. NIE „Wert fehlt im JSON" annehmen, ohne `body_comp` gelesen zu haben; Abwesenheit NIE als 0/Verschlechterung zeigen.
+**🩻 Körper-Komposition (`body_comp`, korrigierte Annahme):** Anders als früher angenommen liegt Gewicht/Körperfett/Lean/BMI **manchmal DOCH im HAE-JSON** — via Withings-Sync (real beobachtet: ein Sa-Vormittags-Reading nach 09:00). `slice_hae_day` gibt sie als `body_comp.{weight_body_mass|body_fat_percentage|lean_body_mass|body_mass_index} = {value,date,time,source,in_json,off_protocol}`. **Wenn vorhanden → explizit zeigen, aber als OFF-PROTOCOL markieren** (Datum/Uhrzeit/Source nennen) — es ist **NICHT die SoT**. Die echte SoT bleibt das **Mo-früh-nüchtern**-Wiegen (manuell gepostet); alles andere (Quelle ≠ Körperwaage ODER nach 09:00 gemessen) kommt mit `off_protocol=True`. NIE „Wert fehlt im JSON" annehmen, ohne `body_comp` gelesen zu haben; Abwesenheit NIE als 0/Verschlechterung zeigen.
 
 ### 3d. CSV-Anomalie-Trigger (Auto-Load)
 | Trigger | Schwelle |
@@ -561,7 +561,7 @@ Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
 - **Schuh:** Rotations-Regel + km aus `gear.md`/`Schuhe_Ausruestung.md` (weather-runprep §5 Punkt 6 / §5b). Schuhnamen IMMER voll ausschreiben (CLAUDE.md NEVER-Liste).
 - **Runna-Session:** Typ aus dem Wochenrhythmus (CLAUDE.md §4 / `athlete.md`): Mo Easy+Core · Mi Long Run/Race-Sim · Sa Parkrun. „Nicht schneller als X" = Decke, nicht Ziel (V3).
 - **Pace@HR147:** temperatur-normalisierte Erwartung aus weather-runprep §5 Punkt 8 (fix +3,5 s/km pro °C >18 °C, `lib/constants.py`); Baseline `live.md`/`baselines.md`. Bei Easy/Long steuert **HR ≤147**, Pace ist Ergebnis.
-- **Sa-Parkrun:** Papa/Crew-Präsenz als sozialer Anker (athlete.md) — **Papa-Faktor nur bei nachweislich Zusammen-gelaufen**, nie aus bloßer Präsenz annehmen.
+- **Sa-Parkrun:** Partner-/Crew-Präsenz als sozialer Anker (athlete.md) — **Partner-Faktor nur bei nachweislich Zusammen-gelaufen**, nie aus bloßer Präsenz annehmen.
 - Fehlt ein Baustein (gear.md nicht geseeded, keine Pace-Baseline) → die Zeile ehrlich als „[?] — Quelle/Grund nennen" zeigen (Hol-Pflicht §0), nicht raten.
 
 -----

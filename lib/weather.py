@@ -14,7 +14,7 @@ PERSONAL-DATA-FREI: lat/lon werden als Args übergeben (aus `athlete.md` gespeis
 NICHT hier hardcodiert. tz-Default Europe/Berlin (wie lib/clock.py).
 
 CLI:
-  python3 lib/weather.py --lat 49.45 --lon 11.11 --date 2026-06-29 \
+  python3 lib/weather.py --lat 52.52 --lon 13.41 --date 2026-06-29 \
       --slot-start 20:00 --slot-end 22:00 [--tz Europe/Berlin]
 """
 from __future__ import annotations

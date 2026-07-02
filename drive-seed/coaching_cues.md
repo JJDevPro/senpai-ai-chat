@@ -1,4 +1,4 @@
-<!-- Dummy — echte Cues leben NUR in Drive. Personal-Data-frei (nur Platzhalter). -->
+<!-- Dummy — echte Daten leben NUR in Drive. Personal-Data-frei (nur Platzhalter). -->
 # Senpai · Coaching-Cues (session-typ-keyed, mutable)
 
 > **Zweck (session-übergreifende Coaching-Schleife):** Der **Run-Bundle-Skill** schreibt nach jedem

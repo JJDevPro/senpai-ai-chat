@@ -296,7 +296,11 @@ def _body_comp(metrics, as_of):
         src = rec.get("source") or ""
         t = _hhmm(rec.get("date"))
         on_src = src.lower() in ("körperwaage", "withings")   # Withings = die SoT-Waage des Athleten
-        off = (not on_src) or (t is not None and t >= "09:00")
+        # Weiches Morgen-Fenster (Entscheidung 2026-07-02): SoT = nüchtern nach dem
+        # Aufstehen, Richtwert ≤09:00 aber KEIN hartes Gate (Homeoffice-Realität) —
+        # als deterministische Grenze gilt der Vormittag (<12:00). Nachmittags-
+        # Messungen bleiben off_protocol.
+        off = (not on_src) or (t is not None and t >= "12:00")
         out[name] = {
             "value": round(_val(rec), 2),
             "date": _day(rec.get("date")),
@@ -364,8 +368,14 @@ def slice_day(metrics, as_of):
     walking_hr = _latest_reading(metrics, "walking_heart_rate_average", on_or_before=gestern)
 
     warnings = []
-    days_present = sorted({_day(r.get("date")) for r in _series(metrics, "heart_rate_variability")}
-                          or {_day(r.get("date")) for r in _series(metrics, "active_energy")})
+    # days_present = UNION mehrerer Leitmetriken (Audit-Fix): das alte `or` fiel nur
+    # bei komplett LEERER HRV-Serie auf active_energy zurück — hatte HRV weniger Tage
+    # als active_energy, fehlten Tage und multi_day_range/no_gestern_data feuerten falsch.
+    days_present = sorted(
+        {_day(r.get("date")) for r in _series(metrics, "heart_rate_variability")}
+        | {_day(r.get("date")) for r in _series(metrics, "active_energy")}
+        | {_day(r.get("date")) for r in _series(metrics, "step_count")}
+    )
     if len(days_present) > 2:
         warnings.append(
             f"multi_day_range: {len(days_present)} Tage im File "

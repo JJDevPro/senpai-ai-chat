@@ -10,7 +10,9 @@ upgrades:
      points, NOT the hourly means (hourly means smooth sigma artificially down).
      The fixture clusters extreme points (19, 120) into the same hour so raw sigma
      is an order of magnitude bigger than the hourly-bucketed sigma.
-  3. BODY-COMP off_protocol — a late Withings reading (>09:00, wrong source) flags.
+  3. BODY-COMP off_protocol — weiches Morgen-Fenster (Entscheidung 2026-07-02):
+     Withings/Koerperwaage VORMITTAGS (<12:00) = gültige SoT; erst Nachmittag
+     (>=12:00) oder eine Nicht-Waagen-Quelle flaggt off_protocol.
   4. LOAD-EXTRA — true_tdee = basal + active, exercise min, flights, and the
      walking-asymmetry trip-wire that fires only when sustained >5 %.
 
@@ -92,15 +94,27 @@ def test_fine_15min_series_present(sliced):
 
 
 # ---------------------------------------------------------------- 3. body-comp off_protocol
-def test_late_withings_weight_is_off_protocol(sliced):
+def test_morning_withings_weight_is_valid_sot(sliced):
+    """Weiches Morgen-Fenster (SoT = nüchtern nach dem Aufstehen, Richtwert ≤09:00,
+    deterministisches Gate erst ab 12:00): die 09:30-Withings-Lesung ist GÜLTIGE SoT,
+    nicht mehr off_protocol (Homeoffice-Realität, Entscheidung 2026-07-02)."""
     wc = sliced["body_comp"]["weight_body_mass"]
     # Latest reading is the 09:30 Withings (supersedes the 08:00 Koerperwaage).
     assert wc["source"] == "Withings"
     assert wc["time"] == "09:30"
-    assert wc["time"] > "09:00"
-    assert wc["off_protocol"] is True
-    # body fat is also a >09:00 Withings reading -> off protocol.
-    assert sliced["body_comp"]["body_fat_percentage"]["off_protocol"] is True
+    assert wc["off_protocol"] is False
+    assert sliced["body_comp"]["body_fat_percentage"]["off_protocol"] is False
+
+
+def test_afternoon_or_non_scale_reading_is_off_protocol():
+    """Das off_protocol-Gate bleibt scharf: Nachmittags-Messung (>=12:00) ODER
+    Nicht-Waagen-Quelle (manueller iPhone-Eintrag) flaggt weiterhin."""
+    afternoon = {"weight_body_mass": {"units": "kg", "data": [
+        {"date": "2026-06-28 14:05:00 +0200", "qty": 75.1, "source": "Withings"}]}}
+    manual = {"weight_body_mass": {"units": "kg", "data": [
+        {"date": "2026-06-28 08:00:00 +0200", "qty": 75.1, "source": "iPhone"}]}}
+    assert s._body_comp(afternoon, AS_OF)["weight_body_mass"]["off_protocol"] is True
+    assert s._body_comp(manual, AS_OF)["weight_body_mass"]["off_protocol"] is True
 
 
 # ---------------------------------------------------------------- 4. load-extra

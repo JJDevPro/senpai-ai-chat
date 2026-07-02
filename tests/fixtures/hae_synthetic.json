@@ -14,7 +14,8 @@
     "    hourly-bucketed sigma (~2) / range (4). A daytime 2026-06-27 HRV point (200)",
     "    sits OUTSIDE the window and must be excluded (max stays 120, n stays 6).",
     "  * Body comp: a Koerperwaage 08:00 reading is superseded by a later Withings",
-    "    09:30 reading -> latest pick is off_protocol (wrong source AND after 09:00).",
+    "    09:30 reading -> latest pick is the Withings and stays ON protocol (soft",
+    "    morning window: Withings is the SoT scale, hard gate only from 12:00).",
     "  * load_extra: basal(1500)+active(500)=true_tdee 2000; exercise 45min; flights 8;",
     "    walking_asymmetry avg 7.0% (>5 -> flag fires); double_support 29% (in-range)."
   ],

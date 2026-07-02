@@ -190,7 +190,13 @@ def compute_readiness(inputs):
     hrv01, hrv_insufficient = _hrv_component(inputs.get("hrv_baseline"))
     sleep01, sleep_present = _sleep_component(inputs.get("daily"))
     tsb01, tsb_present = _tsb_component(inputs.get("banister"))
-    rhr01, rhr_present = _rhr_component(inputs.get("rhr_deviation"))
+    # RHR-Zubringer: expliziter Wert gewinnt; sonst die von sentinel.py mit-emittierte
+    # Abweichung (latest − Trailing-Median) — so ist die RHR-Komponente in JEDEM
+    # Daily Check gefüllt, ohne dass der Aufrufer selbst rechnen muss (EIN Score überall).
+    rhr_dev = inputs.get("rhr_deviation")
+    if rhr_dev is None:
+        rhr_dev = (inputs.get("sentinel") or {}).get("rhr_deviation")
+    rhr01, rhr_present = _rhr_component(rhr_dev)
 
     score01 = {"hrv": hrv01, "sleep": sleep01, "tsb": tsb01, "rhr": rhr01}
     points = {k: WEIGHTS[k] * score01[k] for k in WEIGHTS}

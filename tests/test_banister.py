@@ -94,3 +94,30 @@ def test_step_pure():
     s = bb.step(0.0, 0.0, 100.0)
     assert s["ctl"] == round(100.0 * bb.CTL_LAMBDA, 1)
     assert s["atl"] == round(100.0 * bb.ATL_LAMBDA, 1)
+
+
+# --------------------------------------------------------------------------- #
+# v3 (PR-3): day_trimp — DER deterministische gestern_TRIMP-Zubringer (SKILL Step 9)
+# --------------------------------------------------------------------------- #
+def test_day_trimp_dedups_before_summing(trainings_csv_text):
+    # 2026-06-22 hat eine Beinahe-Doppelzeile (78.141/78.097) — day_trimp MUSS die
+    # Dedup-Kette der Vollrechnung nutzen: 78.1, NICht die Roh-Summe 156.2.
+    assert bb.day_trimp(trainings_csv_text, "2026-06-22") == 78.1
+
+
+def test_day_trimp_rest_day_is_zero(trainings_csv_text):
+    # Ruhetag ohne Eintrag -> 0.0 (Zerofill-Konvention der EWMA-Reihe).
+    assert bb.day_trimp(trainings_csv_text, "2026-06-21") == 0.0
+    # kaputtes Datum -> 0.0 statt Crash
+    assert bb.day_trimp(trainings_csv_text, "kein-datum") == 0.0
+
+
+def test_day_trimp_feeds_incremental_path(trainings_csv_text):
+    # Kette wie im SKILL Step 9: last_row-Stand (24.06) + day_trimp(24.06) ->
+    # ein EWMA-Schritt == Vollrechnung fuer den 25.06.
+    full = bb.compute_from_sheet(trainings_csv_text, as_of="2026-06-25")
+    prev = bb.compute_from_sheet(trainings_csv_text, as_of="2026-06-24")
+    t = bb.day_trimp(trainings_csv_text, "2026-06-24")
+    inc = bb.compute_incremental(prev["ctl"], prev["atl"], "2026-06-24", t, "2026-06-25")
+    assert inc is not None
+    assert abs(inc["tsb"] - full["tsb"]) < 0.2

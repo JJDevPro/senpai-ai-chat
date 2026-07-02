@@ -95,8 +95,21 @@ SIGNAL_ORDER = [
 
 
 # ================================================================ trip-wires (pure)
+def _calendar_consecutive(days_sorted):
+    """True, wenn die sortierten ISO-Tage lückenlose Kalender-Nachbarn sind.
+    Audit-CONFIRMED-Fix: '2 Tage in Folge' (§5/§6) heißt KALENDER-Folge — bei
+    CSV-Lücken sind die 2 jüngsten Zeilen sonst Wochen auseinander und erzeugen
+    falsche Muster."""
+    import datetime as _dt
+    try:
+        parsed = [_dt.date.fromisoformat(str(d)[:10]) for d in days_sorted]
+    except ValueError:
+        return False
+    return all((b - a).days == 1 for a, b in zip(parsed, parsed[1:]))
+
+
 def _hrv_sustained(daily, health_rows):
-    """§5: HRV-Ø <50 an den 2 jüngsten Tagen → WARN; nur heute rot → WATCH."""
+    """§5: HRV-Ø <50 an den 2 jüngsten KALENDER-Folgetagen → WARN; sonst WATCH."""
     hrv_by_day = {}
     for r in health_rows or []:
         if r.get("date") and r.get("hrv") is not None:
@@ -114,16 +127,20 @@ def _hrv_sustained(daily, health_rows):
     if len(days) >= SUSTAINED_DAYS:
         recent = days[-SUSTAINED_DAYS:]
         vals = [hrv_by_day[d] for d in recent]
-        if all(v < HRV_RED for v in vals):
+        if all(v < HRV_RED for v in vals) and _calendar_consecutive(recent):
             shown = ", ".join(f"{d}={round(hrv_by_day[d])}" for d in recent)
             return ({"signal": "hrv_sustained_red", "level": "WARN",
                      "detail": f"HRV🔴 {SUSTAINED_DAYS} Tage in Folge <{HRV_RED} ms "
                                f"({shown}) → Bedtime/Mg/−10 % Intensität (§5)."}, True)
         if hrv_by_day[latest] < HRV_RED:
+            recent = days[-SUSTAINED_DAYS:]
+            gap_note = ("" if _calendar_consecutive(recent)
+                        else f" (Achtung: {recent[0]}→{recent[-1]} sind KEINE Kalender-Nachbarn — "
+                             f"CSV-Lücke, kein echtes Folge-Muster)")
             return ({"signal": "hrv_sustained_red", "level": "WATCH",
-                     "detail": f"HRV🔴 nur heute ({latest}={round(hrv_by_day[latest])} <{HRV_RED} ms); "
-                               f"Vortag {days[-2]}={round(hrv_by_day[days[-2]])} nicht rot — "
-                               f"kein 2-Tage-Muster, nur beobachten (§5)."}, True)
+                     "detail": f"HRV🔴 heute ({latest}={round(hrv_by_day[latest])} <{HRV_RED} ms); "
+                               f"kein bestätigtes 2-KALENDER-Tage-Muster{gap_note} — "
+                               f"nur beobachten (§5)."}, True)
         return None, True
 
     # nur ein Tag verfügbar
@@ -163,7 +180,7 @@ def _rhr_elevation(health_rows):
     baseline_days = days[:-SUSTAINED_DAYS]
     baseline = statistics.median([rhr_by_day[d] for d in baseline_days])
     recent_vals = [rhr_by_day[d] for d in recent_days]
-    if all(v >= baseline + RHR_OVER_BASELINE for v in recent_vals):
+    if all(v >= baseline + RHR_OVER_BASELINE for v in recent_vals) and _calendar_consecutive(recent_days):
         shown = ", ".join(f"{d}={round(rhr_by_day[d])}" for d in recent_days)
         return ({"signal": "rhr_elevation", "level": "WARN",
                  "detail": f"Ruhepuls {SUSTAINED_DAYS} Tage ≥ Baseline+{RHR_OVER_BASELINE}: "
@@ -313,6 +330,17 @@ def evaluate(daily=None, health_rows=None, weight_rows=None,
 
     actionable = any(a["level"] in ACTIONABLE_LEVELS for a in alerts)
     out = {"alerts": alerts, "actionable": actionable, "checked": checked}
+
+    # RHR-Abweichung als ABGELEITETE Zahl mit-emittieren (deterministischer
+    # Zubringer für readiness.py: latest_rhr − Trailing-Median; positiv = erhöht).
+    rhr_by_day = {r["date"]: r["rhr"] for r in (health_rows or [])
+                  if r.get("date") and r.get("rhr") is not None}
+    rdays = sorted(rhr_by_day)
+    if len(rdays) >= SUSTAINED_DAYS + 2:
+        baseline = statistics.median([rhr_by_day[d] for d in rdays[:-1]])
+        out["rhr_deviation"] = round(rhr_by_day[rdays[-1]] - baseline, 1)
+        out["rhr_baseline_median"] = round(baseline, 1)
+
     if daily and daily.get("as_of"):
         out["as_of"] = daily["as_of"]
     return out

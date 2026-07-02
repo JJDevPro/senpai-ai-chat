@@ -36,7 +36,7 @@ description: "AI Coach Daily Check für den Athleten — WHOOP-artiges Tages-Das
 Step 0:  KEIN Tool-Setup nötig — alle Daten kommen lokal via `python3 lib/pull_drive.py` nach
          `./data` + die gebündelten Scripts unter `.claude/skills/daily-check-skill/scripts/`.
          Drive ist read-only SoT (NIE zurückschreiben). Alle Aufrufe vom Repo-Root (CWD).
-Step 1a: DATUM (Tag/Wochentag/KW) — NICHT aus API: User-Angabe → sonst Claudes internes Datum.
+Step 1a: DATUM (Tag/Wochentag/KW) — deterministisch: User-Angabe → sonst **`lib/clock.py` (VM-Uhr → Europe/Berlin)**, NIE das interne Modell-Datum raten. Dieses Datum ist das `--as-of {heute}` ALLER Folge-Steps.
 Step 1b: UHRZEIT (HH:MM): User-Angabe → **`lib/clock.py` (echte VM-Uhr → Europe/Berlin; der SessionStart-Hook druckt sie im 🗺️ HUD)** → `[Zeit n/a]` nur falls Clock-Read scheitert. CLAUDE.md §3. **Kein API, kein Raten.**
 Step 2:  Wochentag → Trainingstag (Mo/Mi/Sa/Do)? → Wetterochs-Flag (PROAKTIV — auch wenn Rest empfohlen wird; Wetter ist Entscheidungs-Input).
 Step 3:  ISO-KW + Montag dieser KW.
@@ -64,13 +64,17 @@ Step 8.5: TAG-SIGNALE: `python3 .claude/skills/daily-check-skill/scripts/daily_s
          🛡️ **Vortag-Härtung (Glitch strukturell behoben):** Wird versehentlich NUR die Heute-Datei übergeben und fehlt der Kalender-Vortag, zieht daily_signals ihn via `--data-dir` (Default = Ordner der ersten Datei) selbst aus `./data` nach (`HealthAutoExport-<gestern>.json`) — nicht-fatal, wenn die Datei wirklich fehlt.
          Liefert Tageslicht, Schlaf-Effizienz, Wrist-Temp+Baseline, Audio-Tag-Kontext, VO2max/cardio_recovery-Fallback, Wasser **+ `dietary`** (Makros gestern+heute: Protein/kcal/Fett/Carbs/Ballaststoffe/Zucker/Wasser → §7b Ernährung).
 Step 8.6: ⛔ SAFETY-GATE (deterministisch, NICHT verhandelbar — CLAUDE.md §6):
-         `python3 .claude/skills/daily-check-skill/scripts/safety_gate.py <slice_json> [--injury] [--opt-out] [--prev-hrv N]`
+         `python3 .claude/skills/daily-check-skill/scripts/safety_gate.py <slice_json> [--injury] [--opt-out] [--prev-hrv N | --health-csv ./data/Taegliche_Kennzahlen.csv]`
          `<slice_json>` = die slice_hae_day-Ausgabe (Datei oder '-' via Pipe). Liefert
-         `{gate,level,reasons,training_allowed,roast_allowed}`. Das Gate IMMER feuern und
+         `{gate,level,reasons,training_allowed,roast_allowed[,data_gaps]}`. Das Gate IMMER feuern und
          RESPEKTIEREN: `training_allowed=false` (HRV🔴🔴 <40 + Schlaf <6h) = Training
          STREICHEN, kein Verhandeln — übersteuert Plan-Matrix + Persona. `roast_allowed=false`
-         (Verletzung/Opt-out) = Persona aus. `--prev-hrv` (gestern hrv_night.avg) bestätigt
-         HRV🔴 als 2-Tage-Deload-Muster. AFib-Burden wird BEWUSST nicht gegated (§6 Medical).
+         (Verletzung/Opt-out) = Persona aus. **Vortags-HRV-Zubringer (deterministisch, PFLICHT
+         für das 2-Tage-Deload-Muster):** `--health-csv` (der Step-10.1-Pull) liest gestern-HRV
+         selbst aus der Kennzahlen-CSV; `--prev-hrv N` nur als manueller Override. HRV<40 bei
+         FEHLENDEM Schlafwert → `level=WARN` + `data_gaps:["heute_sleep.total_h"]` (kein stilles
+         Fail-open): Schlaf nachtragen oder konservativ handeln. AFib-Burden wird BEWUSST nicht
+         gegated (§6 Medical).
 Step 9:  TRAININGS-LOAD TIEF: Trainings_v5 nach CSV ziehen →
          `python3 lib/pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU --tab "Trainings" --out ./data/Trainings_v5.csv` →
          🧮 `banister.compute_from_sheet(raw, as_of=heute)` (§3h) — Dedup + Kalendertag-Zerofill
@@ -81,19 +85,30 @@ Step 9:  TRAININGS-LOAD TIEF: Trainings_v5 nach CSV ziehen →
          ⚡ **INKREMENTELL (Snapshot-Beschleuniger, §7):** zuerst die letzte Zeile aus
          `readiness-history.csv` lesen (`readiness_history.last_row`); ist deren `date` == gestern
          UND ctl/atl vorhanden → `banister.compute_incremental(ctl, atl, date, gestern_TRIMP, heute)`
-         = EIN EWMA-Schritt statt 126-Tage-Replay (Tokens/Zeit ↓, Ergebnis identisch). **ESCAPE-HATCH
+         = EIN EWMA-Schritt statt 126-Tage-Replay (Tokens/Zeit ↓, Ergebnis identisch).
+         **`gestern_TRIMP` kommt AUSSCHLIESSLICH aus `banister.day_trimp(raw_sheet, gestern)`**
+         (dedup→extract, dieselbe Kette wie die Vollrechnung) — NIE aus einer ad-hoc gelesenen
+         Sheet-Zeile, sonst ist der inkrementelle Pfad nicht reproduzierbar. **ESCAPE-HATCH
          → volle `compute_from_sheet`** bei: Lücke (letzte Zeile < gestern), fehlendem/leerem Snapshot,
          `warmup_ok`-Zweifel, Anomalie ODER explizitem Deep-Dive. Im Zweifel gewinnt die Vollrechnung.
 Step 10: Gesundheitsdaten_v5 nach CSV ziehen →
          `python3 lib/pull_drive.py --sheet 1ENUtb3LS5GgaDDhciBCuyUDqlwJTsjU6n6PTCZuIcDE --out ./data/Gesundheitsdaten_v5.csv` → nur KW-Zeilen (Trend).
 Step 10.1: 🟢 HRV-STATUS (Garmin-Klon): 'Tägliche Kennzahlen'-Tab für die 60-Tage-HFV-Historie ziehen →
          `python3 lib/pull_drive.py --sheet 1ENUtb3LS5GgaDDhciBCuyUDqlwJTsjU6n6PTCZuIcDE --tab "Tägliche Kennzahlen" --out ./data/Taegliche_Kennzahlen.csv`
-         `python3 .claude/skills/daily-check-skill/scripts/hrv_baseline.py --health-csv ./data/Taegliche_Kennzahlen.csv --as-of {heute}` → `{median,band,status}` (§6.5). LOW_FLOOR = safety_gate.HRV_RED (geteilt).
-Step 10.2: 🔋 READINESS (0–100): die SCHON berechneten Aggregate fusionieren (KEIN Re-Compute) —
-         `python3 .claude/skills/daily-check-skill/scripts/readiness.py --hrv-baseline <hrv_json|-> --daily <slice_json> --banister <banister_json> --safety-gate <gate_json>` → `{score,band,top_driver,top_limiter,safety_override}`.
+         `python3 .claude/skills/daily-check-skill/scripts/hrv_baseline.py --health-csv ./data/Taegliche_Kennzahlen.csv --as-of {heute}` → `{median,band,status,latest_lag_days,stale}` (§6.5). LOW_FLOOR = safety_gate.HRV_RED (geteilt). Bei `stale=true` (Sheet-Lag) den Lag im Output nennen — Baseline dann als „Stand −N d" labeln.
+Step 10.15: 🚨 SENTINEL (Trip-Wires, JEDER Daily Check — Pflicht-Zubringer für den EINEN Score):
+         `python3 .claude/skills/daily-check-skill/scripts/sentinel.py --health-csv ./data/Taegliche_Kennzahlen.csv --daily <slice_json>` → `{alerts,warn_count,rhr_deviation,rhr_baseline_median,…}`.
+         Kalender-konsekutive HRV-/RHR-Muster (2+ Tage), Atemstörungs-Bänder, Gewichts-Trend. Der Output ist der
+         deterministische RHR-Baseline-Zubringer für Step 10.2 — NIE RHR-Abweichung im Kopf schätzen.
+Step 10.2: 🔋 READINESS (0–100, der EINE Score — §6.5): die SCHON berechneten Aggregate fusionieren (KEIN Re-Compute) —
+         `python3 .claude/skills/daily-check-skill/scripts/readiness.py --hrv-baseline <hrv_json> --daily <slice_json> --banister <banister_json> --safety-gate <gate_json> --sentinel <sentinel_json>` → `{score,band,top_driver,top_limiter,safety_override}`.
+         `--sentinel` ist PFLICHT-Input (liefert `rhr_deviation` + Warn-Penalty); es gibt EINEN Readiness-Score im System — WHOOP-Card, Verdict und Heute-Plan zitieren DIESEN Wert, kein LLM-Komposit daneben.
          ⛔ Safety-Gate bleibt AUTORITATIV: rotes Gate deckelt den Score auf ≤35 (`safety_override=true`) — übersteuert alles (§13/§16).
-Step 10.3: 🔋 BODY BATTERY: `python3 .claude/skills/daily-check-skill/scripts/body_battery.py --slice <slice_json> --hrv <hrv_json> --banister <banister_json> --as-of {heute}` → `{bb_start,bb_end,drained,recharged,status}` (§6.5). Heuristik/Surrogat, klar so labeln.
-Step 10.4: 🏃 RUNNING TOLERANCE: `python3 .claude/skills/daily-check-skill/scripts/running_tolerance.py --trainings ./data/Trainings_v5.csv --as-of {heute}` → `{week_km,ceiling_km,acwr,ramp_flag,status}` (Verletzungs-Decke bei 116 kg → §13 Heute-Plan).
+Step 10.3: 🔋 BODY BATTERY: `python3 .claude/skills/daily-check-skill/scripts/body_battery.py --slice <slice_json> --hrv <hrv_json> --banister <banister_json> --as-of {heute} --prev-bb <gestern_bb_end>` → `{bb_start,bb_end,drained,recharged,status}` (§6.5). Heuristik/Surrogat, klar so labeln.
+         **Verkettung (PFLICHT wenn verfügbar):** `<gestern_bb_end>` = `bb_end` aus der letzten Zeile der
+         `readiness-history.csv` (`readiness_history.last_row`, `date` == gestern) — Body Battery ist eine
+         Kette, kein Tages-Reset. Fehlt die Zeile/Lücke → ohne `--prev-bb` starten (Skript nutzt seinen Default) + im Output als „unverkettet" labeln.
+Step 10.4: 🏃 RUNNING TOLERANCE: `python3 .claude/skills/daily-check-skill/scripts/running_tolerance.py --trainings ./data/Trainings_v5.csv --as-of {heute}` → `{week_km,ceiling_km,acwr,ramp_flag,status}` (Verletzungs-Decke bei hohem Körpergewicht, Schwelle → `athlete.md` → §13 Heute-Plan).
 Step 10.5: 📈 HISTORY (T12, best-effort, NON-BLOCKING): Tageszeile nach Drive persistieren —
          `python3 .claude/skills/daily-check-skill/scripts/readiness_history.py --as-of {heute} --readiness <readiness_json> --body-battery <bb_json> --banister <banister_json> --hrv-baseline <hrv_json> --daily <slice_json> --signals <signals_json> --tolerance <tolerance_json>`.
          (Die erweiterte Zeile trägt jetzt ctl/atl/hrv_ms/rhr/weight/kfa/vo2/week_km — speist den inkrementellen Banister (Step 9) + den Trend-Snapshot.)
@@ -313,7 +328,7 @@ Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` +
 
 ## 6. 🎯 TAGES-ÜBERSICHT (WHOOP-Card)
 
-Top-Karte, drei Achsen auf einen Blick. Recovery = Komposit, ehrlich als **Ampel-Band** (kein Fake-Prozent).
+Top-Karte, drei Achsen auf einen Blick. Recovery = **deterministisch aus dem Readiness-Score (Step 10.2)**, ehrlich als **Ampel-Band** (kein Fake-Prozent, kein LLM-Komposit).
 
 ```
 🎯 TAGES-ÜBERSICHT — [Wochentag DD.MM.]
@@ -326,15 +341,16 @@ Top-Karte, drei Achsen auf einen Blick. Recovery = Komposit, ehrlich als **Ampel
 > **TSB = HEUTIGE Readiness** (CTL−ATL durch gestern), NICHT der gestrige Wert. EINE TSB-Zahl im ganzen Report — Card, Gestern-Retro-Block und KW-Trend (heutige Spalte) identisch.
 ```
 
-**Recovery-Komposit (HRV dominiert, dann RHR, dann Schlaf):**
-| Band | Bedingung |
+**Recovery-Band = 1:1-Mapping aus `readiness.py` (Step 10.2) — KEIN eigenes LLM-Komposit:**
+| Band (Card) | readiness.py `band` |
 |---|---|
-| 🟢 BEREIT | HRV 🟢 UND RHR ≤ Baseline+3 UND Schlaf nicht 🔴 |
-| 🟡 KOMPROMITTIERT | genau eine Achse gelb/leicht erhöht |
-| 🟠 GEDÄMPFT | zwei Achsen schwach ODER RHR Baseline+5 |
-| 🔴 ERSCHÖPFT | HRV 🔴 ODER ≥2 Achsen rot |
+| 🟢 BEREIT | `high` (Score ≥75) |
+| 🟡 KOMPROMITTIERT | `moderate` (50–74) |
+| 🟠 GEDÄMPFT | `low` (35–49) |
+| 🔴 ERSCHÖPFT | `very_low`/`red` (<35 bzw. `safety_override`) |
 
-> 🌡️ **Wrist-Temp-Modifier:** Schlaf-Handgelenk-Temp >+0,4 °C über Baseline (daily_signals §3i, nur wenn `baseline_ok`) = Hitze-Last/Krankheit → Recovery eine Stufe vorsichtiger einordnen.
+> Der Score gewichtet HRV > Schlaf > TSB > RHR bereits deterministisch (inkl. Sentinel-Penalty) — die Card ÜBERSETZT nur, sie rechnet nicht nach. HRV/RHR/Schlaf-Detail steht in der Readiness-Karte (§6.5) darunter.
+> 🌡️ **Wrist-Temp-Kontext (nur Narrativ, ändert das Band NICHT):** Schlaf-Handgelenk-Temp >+0,4 °C über Baseline (daily_signals §3i, nur wenn `baseline_ok`) = Hitze-Last/Krankheits-Hinweis → im Einordnungs-Satz nennen.
 > Recovery ist ein **Readiness-Hinweis, kein Befehl** — Trainingsplan/Taper/Override gehen vor.
 
 -----

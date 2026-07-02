@@ -127,6 +127,15 @@ def compute_baseline(rows, as_of):
     else:
         status = "unbalanced"
 
+    # Staleness (Audit-Fix): hinkt das Sheet hinterher, bewertet der Status still
+    # den VORTAG statt der heutigen Nacht — Lag ausweisen statt verschweigen.
+    lag_days = None
+    try:
+        from datetime import date as _dt_date
+        lag_days = (_dt_date.fromisoformat(as_of) - _dt_date.fromisoformat(latest_day)).days
+    except ValueError:
+        pass
+
     return {
         "as_of": as_of,
         "window_days": WINDOW_DAYS,
@@ -135,6 +144,8 @@ def compute_baseline(rows, as_of):
         "mad": round(mad, 2),
         "band": {"low": round(band_low, 2), "high": round(band_high, 2)},
         "latest": {"value": round(latest_val, 2), "date": latest_day},
+        "latest_lag_days": lag_days,
+        "stale": bool(lag_days and lag_days >= 1),
         "latest_vs_band": latest_vs_band,
         "status": status,
         "k": K,

@@ -218,11 +218,14 @@ def _weekly_from_trainings(raw_text, as_of=None):
 
 
 def _parse_list(spec):
-    """'-' = stdin, sonst Komma-/Whitespace-getrennte Zahlen-Liste."""
+    """'-' = stdin, sonst Komma-/Semikolon-/Whitespace-getrennte Zahlen-Liste.
+    (Doku-Bug-Fix: Whitespace war versprochen, wurde aber nicht gesplittet —
+    space-getrennte Eingaben wurden komplett verworfen.)"""
     if spec == "-":
         spec = sys.stdin.read()
-    parts = [p for p in spec.replace("\n", ",").replace(";", ",").split(",")]
-    return [p.strip() for p in parts if p.strip() != ""]
+    for sep in ("\n", ";", "\t", " "):
+        spec = spec.replace(sep, ",")
+    return [p.strip() for p in spec.split(",") if p.strip() != ""]
 
 
 def main(argv=None):

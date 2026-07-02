@@ -16,7 +16,9 @@ description: "Senpais Wochen-Payload. Trigger: Payload, Sonntag-KW-Abschluss, Wo
 |---|---|
 | readiness-history.csv (KW-Anker) | Projekt-Datei → nach `./data/readiness-history.csv` schreiben |
 | Makro-/Tages-Detail (falls nötig) | Tages-JSONs bzw. Monats-CSV als Chat-Upload anfordern — anfordern statt raten (Hol-Pflicht) |
-| live.md · backlog.md · trend_snapshot.md | Projekt-Datei (Kontext) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
+| live.md · backlog.md · trend_snapshot.md | State-Read (Projekt-Wissen bzw. Drive-Connector frisch, siehe unten) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
+
+**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — Connector-Stand schlägt jede statische Kopie.
 
 **Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
 
@@ -170,4 +172,4 @@ Am KW-Ende `backlog.md` (Drive-synchronisierte Projekt-Datei — Inhalt im Konte
 **Ende payload-skill v2.0.** Code-Fence only. Zahlen aus `weekly_rollup.py`. live.md wird GEPATCHT, nie ersetzt. Felder vollständig oder belegtes `[?]`.
 
 ---
-> Export-Stand: payload-skill v2.0 · senpai-ai-chat@57edbd6 · content ff119fcf8aa2 · generiert von export_claude_ai.py — NICHT von Hand editieren.
+> Export-Stand: payload-skill v2.0 · senpai-ai-chat@ebb935d · content da87d0a04028 · generiert von export_claude_ai.py — NICHT von Hand editieren.

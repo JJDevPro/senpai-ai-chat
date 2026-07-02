@@ -16,7 +16,9 @@ description: "Senpais Wetter- & Pre-Lauf-Engine. Trigger: wetter, lauf, regen, h
 |---|---|
 | Bright-Sky-Stundenwerte | URL aus `assets/brightsky_url.txt` ({date} ersetzen) per CHAT-Web-Fetch holen → Antwort ungekürzt nach `./data/brightsky.json` → `python3 scripts/weather.py --from-json ./data/brightsky.json …` |
 | Wetterochs (Narrativ/Gewitter/Fallback) | Chat-Web-Fetch RSS + Delphi-JSON (wie gehabt) |
-| gear.md · coaching_cues.md · live.md | Projekt-Datei (Kontext) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
+| gear.md · coaching_cues.md · live.md | State-Read (Projekt-Wissen bzw. Drive-Connector frisch, siehe unten) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
+
+**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — Connector-Stand schlägt jede statische Kopie.
 
 **Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
 
@@ -179,4 +181,4 @@ An **Samstag** (Parkrun 09:00, Heim-Strecke — Ort/GPS-Anker in `athlete.md`) z
 **Ende weather-runprep-skill v1.3.** Source-Priorität: User-Angabe > **Bright Sky/DWD (präzise Slot-Zahlen)** > Wetterochs (Narrativ/Gewitter/Fallback). Wetter = Entscheidungs-Input (vor der Empfehlung, nicht danach). Trainingstage = Mo/Mi/Sa/Do. **Slot-Uhrzeit bestimmt Starttemp — Tagesmax ist fast nie die Starttemp; Parkrun 09:00 = Morgenwert, NIE Tagesmax (§2a).** Hitze-Tax fix 3,5 s/km/°C ab 18°C. Do: Gym-Hitze (keine Klimaanlage) + Flex-Regel-Wetter.
 
 ---
-> Export-Stand: weather-runprep-skill v1.3 · senpai-ai-chat@8be503b · content 07c24e1aa4cc · generiert von export_claude_ai.py — NICHT von Hand editieren.
+> Export-Stand: weather-runprep-skill v1.3 · senpai-ai-chat@ebb935d · content 92338dcd75d0 · generiert von export_claude_ai.py — NICHT von Hand editieren.

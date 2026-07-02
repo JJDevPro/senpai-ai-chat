@@ -15,8 +15,10 @@ description: "Senpais Race-Engine. Trigger: race, Rennen, HM, Halbmarathon, 10km
 | Was | Woher |
 |---|---|
 | Race_Strategie.md · 21km.gpx | im Bundle: `assets/` (beim Export aus Drive eingefroren — bei Race-Strategie-Änderung Re-Export nötig) |
-| live.md (Race-Kalender, Countdown, Gewicht) | Projekt-Datei (Kontext) |
+| live.md (Race-Kalender, Countdown, Gewicht) | per Drive-Connector frisch lesen (Zahlen-SSoT) |
 | Referenz-Läufe (Decoupling-Quelle) | letzter Run-Report bzw. FIT-Upload (run-bundle-skill) |
+
+**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — Connector-Stand schlägt jede statische Kopie.
 
 **Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
 
@@ -123,4 +125,4 @@ Wenn ein Pace-Einbruch/Run-Walk-Eskalation gemeldet wird:
 **Ende race-projection-skill v1.1.** 4 Szenarien AUS DEN SKRIPTEN (`race_readiness`/`hm_projection`/`pacing_card`), Cutoff-Puffer + Gehpausen-Budget deterministisch, Decoupling nur aus validen Quellen, Wand = neuromuskulär ≠ Kardio.
 
 ---
-> Export-Stand: race-projection-skill v1.1 · senpai-ai-chat@55c08a6 · content 027ba6a8ca59 · generiert von export_claude_ai.py — NICHT von Hand editieren.
+> Export-Stand: race-projection-skill v1.1 · senpai-ai-chat@ebb935d · content f97c6330fce6 · generiert von export_claude_ai.py — NICHT von Hand editieren.

@@ -13,11 +13,11 @@ Auf claude.ai gibt es **keine Slash-Commands** — Skills feuern automatisch üb
 | `Payload` / Sonntag-KW-Abschluss | **payload-skill** (bevorzugt im Repo-Zwilling; hier = mobiler Fallback) |
 | `Sync` / KW-Start / Driftverdacht / `Menu` / „was kann ich gerade tun“ | **sync-skill** |
 | Z2-Steuerung, Flex-Regel, Laufform-Tiefe, Pace@Z2-Methodik | `references/V3_Protocol.md` (run-bundle-Bundle) |
-| Schuhwahl, Blasen, Socken, GCT-Monitoring, Equipment-Blacklist | `Schuhe_Ausruestung.md` (Projekt-Datei) |
-| Gym-Übungen, Geräte-IDs, Biomechanik | `Kraft-Programm.md` (Projekt-Datei) |
-| Schlaf-/HRV-Anomalie, Sensor-Warnung | `Schlaf_HRV_Baseline.md` (Projekt-Datei) |
+| Schuhwahl, Blasen, Socken, GCT-Monitoring, Equipment-Blacklist | `Schuhe_Ausruestung.md` (Projekt-Wissen, statische Kopie) |
+| Gym-Übungen, Geräte-IDs, Biomechanik | `Kraft-Programm.md` (Projekt-Wissen, statische Kopie) |
+| Schlaf-/HRV-Anomalie, Sensor-Warnung | `Schlaf_HRV_Baseline.md` (Projekt-Wissen, statische Kopie) |
 | Stagnation, Rebound, 10-Jahres-Historie | `Historie.md` + `Archiv_Historie.md` (Drive-Connector bei Trigger) |
 | JSON/CSV/FIT-Struktur, Parsing-Frage | `references/Daten_Parsing.md` (run-bundle-Bundle) |
-| `Backlog` / „was steht noch offen“ | `backlog.md` (Projekt-Datei) |
+| `Backlog` / „was steht noch offen“ | `backlog.md` (Drive-Connector) |
 
 **Quick-Commands (inline, kein Skill nötig):** `HRV` · `VO2` · `Roast` · `Coaching` · `Pace@Z2` (**liest den Engine-Wert aus `live.md` — NIE im Kopf aus Läufen rekonstruieren**) · `Schuhe`/`gear` (liest `gear.md` → Schuh-km-Tabelle + Rotations-Ampel) → knapper strukturierter Output mit Ampeln (Sektion 5).

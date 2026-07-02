@@ -14,8 +14,11 @@ description: "Senpais Rekalibrierung + Menu. Trigger: Sync, KW-Start, Drift-Verd
 
 | Was | Woher |
 |---|---|
-| live.md · athlete.md · trend_snapshot.md · backlog.md | Projekt-Dateien (Kontext) — nichts zu ziehen |
+| athlete.md | statische Kopie im Projekt-Wissen (Grundkontext) |
+| live.md · trend_snapshot.md · backlog.md | per Drive-Connector frisch lesen — Sync = Re-Anker auf FRISCHEN State |
 | Konsolidierung (§3.5) | senpai-journal.md/learnings.md/baselines.md per Connector nach `./data/` → `python3 scripts/consolidate.py --local --data-dir ./data` → learnings/baselines per Connector-Update zurück |
+
+**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — Connector-Stand schlägt jede statische Kopie.
 
 **Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
 
@@ -125,4 +128,4 @@ Senpais Action-HUD auf Abruf — zeit-/wochentag-bewusste Übersicht der sinnvol
 3. Output = zeit-/wochentag-bewusstes Aktions-HUD (Jetzt-Zeile, Morgen-Ausblick, passender Skill-Trigger zum Slot) + Skill-Index als Cheat-Sheet (pro Eintrag Trigger-Phrase + ein Halbsatz wofür). Das HUD 1:1 als Gerüst nehmen, kurz in Senpais Stimme einordnen (2–4 Emojis/Absatz, Metaphern-Familien rotieren); ≥22:00 → **eine** Bedtime-Zeile. Keine Skills erfinden, die der Index nicht listet. Nur Aggregate/Übersicht, kein Daten-Pull.
 
 ---
-> Export-Stand: sync-skill v1.1 · senpai-ai-chat@57edbd6 · content 8721af5d1018 · generiert von export_claude_ai.py — NICHT von Hand editieren.
+> Export-Stand: sync-skill v1.1 · senpai-ai-chat@ebb935d · content 98259579812a · generiert von export_claude_ai.py — NICHT von Hand editieren.

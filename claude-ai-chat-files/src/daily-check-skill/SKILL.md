@@ -15,8 +15,10 @@ description: "Senpais Daily Check: WHOOP-Tages-Dashboard (Recovery, Schlaf, HRV,
 | Was | Woher |
 |---|---|
 | Tages-JSONs (heute + gestern, HealthAutoExport) | Chat-Upload → Sandbox (typisch `/mnt/user-data/uploads`, per `ls` verifizieren) — BEIDE anfordern (Mitternachts-Merge) |
-| live.md · baselines.md · learnings.md · backlog.md · trend_snapshot.md | Projekt-Datei (Kontext) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
+| live.md · baselines.md · learnings.md · backlog.md · trend_snapshot.md | State-Read (Projekt-Wissen bzw. Drive-Connector frisch, siehe unten) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
 | readiness-history.csv | Projekt-Datei → nach `./data/readiness-history.csv` schreiben (banister/readiness_history brauchen sie dort) |
+
+**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — Connector-Stand schlägt jede statische Kopie.
 
 **Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
 
@@ -713,4 +715,4 @@ Schreibt der User **„Briefing"** → Daily Check (§2–§16), aber mit umgeke
 Verdict am Ende wie Step 16 ins Journal (optional, best-effort, Connector; Fallback Code-Fence).
 
 ---
-> Export-Stand: daily-check-skill v0.16 · senpai-ai-chat@8be503b · content 90abab255451 · generiert von export_claude_ai.py — NICHT von Hand editieren.
+> Export-Stand: daily-check-skill v0.16 · senpai-ai-chat@ebb935d · content 392c828162ff · generiert von export_claude_ai.py — NICHT von Hand editieren.

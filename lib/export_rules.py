@@ -125,6 +125,15 @@ _PRE_KERNREGEL = (
     "(landet im Kontext!) — immer als Chat-Upload anfordern (landet in der Sandbox).\n"
 )
 
+_PRE_STATEREAD = (
+    "**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als "
+    "Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native "
+    "Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei "
+    "Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) "
+    "die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — "
+    "Connector-Stand schlägt jede statische Kopie.\n"
+)
+
 
 def _pre(matrix_rows: list[tuple[str, str]], pip_line: str | None = None,
          extra: str | None = None) -> str:
@@ -132,6 +141,7 @@ def _pre(matrix_rows: list[tuple[str, str]], pip_line: str | None = None,
     parts = [
         _PRE_HEAD,
         "**Datenbeschaffung:**\n\n| Was | Woher |\n|---|---|\n" + rows + "\n",
+        _PRE_STATEREAD,
         _PRE_WRITEBACK,
     ]
     if pip_line:
@@ -143,7 +153,8 @@ def _pre(matrix_rows: list[tuple[str, str]], pip_line: str | None = None,
 
 
 _UPLOADS = "Chat-Upload → Sandbox (typisch `/mnt/user-data/uploads`, per `ls` verifizieren)"
-_PROJFILE = "Projekt-Datei (Kontext) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben"
+_PROJFILE = ("State-Read (Projekt-Wissen bzw. Drive-Connector frisch, siehe unten) → "
+             "bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben")
 
 # ---------------------------------------------------------------------------
 # SKILLS-Registry — die eine Quelle für den Exporter.
@@ -202,8 +213,8 @@ SKILLS = {
         "preamble": _pre(
             [
                 ("Gym-ZIP (Apple-Watch/HealthFit)", _UPLOADS),
-                ("baselines.md (PR-SSoT) · athlete.md (Geräte-Map) · live.md", _PROJFILE),
-                ("Kraft-Programm.md (Geräte/Biomechanik)", "Projekt-Datei (Drive-synchronisiert)"),
+                ("baselines.md (PR-SSoT) · live.md", "per Drive-Connector frisch lesen (PR-Vergleich braucht aktuellen Stand) → nach `./data/` schreiben"),
+                ("athlete.md (Geräte-Map) · Kraft-Programm.md", "statische Kopien im Projekt-Wissen (Grundkontext)"),
             ],
         ),
     },
@@ -243,7 +254,7 @@ SKILLS = {
         "pip": [],
         "preamble": _pre(
             [
-                ("live.md (Tagestyp, SoT-Gewicht, Streaks)", "Projekt-Datei (Kontext)"),
+                ("live.md (Tagestyp, SoT-Gewicht, Streaks)", "per Drive-Connector frisch lesen (Zahlen-SSoT)"),
                 ("Makro-Zahlen des Tages", "User-Post im Chat bzw. Tages-JSON-Upload (daily-check-Slicer)"),
             ],
         ),
@@ -291,7 +302,7 @@ SKILLS = {
         "preamble": _pre(
             [
                 ("Race_Strategie.md · 21km.gpx", "im Bundle: `assets/` (beim Export aus Drive eingefroren — bei Race-Strategie-Änderung Re-Export nötig)"),
-                ("live.md (Race-Kalender, Countdown, Gewicht)", "Projekt-Datei (Kontext)"),
+                ("live.md (Race-Kalender, Countdown, Gewicht)", "per Drive-Connector frisch lesen (Zahlen-SSoT)"),
                 ("Referenz-Läufe (Decoupling-Quelle)", "letzter Run-Report bzw. FIT-Upload (run-bundle-skill)"),
             ],
         ),
@@ -335,7 +346,8 @@ SKILLS = {
         "pip": [],
         "preamble": _pre(
             [
-                ("live.md · athlete.md · trend_snapshot.md · backlog.md", "Projekt-Dateien (Kontext) — nichts zu ziehen"),
+                ("athlete.md", "statische Kopie im Projekt-Wissen (Grundkontext)"),
+                ("live.md · trend_snapshot.md · backlog.md", "per Drive-Connector frisch lesen — Sync = Re-Anker auf FRISCHEN State"),
                 ("Konsolidierung (§3.5)", "senpai-journal.md/learnings.md/baselines.md per Connector nach `./data/` → `python3 scripts/consolidate.py --local --data-dir ./data` → learnings/baselines per Connector-Update zurück"),
             ],
         ),

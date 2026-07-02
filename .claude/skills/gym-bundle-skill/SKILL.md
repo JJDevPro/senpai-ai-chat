@@ -3,11 +3,11 @@ name: gym-bundle-skill
 description: "AI Coach Gym-Analyse für den Athleten — Drive-native. PFLICHT laden bei jeder Krafttraining-Auswertung: eine Gym-ZIP (Funktionelles_Krafttraining oder Krafttraining) aus Drive, der gymanalyse-Command, die Phrasen analysier den Gym/Gym-Report/Gym fertig, oder ein Übungs-Text mit Gerätenummern und Gewichten (auch ohne ZIP, dann Text-Only-Modus). Liefert: Übungs-Parsing, PR-Detection gegen baselines.md (aus dem Drive-Personal-Folder), Tonnage pro Muskelgruppe, HR-Profil pro Übung, Lauf-Carry-Over, 80-Prozent-Re-Entry-Regel, Bedtime-Check, Senpai-Verdict. Geräte-Map aus dem Athleten-Profil (athlete.md / Drive). Holt Daten via Google Drive (pull_drive.py). NICHT für Lauf (run-bundle-skill), Ernährung (nutrition-skill) oder Tages-Werte (daily-check-skill)."
 ---
 
-# Gym-Bundle-Analyse-Skill v1.1 — Drive-Native
+# Gym-Bundle-Analyse-Skill v2.0 — Drive-Native · Engine-Kontrakt
 
 > Modul-Datei. Senpai folgt diesem Workflow, wenn eine HealthFit-Gym-Markdown-ZIP (`*-Funktionelles_Krafttraining-*.zip` oder `*-Krafttraining-*.zip`) aus Drive analysiert werden soll — oder explizit per `/gymanalyse` aufgerufen wird.
-> **Primärquelle:** Google Drive (Gym-ZIP im HAE/Daily-Folder) → lokal nach `./data` via `lib/pull_drive.py`. Senpai schreibt NIE nach Drive.
-> **Iteration:** v1.0 (22.05.2026) — Initial Commit nach Live-Test mit Session 16.04.2026 (8-PR-Donnerstag).
+> **Primärquelle:** Google Drive (Gym-ZIP im HAE/Daily-Folder) → lokal nach `./data` via `lib/pull_drive.py`. Drive-Truth bleibt read-only; **State-Write-Back (baselines.md/live.md) via `--upload` ist erlaubt und bei PRs Pflicht (§6).**
+> **v2.0 — Engine-Kontrakt:** `scripts/analyze_gym.py` ist jetzt die deterministische Engine (nach analyze_run_fit-Muster): Übungs-Parsing, Segment-Mapping, Tonnage/Muskelgruppe, PR-Detection, Belastungs-Score, Bedtime-Ampel — ALLES als Aggregat-JSON aus dem Script. **Der Report übersetzt die Engine-Werte in Persona-Text, er rechnet sie NICHT nach** (Verdict-Kontrakt). Versions-Historie → `CHANGELOG.md` (Drive).
 
 ---
 
@@ -55,17 +55,21 @@ python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match liv
 | **`./data/baselines.md`** (Gym PRs, aus Drive-Personal-Folder gezogen) | **Primäre PR-Wahrheitsquelle** | IMMER für PR-Detection |
 | **JPEGs** | Visual-Drill-Down | Nur on demand |
 
-**WICHTIG:** Live-Gym-PRs leben in **`baselines.md`** (Abschnitt Gym PRs) im Drive-Personal-Folder `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` — vor Gebrauch via `pull_drive.py` nach `./data` ziehen (siehe §1), NIE eine externe `Gym_Historie.md` anlegen. Ein neuer PR wird als **vorgeschlagene Edit an `./data/live.md`** umgesetzt (nach Bestätigung im Chat), dann nach Drive zurückgeschrieben (Write-Back, siehe §6), nie silent.
+**WICHTIG:** Live-Gym-PRs leben in **`baselines.md`** (Abschnitt Gym PRs) im Drive-Personal-Folder `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` — vor Gebrauch via `pull_drive.py` nach `./data` ziehen (siehe §1), NIE eine externe `Gym_Historie.md` anlegen. **baselines.md ist die PR-SSoT** — neue PRs schreibt Senpai **autonom + sichtbar** dorthin zurück (Diff im Chat, §6); `live.md` spiegelt nur.
 
-**ZIP entpacken + Segmente analysieren (lokal, nach Drive-Pull):**
+**ZIP entpacken + Engine fahren (lokal, nach Drive-Pull):**
 ```bash
 # 1) ZIP entpacken → lokalisiert Master-Markdown + Segmente-CSV (druckt nur Pfade, nie Inhalte)
 python3 .claude/skills/gym-bundle-skill/scripts/unzip_gym.py ./data/<gym-bundle>.zip --out ./data
 #   → md=<pfad>   segments=<pfad>   other_files=<n>
-# 2) Segmente-CSV analysieren → HR pro Lap/Übungs-Segment + Session-Aggregate
-python3 .claude/skills/gym-bundle-skill/scripts/analyze_gym.py ./data/<...>-segmente.csv
+# 2) Übungs-Text des Athleten in eine Datei (oder stdin) + DIE ENGINE:
+python3 .claude/skills/gym-bundle-skill/scripts/analyze_gym.py \
+  --exercises ./data/uebungen.txt --segments ./data/<...>-segmente.csv \
+  --baselines ./data/baselines.md --as-of {heute} [--days-since-last N]
+#   → EIN Aggregat-JSON: exercises (Sätze/Tonnage/PR-Status/HR/Strain),
+#     tonnage.by_group (+Band-Ampeln), pr.baseline_updates, bedtime, segment_mapping
 ```
-Die `md=`-Master-Markdown wird direkt gelesen (Session-Aggregate); die `segments=`-CSV speist das Übungs-Segment-Mapping (§5).
+Die `md=`-Master-Markdown wird direkt gelesen (Session-Aggregate: TRIMP, CTL/ATL, kcal — Cross-Check); die `segments=`-CSV geht an die Engine (`--segments` akzeptiert AUCH die Master-Sampling-CSV mit Lap-Spalte — Format-Autodetect).
 
 ---
 
@@ -123,18 +127,18 @@ Die `md=`-Master-Markdown wird direkt gelesen (Session-Aggregate); die `segments
 
 ---
 
-## 5. Segmente-Übungs-Mapping-Logik
+## 5. Segmente-Übungs-Mapping-Logik (ENGINE — `segment_mapping` im JSON)
 
 **Standard-Annahme:** Apple Watch erkennt **(Anzahl Übungen + 1) Segmente** auto-detected — das erste Segment ist meist **Aufwärmen/Geräte-Suche** (niedrigste HR, längere Dauer).
 
-**Match-Algorithmus:**
-1. Lese alle Segmente aus `*-segmente.csv`
-2. Zähle Übungen aus dem Text des Athleten
-3. **Wenn `n_segmente == n_uebungen + 1`:** erstes Segment = Aufwärmen, Rest 1:1 Reihenfolge
-4. **Wenn `n_segmente == n_uebungen`:** kein separates Aufwärm-Segment, 1:1 Mapping
-5. **Wenn `n_segmente == n_uebungen + 2`:** ggf. Cool-Down am Ende = letztes Segment ignorieren
-6. **Wenn größere Abweichung:** Best-Effort-Mapping per HR-Profil-Logik (z.B. niedrigste HR-Segmente = Aufwärm/Cool-Down)
-7. **Wenn der Athlet sagt "Laps vergessen":** Skill schätzt Übungs-Dauer per HR-Pattern, gibt Hinweis im Output
+**Match-Algorithmus (in `analyze_gym.py::map_segments` verdrahtet — NICHT im Kopf mappen):**
+1. `n_segmente == n_uebungen + 1` → erstes Segment = Aufwärmen, Rest 1:1 (`mode: warmup+1:1`)
+2. `n_segmente == n_uebungen` → kein separates Aufwärm-Segment, 1:1 (`mode: 1:1`)
+3. `n_segmente == n_uebungen + 2` → Aufwärmen vorn + Cool-Down hinten (`mode: warmup+1:1+cooldown`)
+4. **Größere Abweichung → `mode: unmatched`:** die Engine rät NICHT — HR pro Übung entfällt, der Hinweis aus `segment_mapping.note` kommt 1:1 in den Report (Session-HR bleibt verfügbar).
+5. "Laps vergessen" (Athlet sagt es) → wie `unmatched` behandeln: Hinweis, keine geschätzten Übungs-HRs erfinden.
+
+Das Aufwärm-Segment liefert die **Baseline für den Belastungs-Score** (`strain_hr_over_baseline` = HR-Peak − Warmup-Ø; ohne Warmup: − niedrigster Segment-Ø).
 
 **Validierung (16.04.2026 als Test):**
 - 14 Segmente, 13 Übungen → Segment 1 (5min, HR Ø 98) = Aufwärmen ✅
@@ -142,32 +146,26 @@ Die `md=`-Master-Markdown wird direkt gelesen (Session-Aggregate); die `segments
 
 ---
 
-## 6. PR-Detection (Pflicht aus baselines.md, Drive-Personal-Folder)
+## 6. PR-Detection (ENGINE) + autonomer Write-Back nach baselines.md (SSoT)
 
-**Workflow:**
-1. Ziehe `baselines.md` aus dem Drive-Personal-Folder nach `./data` und lade die aktuellen PR-Werte (Abschnitt Gym PRs, Stand KWxx):
-   ```bash
-   python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match baselines.md --out ./data
-   # → dann ./data/baselines.md lesen
-   ```
-2. Vergleiche pro Übung: höchstes Gewicht der aktuellen Session vs. PR-Wert
-3. PR-Erkennung:
-   - `aktuell > PR` → 🏆 **NEUER PR** → schlage Edit an `./data/live.md` vor
-   - `aktuell == PR` → 🟢 **PB matched** (kein neues Max, aber gleich gut)
-   - `aktuell < PR` → 🟡 Normal (kein PR, kein Drama)
-4. Bei Re-Entry-Sessions (nach Pause): **80 % der PR ist Ziel, nicht 100 %** — sonst PR-Hetzjagd
+**Detection läuft in der Engine** (`--baselines ./data/baselines.md`): pro Übung höchstes Session-Gewicht vs. Baseline →
+- `aktuell > PR` → `pr_status: "🏆 PR"` + Eintrag in `pr.baseline_updates` (old/new/Δkg/Δ%)
+- `aktuell == PR` → `pr_status: "🟢 PB matched"`
+- `aktuell < PR` → `pr_status: "🟡 normal"`
+- kein Baseline-Treffer → `pr_status: "no_baseline"` → letzte Session als Referenz nennen + Baseline-Zeile ergänzen (Hinweis im Report)
+- Re-Entry (`--days-since-last` > 7): **80 % der PR ist das Ziel, nicht 100 %** — `reentry_over_target=true` = Verletzungs-Warnung, kein Lob (§11)
 
-**State-Update bei neuen PRs:**
+**⚡ State-Update bei neuen PRs — AUTONOM + SICHTBAR (Entscheidung #16, Split-Brain-Fix):**
+**`baselines.md` ist die PR-SSoT** — der Write-Back geht DORTHIN; `live.md` wird nur als Spiegel nachgezogen. Keine Rückfrage („Soll ich eintragen?" ist abgeschafft), aber IMMER sichtbar: **der Diff (alt→neu je Übung) steht im Report-PR-Block.**
 ```bash
-# 1) Live-State aus dem Drive-Personal-Folder ziehen (falls noch nicht in ./data)
-python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data
-# 2) ./data/live.md lokal editieren → bestehende Zeile aktualisieren:
-#    "Gym PRs (Stand KWxx, [Datum]): ..., [Übung] [alter PR aus baselines.md]→[neuer Wert] 🏆, ..."
-# 3) Write-Back nach Drive (Datei muss vom User vorab angelegt sein —
-#    der Service-Account kann in My Drive nur updaten, nicht neu anlegen):
+# 1) ./data/baselines.md lokal editieren: im Abschnitt "Gym PRs" je Übung aus
+#    pr.baseline_updates die Zeile aktualisieren ([Übung] [alt]→[neu] kg, Datum)
+# 2) Write-Back nach Drive (Datei ist vor-seeded — update, nie neu anlegen):
+python3 lib/pull_drive.py --upload ./data/baselines.md --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --name baselines.md
+# 3) Spiegel: die "Gym PRs (Stand KWxx)"-Zeile in ./data/live.md nachziehen + uploaden
 python3 lib/pull_drive.py --upload ./data/live.md --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --name live.md
 ```
-Senpai macht das **nach Bestätigung** im Chat ("Soll ich den PR in `live.md` eintragen?"), nicht silent.
+Kein neuer PR (`pr.baseline_updates` leer) → KEIN Write-Back (kein Noise-Upload).
 
 **Was als PR gilt:**
 - Neues Maximalgewicht (1RM-Approximation)
@@ -176,38 +174,32 @@ Senpai macht das **nach Bestätigung** im Chat ("Soll ich den PR in `live.md` ei
 
 ---
 
-## 7. Tonnage-Berechnung
+## 7. Tonnage-Berechnung (ENGINE — `tonnage` im JSON)
 
-**Pro Übung:** `Σ (Gewicht × Wiederholungen) für alle Sätze`
+**Pro Übung:** `Σ (Gewicht × Wiederholungen) für alle Sätze` — rechnet die Engine (`tonnage_kg` je Übung, `tonnage.total_kg`, `tonnage.by_group`).
 
-**Default-Annahmen:**
+**Default-Annahmen (im Parser verdrahtet):**
 - 10 Reps pro Satz wenn nicht anders angegeben
-- Bei Notation "(6x)" → 6 Reps für letzten Satz
+- Bei Notation "(6x)" → 6 Reps für den letzten Satz
 - Bei "4× 105" → 4 Sätze á 10 Reps mit 105 kg
 
-**Klassifikation:**
-- Bein-Tonnage = Σ aller Bein-Übungen
-- Oberkörper-Tonnage = Σ aller OK-Übungen
-- Core-Tonnage = Σ aller Core-Übungen
-- Verteilungs-Bewertung: gesund wenn Bein 50-65%, OK 25-35%, Core 8-15%
+**Verteilungs-Bewertung — EIN Band-Satz (SSoT `lib/constants.py`; die alte 60/30/10-Zeile war nur der Band-Mittelwert):**
+gesund wenn **Beine 50–65 % · Oberkörper 25–35 % · Core 8–15 %** — Ampel je Gruppe kommt aus der Engine (`by_group[*].ampel`: 🟢 im Band, 🟡 außerhalb).
 
 ---
 
 ## 8. Workflow-Sequenz
 
 1. **Daten holen** → Gym-ZIP aus Drive nach `./data` (`lib/pull_drive.py`, siehe §1); fehlt sie → Text-Only-Modus
-2. **Text-Message parsen** → Übungs-Liste mit Gerätenummer + Gewichten
+2. **Übungs-Text des Athleten** in `./data/uebungen.txt` schreiben (oder via stdin `-`)
 3. **ZIP entpacken** (wenn vorhanden) → `scripts/unzip_gym.py` (liefert `md=` + `segments=` Pfade)
-4. **Master-Markdown lesen** → Session-Aggregate
-5. **Segmente-CSV lesen + analysieren** → `scripts/analyze_gym.py` → Auto-erkannte Übungs-Segmente mit HR
-6. **Übungs-Segment-Mapping** via §5
-7. **PR-Detection** via §6 (gegen `./data/baselines.md`, aus Drive-Personal-Folder gezogen)
-8. **Tonnage pro Übung + Muskelgruppe** rechnen
-9. **HR-Profil pro Übung** zuordnen (Min/Max/Ø)
-10. **Belastungs-Score** pro Übung (HR-Peak − Baseline)
-11. **Lauf-Carry-Over-Analyse** generieren (PFLICHT, siehe §10)
-12. **Markdown-Report** nach Template (siehe §9) rendern
-13. **PR-State-Update** anbieten (Edit an `./data/live.md` + Write-Back nach Drive-Personal-Folder, falls neue PRs — siehe §6)
+4. **Master-Markdown lesen** → Session-Aggregate (TRIMP, CTL/ATL, kcal — Cross-Check zur Engine)
+5. **⚙️ DIE ENGINE** (rechnet Schritte 5–10 des alten Workflows in EINEM Aufruf):
+   `python3 .claude/skills/gym-bundle-skill/scripts/analyze_gym.py --exercises ./data/uebungen.txt --segments <segments_csv> --baselines ./data/baselines.md --as-of {heute} [--days-since-last N]`
+   → Übungs-Parsing + Segment-Mapping (§5) + PR-Detection (§6) + Tonnage/Gruppen (§7) + HR-Profil + Belastungs-Score + Bedtime-Ampel (§12), alles als Aggregat-JSON.
+6. **Lauf-Carry-Over-Analyse** generieren (PFLICHT, siehe §10 — der einzige LLM-Analyse-Anteil)
+7. **Markdown-Report** nach Template (§9) rendern — Zahlen/Ampeln 1:1 aus dem Engine-JSON, NIE nachgerechnet
+8. **PR-State-Update ausführen** (autonom + sichtbar, §6): `pr.baseline_updates` → `baselines.md` (SSoT) + `live.md`-Spiegel + Upload; Diff im Report
 
 ---
 
@@ -246,7 +238,7 @@ ASCII-Balken pro Muskelgruppe:
 Beine        ████████████  X% (X kg)
 Oberkörper   █████        X% (X kg)
 Core         ██           X% (X kg)
-Bewertung gegen Standard-Verteilung 60/30/10
+Bewertung gegen die Band-Verteilung 50–65/25–35/8–15 % (§7, Engine-Ampeln)
 
 ### Set-Density / Belastungs-Score
 [Tabelle pro Übung: HR-Peak − Baseline | Coaching-Hinweis]
@@ -331,7 +323,7 @@ Selbst bei einer durchschnittlichen Session sollte Senpai einen Lauf-Bezug ziehe
 - Dritte Re-Entry-Session = 100% PR-Versuch erlaubt
 
 **Senpai-Coaching bei Re-Entry:**
-- 🟢 80% gefahren: "Diszplin, kein Verletzungs-Risiko"
+- 🟢 80% gefahren: "Disziplin, kein Verletzungs-Risiko"
 - 🟠 100% direkt gefahren: "Zu früh — Verletzungs-Warnung, in nächster Session reduzieren"
 - 🔴 >Pre-Pause-PR direkt: "Statistisch unwahrscheinlich nachhaltig — meist GPS-/Mess-Artefakt oder Form-Defizit"
 
@@ -341,13 +333,13 @@ Selbst bei einer durchschnittlichen Session sollte Senpai einen Lauf-Bezug ziehe
 
 **V3-Regel:** Donnerstag-Gym-Ende ≤21:30.
 
-**Erkennung:** Master-Markdown gibt "Endzeit" — Senpai checkt das automatisch.
+**Erkennung:** die Engine liest das Session-Ende aus den Segmenten (`bedtime` im JSON — Ampel + Label fertig gerechnet); Fallback = "Endzeit" aus der Master-Markdown.
 
 **Bewertung:**
 - 🟢 Ende ≤21:30 → "im V3-Slot"
 - 🟡 Ende 21:30-22:00 → "leicht überzogen, Bedtime-Risk"
 - 🟠 Ende 22:00-22:30 → "Bedtime-Risk-Real, Casein-Timing schwierig"
-- 🔴 Ende >22:30 → "V2-Verletzung, HRV-Crash-Risiko, Sleep-Compliance unmöglich"
+- 🔴 Ende >22:30 → "V3-Bruch, HRV-Crash-Risiko, Sleep-Compliance unmöglich"
 
 ---
 
@@ -391,16 +383,8 @@ Selbst bei einer durchschnittlichen Session sollte Senpai einen Lauf-Bezug ziehe
 
 ## 15. Versions-Historie
 
-- **v1.0** (22.05.2026) — Initial Commit nach Live-Test mit Session 16.04.2026.
-- **v1.1** (25.06.2026) — 🦵 walking_asymmetry-Trip-Wire im Lauf-Carry-Over (Dysbalance-Flag >3–5 % sustained, bes. nach Gym-Re-Entry).
-  - Datenfluss: Drive-Pull (`lib/pull_drive.py`) → Text + ZIP (Markdown + Segmente-CSV)
-  - 14-Segment-Auto-Detect → Aufwärm-Logik
-  - PR-Detection via `baselines.md` (Drive-Personal-Folder → `./data`, über `live.md` + Write-Back updateable)
-  - Tonnage-Berechnung pro Muskelgruppe (Beine/Oberkörper/Core)
-  - Lauf-Carry-Over als Pflicht-Block
-  - 80%-Re-Entry-Regel
-  - Bedtime-Compliance-Check
+→ `CHANGELOG.md` (Drive-Personal-Folder, via `pull_drive.py` bei Trigger `Changelog`). Kurzform: v1.0 Initial (22.05.2026) · v1.1 walking_asymmetry-Trip-Wire · **v2.0 Engine-Kontrakt** (deterministische `analyze_gym.py`, PR-Write-Back autonom+sichtbar nach baselines.md, Volumen-Bänder vereinheitlicht).
 
 ---
 
-**Ende der Skill-Definition. Senpai folgt diesem Workflow bei jeder Gym-ZIP aus Drive oder Text-only Gym-Message.**
+**Ende der Skill-Definition v2.0. Engine rechnet, Senpai übersetzt — bei jeder Gym-ZIP aus Drive oder Text-only Gym-Message.**

@@ -210,3 +210,22 @@ def test_viszeralfett_removed_from_schemas():
     assert "{{VISZERAL}}" not in seed_live
     assert "{{VISZERAL_ZIEL}}" not in seed_athlete
     assert "Gewicht/KFA/Viszeralfett" not in CLAUDE_MD
+
+
+# ── §11-Ampel-Bänder: Registry <-> Engine <-> run SKILL.md (PR-4) ───────────
+def test_v3_ampel_bands_registry_matches_engine():
+    assert C.CADENCE_AMPEL == arf.CADENCE_AMPEL
+    assert C.GCT_AMPEL_MS == arf.GCT_AMPEL_MS
+    assert C.VR_AMPEL_PCT == arf.VR_AMPEL_PCT
+    assert C.EF_AMPEL == arf.EF_AMPEL
+    assert C.DECOUPLING_AMPEL_PCT == arf.DECOUPLING_AMPEL_PCT
+    assert C.EASY_HR_YELLOW_MAX == arf.EASY_HR_YELLOW_MAX
+
+
+def test_v3_ampel_bands_in_run_skill_prose():
+    # Kadenz 🟢 ≥175 | 🟡 166-174 | 🟠 160-165 | 🔴 <160
+    assert "🟢 ≥175" in RUN_SKILL and "🔴 <160" in RUN_SKILL
+    # GCT 🟢 <260 … 🔴 >300
+    assert "🟢 <260" in RUN_SKILL and "🔴 >300" in RUN_SKILL
+    # Decoupling 🟢 <5% … 🔴 >10%
+    assert "🟢 <5%" in RUN_SKILL and "🔴 >10%" in RUN_SKILL

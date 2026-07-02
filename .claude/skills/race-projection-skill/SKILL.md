@@ -3,7 +3,7 @@ name: race-projection-skill
 description: "AI Coach Race-Projektions-Engine für den Athleten. PFLICHT laden bei jeder Renn-Planung, Zielzeit-/Cutoff-Frage oder Pace-Strategie für ein konkretes Rennen — auch ohne explizites Stichwort. Trigger: Keywords race/Rennen/HM/Halbmarathon/Marathon/cutoff/Besenwagen/Zielzeit/Firmenlauf/Stadtlauf/10km/Pace-Strategie, der Race-Command, anstehender Renntermin. Liefert: 4-Szenarien-Pace-Projektion (Best/Real/Konservativ/Cutoff), Cutoff-Math, Pace-Band-Visualisierung gegen Zielzeit, Decoupling-Quellen-Hierarchie, Kardio-vs-Neuromuskulär-Diagnose. Nutzt Race_Strategie.md + 21km.gpx (aus der privaten Drive personal-folder gepullt). NICHT für normale Lauf-Analyse (dafür run-bundle-skill)."
 ---
 
-# Race-Projection-Skill v1.0 — Senpai Race-Engine
+# Race-Projection-Skill v1.1 — Senpai Race-Engine (skriptiert)
 
 > Senpai lädt diese Datei bei Race-/Cutoff-/Zielzeit-Fragen oder dem `Race`-Command.
 > **Personal-Module (aus der privaten Drive personal-folder `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` pullen, NICHT mehr aus `modules/`):**
@@ -30,18 +30,43 @@ description: "AI Coach Race-Projektions-Engine für den Athleten. PFLICHT laden 
 
 ---
 
-## 2. 4-Szenarien-Projektion (Pflicht-Format)
+## 2. 4-Szenarien-Projektion (SKRIPTIERT — der EINZIGE Rechenpfad)
 
-Aus aktueller Pace@Z2 / Parkrun-Effort + Distanz + Wetter + Streckenprofil:
+**⛔ Kein Kopfrechnen.** Jede projizierte Zeit/Pace kommt aus den Skripten (Entscheidung #11); der Report übersetzt nur in Persona-Text.
+
+**2a. Kurz-Distanz (≤10 km, Firmenlauf/Stadtlauf/Parkrun-Effort) — `race_readiness`:**
+```bash
+python3 lib/pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU --tab "Trainings" --out ./data/Trainings_v5.csv
+python3 .claude/skills/daily-check-skill/scripts/stats.py race_readiness \
+  --trainings ./data/Trainings_v5.csv --as-of {heute} \
+  --race-event "<Event>" --race-date <YYYY-MM-DD> --race-km <km>   # alles aus ./data/live.md
+```
+→ `projection.best/real/conservative` (Z2-Pace-Basis × Faktor, TSB-Nudge, MM:SS korrekt gerundet). Das 4. Szenario (🔴 Cutoff/Ziel) = Cutoff-Math aus 2b.
+
+**2b. HM/Long-Race — Buffer-Math (`hm_projection`, run-bundle-§7-Formel skriptiert):**
+```bash
+python3 .claude/skills/daily-check-skill/scripts/stats.py hm_projection \
+  --h1-pace <MM:SS> --decoupling <pct> --temp-c <T> --distance-km 21.1 \
+  [--target-time H:MM:SS] [--cutoff-time H:MM:SS] [--sweep-pace MM:SS] \
+  [--scenarios szenarien.json]   # Matrix: [{name,h1_pace,decoupling_pct,temp_c},…]
+```
+→ `H1a = H1 + HitzeTax(3,5 s/km/°C >18°C)` · `H2a = H1a×(1+Dec)` · `Projected = (H1a+H2a)×km/2`, plus **Cutoff-Puffer + Gehpausen-Budget** (`cutoff.walk_budget`: km/Minuten gegen die Sweep-Pace, deterministisch). **Szenarien-Inputs (H1-Paces, Decoupling, Temp) kommen aus `./data/live.md` + `Race_Strategie.md` (Drive) — NIE aus dem Repo.** Decoupling nur aus validen Quellen (§4).
+
+**2c. Pacing-Card (Renntag-Artefakt):**
+```bash
+python3 .claude/skills/run-bundle-skill/scripts/pacing_card.py \
+  --race "<Event>" --distance-km <km> --readiness rr.json [--temp-c <T>]
+```
+→ Even-/Negativ-Split-Tabelle (summiert exakt zur Zielzeit), HF-Phasen-Steuerung, Start-Disziplin, deterministische V3-Hitze-Tax.
+
+**Pflicht-Format im Report** (Zahlen = Skript-Output):
 
 | Szenario | Annahme | Projizierte Zeit | Ø-Pace |
 |---|---|---|---|
-| 🟢 **Best Case** | optimale Bedingungen, voller Effort, kein Wand-Event | … | … |
-| 🔵 **Realistisch** | erwartbare Bedingungen, Trainingspartner-Faktor, 1–2 strategische Gehpausen | … | … |
-| 🟡 **Konservativ** | Hitze/Wind-Penalty, frühe Ermüdung, mehr Gehpausen | … | … |
-| 🔴 **Cutoff/Ziel** | Mindestleistung vs Wertungsgrenze | … | … |
-
-**Cutoff-Math:** Ziel-Zeit ÷ Distanz = erforderliche Ø-Pace. Puffer ausweisen (Sekunden/km Reserve gegen Cutoff). Gehpausen-Budget einrechnen (beim Körpergewicht aus dem Profil strategisch korrekt).
+| 🟢 **Best Case** | `best`-Band bzw. Best-Szenario | … | … |
+| 🔵 **Realistisch** | `real`-Band / Realist-Szenario | … | … |
+| 🟡 **Konservativ** | `conservative` / Heiß+Müde | … | … |
+| 🔴 **Cutoff/Ziel** | Cutoff-Math (2b): Puffer + Gehpausen-Budget | … | … |
 
 ---
 
@@ -79,4 +104,4 @@ Wenn ein Pace-Einbruch/Run-Walk-Eskalation gemeldet wird:
 
 ---
 
-**Ende race-projection-skill v1.0.** 4 Szenarien, Cutoff-Puffer ausweisen, Decoupling nur aus validen Quellen, Wand = neuromuskulär ≠ Kardio.
+**Ende race-projection-skill v1.1.** 4 Szenarien AUS DEN SKRIPTEN (`race_readiness`/`hm_projection`/`pacing_card`), Cutoff-Puffer + Gehpausen-Budget deterministisch, Decoupling nur aus validen Quellen, Wand = neuromuskulär ≠ Kardio.

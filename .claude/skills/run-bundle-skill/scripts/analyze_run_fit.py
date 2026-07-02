@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-analyze_run_fit.py — DIE FIT-Analyse-Engine des run-bundle-skill (v3.12).
+analyze_run_fit.py — DIE FIT-Analyse-Engine des run-bundle-skill (v3.14).
 
 ZWECK
 -----
-Der gebündelte `analyze_run.py` parst NUR HealthFit-CSV und rechnet ROHE
-Mittelwerte (inkl. Gehen) — ihm fehlt der Walking-Filter v3.5. Dieses Script
-ist der echte FIT-Pfad: es liest die Garmin-/HealthFit-`.fit`, wendet den
+Der FIT-Pfad der Lauf-Analyse: liest die Garmin-/HealthFit-`.fit`, wendet den
 Kadenz-primären Walking-Filter v3.5 an und liefert ausschließlich AGGREGATE
 (kompaktes JSON) auf stdout — NIE Roh-Record-Arrays (das würde den ganzen
 Sinn der Pipeline brechen: nur Aggregate + Verdict dürfen in den Modell-Kontext).
+Die Aggregations-Funktionen hier sind die GETEILTE Engine — `analyze_run.py`
+(CSV-Fallback) parst nur anders und ruft dieselben Funktionen auf.
 
 PIPELINE-REGELN (autoritativ, hier hart verdrahtet)
 ---------------------------------------------------
@@ -48,8 +48,19 @@ RUNNING_SPORTS = {"running"}   # sub_sport generic/trail/treadmill etc. sind ok
 # Mini-Rest-Lap des Auto-Splitters).
 HARD_HR_CAP = 159              # > 159 == Z4/Z5 (Schluss-Surge / Beast-KM)
 MIN_HARD_RUN_SAMPLES = 60      # Mindest-Lauf-Samples, damit ein Lap als Surge zählt
-TRAIL_SOFT_GAP = 15            # s ohne Z4/Z5 → Sample-Surge gilt als beendet
-MIN_TRAIL_BLOCK = 30           # Mindest-Länge eines Sample-Schluss-Surges
+# Einheit = SAMPLES (bei 1-Hz-Records ≈ Sekunden; Apple-FITs können unregelmäßig
+# samplen — die Schwellen sind bewusst Sample-basiert, nicht Zeit-basiert).
+TRAIL_SOFT_GAP_N = 15          # Samples ohne Z4/Z5 → Sample-Surge gilt als beendet
+MIN_TRAIL_BLOCK_N = 30         # Mindest-Sample-Länge eines Schluss-Surges
+
+# §11-Ampel-Bänder (SSoT: lib/constants.py + run-bundle-skill §11 — Werte werden
+# von tests/test_threshold_consistency.py gegen die Registry gepinnt).
+CADENCE_AMPEL = (175, 166, 160)     # 🟢 ≥175 · 🟡 166–174 · 🟠 160–165 · 🔴 <160
+GCT_AMPEL_MS = (260, 280, 300)      # 🟢 <260 · 🟡 260–280 · 🟠 280–300 · 🔴 >300
+VR_AMPEL_PCT = (8.0, 10.0, 12.0)    # 🟢 <8 · 🟡 8–10 · 🟠 10–12 · 🔴 >12
+EF_AMPEL = (1.75, 1.55, 1.40)       # 🟢🟢 >1,75 · 🟢 1,55–1,75 · 🟠 1,40–1,55 · 🔴 <1,40
+DECOUPLING_AMPEL_PCT = (5.0, 7.0, 10.0)  # 🟢 <5 · 🟡 5–7 · 🟠 7–10 · 🔴 >10
+EASY_HR_YELLOW_MAX = 155            # Easy: 🟢 Ø≤147 · 🟡 148–155 · 🔴 >155
 
 
 # ── kleine Helfer ───────────────────────────────────────────────────────────
@@ -149,9 +160,13 @@ def extract_records(fit):
     for msg in fit.get_messages("record"):
         d = _msg_dict(msg)
 
-        cad = _num(d.get("cadence")) or 0.0
+        # Kadenz-ABSENZ ≠ 0 spm: fehlt das cadence-Feld ganz (Sensor-Dropout /
+        # Gerät ohne Kadenz), wäre „0 spm" eine Walking-Fehlklassifikation
+        # (NEVER-Regel: Gehen NIE aus Signal-Absenz ableiten, §4). spm bleibt
+        # dann None und der Gangart-Filter fällt auf Speed-only zurück.
+        cad = _num(d.get("cadence"))
         frac = _num(d.get("fractional_cadence")) or 0.0
-        spm = (cad + frac) * 2.0
+        spm = (cad + frac) * 2.0 if cad is not None else None
 
         if "enhanced_speed" in d:
             have_enhanced_speed = True
@@ -172,9 +187,14 @@ def extract_records(fit):
         else:
             last_temp = temp
 
-        # Walking-Filter v3.5 (Kadenz-primär, Speed-Bestätigung)
-        is_stand = (spm == 0) and (spd < STAND_SPD)
-        is_walk = (spm < WALK_CAD) and (spd < WALK_SPD) and not is_stand
+        # Walking-Filter v3.5 (Kadenz-primär, Speed-Bestätigung).
+        # Ohne Kadenz-Signal (spm is None): Speed-only-Fallback statt 0-spm-Lüge.
+        if spm is None:
+            is_stand = spd < STAND_SPD
+            is_walk = (spd < WALK_SPD) and not is_stand
+        else:
+            is_stand = (spm == 0) and (spd < STAND_SPD)
+            is_walk = (spm < WALK_CAD) and (spd < WALK_SPD) and not is_stand
         is_run = not is_walk and not is_stand
 
         recs.append({
@@ -447,6 +467,24 @@ def run_form(recs, session):
 
 
 # ── Bestwerte mit KM-Position ───────────────────────────────────────────────
+def _smoothed_top_speed(recs):
+    """Top-Speed GPS-Spike-geschützt: Maximum des 3-Sample-MEDIANS statt des
+    Einzel-Sample-Maximums (ein einzelner GPS-Glitch kann sonst eine absurde
+    2:xx-Pace als „Bestwert" produzieren). Nur running-Samples als Zentrum."""
+    spds = [r["spd"] for r in recs]
+    best, best_rec = None, None
+    for i, r in enumerate(recs):
+        if not r["run"] or not r["spd"]:
+            continue
+        window = [s for s in spds[max(0, i - 1):i + 2] if s]
+        if len(window) < 2:      # Rand-Sample ohne Nachbarn → kein Spike-Schutz möglich
+            continue
+        m = _median(window)
+        if m and (best is None or m > best):
+            best, best_rec = m, r
+    return best, best_rec
+
+
 def best_values(recs):
     def km(r):
         return _r(r["dist"] / 1000.0, 2) if r["dist"] is not None else None
@@ -460,7 +498,7 @@ def best_values(recs):
             else min(cand, key=lambda x: x[key])
         return r
 
-    top_spd = pick("spd")
+    top_spd_v, top_spd_rec = _smoothed_top_speed(recs)
     max_hr = pick("hr")
     max_pw = pick("power")
     max_cad = pick("spm", predicate=lambda r: r["run"])
@@ -468,9 +506,10 @@ def best_values(recs):
     min_gct = pick("gct", want_max=False, predicate=lambda r: r["run"] and r["gct"] > 0)
 
     out = {}
-    if top_spd:
-        out["top_speed"] = {"pace": _pace_str(_pace_from_speed(top_spd["spd"])),
-                            "km": km(top_spd)}
+    if top_spd_rec:
+        out["top_speed"] = {"pace": _pace_str(_pace_from_speed(top_spd_v)),
+                            "km": km(top_spd_rec),
+                            "method": "3-Sample-Median, running-only (GPS-Spike-Schutz)"}
     if max_hr:
         out["max_hr"] = {"bpm": _r(max_hr["hr"], 0), "km": km(max_hr)}
     if max_pw:
@@ -539,6 +578,7 @@ def _drop_trailing_hard_block(run):
     Z4/Z5-Block (Beast-Finish) abschneiden, damit der Easy-Pace nicht durch
     einen harten Schluss-KM korrumpiert wird. Gibt (getrimmte_run_records,
     block_len) zurück; block_len==0 ⇒ kein Surge erkannt.
+    Zähl-Einheit = SAMPLES (siehe TRAIL_SOFT_GAP_N — bei 1-Hz-Records ≈ s).
     """
     n = len(run)
     cut = n
@@ -552,11 +592,11 @@ def _drop_trailing_hard_block(run):
             soft = 0
         else:
             soft += 1
-            if soft >= TRAIL_SOFT_GAP:
+            if soft >= TRAIL_SOFT_GAP_N:
                 break
         i -= 1
     block_len = n - cut
-    if 0 < cut < n and block_len >= MIN_TRAIL_BLOCK:
+    if 0 < cut < n and block_len >= MIN_TRAIL_BLOCK_N:
         return run[:cut], block_len
     return run, 0
 
@@ -652,10 +692,18 @@ def pace_at_z2(seg_run, session, recs=None, label=None,
 
     spd = _mean([r["spd"] for r in z2])
     raw_s = _pace_from_speed(spd)
-    start_temp = _num(session.get("avg_temperature"))
-    if start_temp is None and recs:
+    # START-Temp = erste echte Temperatur-Lesung der Records (das Label sagt
+    # „Starttemp", also muss es auch die sein) — session.avg_temperature ist der
+    # LAUF-DURCHSCHNITT und nur der klar gelabelte Fallback (Audit-CONFIRMED:
+    # vorher lief die Hitze-Norm auf avg unter dem Label „start_temp_c").
+    start_temp, temp_source = None, None
+    if recs:
         temps = [r["temp"] for r in recs if r["temp"] is not None]
-        start_temp = temps[0] if temps else None
+        if temps:
+            start_temp, temp_source = temps[0], "records_start"
+    if start_temp is None:
+        start_temp = _num(session.get("avg_temperature"))
+        temp_source = "session_avg" if start_temp is not None else None
     norm_s = raw_s
     heat_tax = None
     if raw_s is not None and start_temp is not None:
@@ -680,6 +728,7 @@ def pace_at_z2(seg_run, session, recs=None, label=None,
         "pace_normalized_18c_s": _r(norm_s, 1),
         "pace_normalized_18c": _pace_str(norm_s),
         "start_temp_c": _r(start_temp, 1),
+        "temp_source": temp_source,
         "heat_tax_s_per_km": _r(heat_tax, 1),
         "hr_cap": HR_Z2_CAP,
         "n_samples": len(z2),
@@ -687,6 +736,92 @@ def pace_at_z2(seg_run, session, recs=None, label=None,
         "ineligible_reasons": reasons or None,
         "note": "Baseline = state/live.md; neue Baseline nur bei Z2 sauber, <=22C, Gehen<=5%, Decoupling<8%",
     }
+
+
+# ── §11-Ampeln + EF (engine-seitig — der Report ÜBERSETZT nur noch) ─────────
+def _band_desc(v, hi, mid, lo, colors=("🟢", "🟡", "🟠", "🔴")):
+    """Absteigende Schwellen (größer = besser): v≥hi → colors[0] … v<lo → colors[3]."""
+    if v is None:
+        return None
+    if v >= hi:
+        return colors[0]
+    if v >= mid:
+        return colors[1]
+    if v >= lo:
+        return colors[2]
+    return colors[3]
+
+
+def _band_asc(v, lo, mid, hi, colors=("🟢", "🟡", "🟠", "🔴")):
+    """Aufsteigende Schwellen (kleiner = besser): v<lo → colors[0] … v>hi → colors[3]."""
+    if v is None:
+        return None
+    if v < lo:
+        return colors[0]
+    if v <= mid:
+        return colors[1]
+    if v <= hi:
+        return colors[2]
+    return colors[3]
+
+
+def v3_ampeln(summary, form, dec, seg_run, race_effort):
+    """§11-Ampel-Urteile deterministisch aus der Engine — {value, ampel[, note]}
+    pro Metrik. Der LLM-Report übersetzt die Ampeln in Persona-Text, er rechnet
+    sie NICht nach (Verdict-Kontrakt, Entscheidung #2)."""
+    out = {}
+
+    cad = form.get("cadence_spm")
+    c_hi, c_mid, c_lo = CADENCE_AMPEL
+    out["cadence"] = {"value": cad, "ampel": _band_desc(cad, c_hi, c_mid, c_lo)}
+
+    gct = form.get("gct_median_ms")
+    g_lo, g_mid, g_hi = GCT_AMPEL_MS
+    out["gct"] = {"value": gct, "ampel": _band_asc(gct, g_lo, g_mid, g_hi)}
+
+    vr = form.get("vr_pct_record_weighted")
+    v_lo, v_mid, v_hi = VR_AMPEL_PCT
+    out["vertical_ratio"] = {"value": vr, "ampel": _band_asc(vr, v_lo, v_mid, v_hi)}
+
+    # EF (Aerobe Effizienz) = Speed [m/min] / HR über das Steady-Z2-Segment.
+    ef_run = [r for r in seg_run if r["hr"] and r["spd"]]
+    ef = None
+    if ef_run:
+        s = _mean([r["spd"] for r in ef_run])
+        h = _mean([r["hr"] for r in ef_run])
+        ef = (s * 60.0 / h) if (s and h) else None
+    e_hi, e_mid, e_lo = EF_AMPEL
+    out["ef"] = {"value": _r(ef, 3),
+                 "ampel": _band_desc(ef, e_hi, e_mid, e_lo, ("🟢🟢", "🟢", "🟠", "🔴")),
+                 "basis": "Speed[m/min]/HR, steady Z2-Segment running-only"}
+
+    # Decoupling-Ampel — nur methodisch valide bei Steady-State ≥45 min (§7/§11).
+    d_val = dec.get("decoupling_pct")
+    d_lo, d_mid, d_hi = DECOUPLING_AMPEL_PCT
+    dur = summary.get("duration_s") or 0
+    steady_ok = (not race_effort) and dur >= 45 * 60
+    d_amp = _band_asc(d_val, d_lo, d_mid, d_hi)
+    out["decoupling"] = {
+        "value": d_val,
+        "ampel": (d_amp if steady_ok else ("🟡" if d_val is not None else None)),
+        "valid_steady_state": steady_ok,
+        "note": None if steady_ok else "methodisch nicht aussagekräftig (kein Steady-State ≥45 min @ Z2)",
+    }
+
+    # Easy/Long-HR-Compliance (V3-HR-Cap-Logik) — bei Race N/A (Z3/Z4 ist der Plan).
+    hr_avg = summary.get("hr_avg")
+    if race_effort:
+        out["easy_hr_compliance"] = {"value": hr_avg, "ampel": None,
+                                     "note": "Race-Effort — HR-Cap-Ampel N/A (§8b)"}
+    else:
+        amp = None
+        if hr_avg is not None:
+            amp = "🟢" if hr_avg <= HR_Z2_CAP else ("🟡" if hr_avg <= EASY_HR_YELLOW_MAX else "🔴")
+        out["easy_hr_compliance"] = {
+            "value": hr_avg, "ampel": amp,
+            "note": "Schnitt ≠ Decke: Z3-Zeitanteil (hr_zones) immer mit ausweisen (§11)",
+        }
+    return out
 
 
 # ── Topografie (100m-Primär + 50m-Fein an Steil-Zonen) ──────────────────────
@@ -885,8 +1020,38 @@ def analyze(fit_path, as_of):
     run_date = (summary.get("start_time_utc") or "")[:10] or (as_of or "")
     pre_v3 = bool(run_date) and run_date < "2026-05-27"
 
+    # Kadenz-Absenz-Transparenz: bei Speed-only-Fallback (spm=None) das im Meta
+    # ausweisen — Gehanteil ist dann weniger belastbar (§4).
+    n_no_cad = sum(1 for r in recs if r["spm"] is None)
+    walking_filter = "v3.5 (cad<140 & spd<2.0; stand=cad0&spd<0.5 separat)"
+    if n_no_cad:
+        walking_filter += (f"; ⚠️ {n_no_cad}/{len(recs)} Samples ohne Kadenz → "
+                           f"Speed-only-Fallback (Gehanteil weniger belastbar)")
+
+    splits = km_splits(recs)
+    form = run_form(recs, session)
+    best = best_values(recs)
+
+    # 7. Bestwert: schnellster KM aus den running-only-KM-Splits. Den partiellen
+    # Schluss-Bucket ausschließen, wenn er <0,8 km trägt (Mini-Rest ≠ Bestwert).
+    eligible = list(splits)
+    dist_km = summary.get("distance_km")
+    if eligible and dist_km and (dist_km - int(dist_km)) < 0.8 and len(eligible) > 1 \
+            and eligible[-1]["km"] > int(dist_km):
+        eligible = eligible[:-1]
+    fk = min((s for s in eligible if s.get("pace_run_s")),
+             key=lambda s: s["pace_run_s"], default=None)
+    if fk:
+        best["fastest_km"] = {"km": fk["km"], "pace": fk["pace_run"],
+                              "hr_avg": fk["hr_avg"],
+                              "basis": "running-only KM-Split (partieller Schluss-KM <0,8 km ausgeschlossen)"}
+
+    race_effort = bool(pz2.get("race_effort"))
+    ampeln = v3_ampeln(summary, form, dec, seg_run, race_effort)
+
     return {
         "ok": True,
+        "schema_version": "3.14",
         "meta": {
             "fit_path": fit_path,
             "as_of": as_of,
@@ -897,27 +1062,28 @@ def analyze(fit_path, as_of):
             "workout_name": workout_name,
             "apple_watch_fit": apple_watch_fit,
             "record_count": len(recs),
-            "walking_filter": "v3.5 (cad<140 & spd<2.0; stand=cad0&spd<0.5 separat)",
+            "walking_filter": walking_filter,
             "parser": "fitparse",
-            "skill": "run-bundle-skill v3.13",
+            "skill": "run-bundle-skill v3.14",
         },
         "summary": summary,
-        "splits_km": km_splits(recs),
+        "splits_km": splits,
         "splits_lap": lap_splits(fit, recs),
         "hr_zones": hrz,
         "hr_source_warn": hr_source_warn(recs),
-        "run_form": run_form(recs, session),
-        "best_values": best_values(recs),
+        "run_form": form,
+        "best_values": best,
         "sprint_last_60s": last_60s_sprint(recs, run_avg_pace_s),
         "decoupling": dec,
         "pace_at_z2": pz2,
+        "v3_ampeln": ampeln,
         "topography": topography(recs),
     }
 
 
 def main():
     ap = argparse.ArgumentParser(
-        description="FIT-Lauf-Analyse (run-bundle-skill v3.12) — Aggregate-JSON auf stdout.")
+        description="FIT-Lauf-Analyse (run-bundle-skill v3.14) — Aggregate-JSON auf stdout.")
     ap.add_argument("fit_path", help="Pfad zur .fit-Datei")
     ap.add_argument("--as-of", required=True, metavar="YYYY-MM-DD",
                     help="Bezugsdatum (heute), z.B. 2026-06-28")

@@ -137,3 +137,61 @@ def test_banister_fit_is_advisory_and_well_formed():
     assert isinstance(res["recommended_tc"], list) and len(res["recommended_tc"]) == 2
     # The deterministic default must always remain reported for comparison.
     assert res["default_tc"] == [42, 7]
+
+
+# ---------------------------------------------------------------------------
+# hm_projection — Buffer-Math (run-bundle §7) skriptiert (PR-4)
+# ---------------------------------------------------------------------------
+def test_project_hm_formula_pinned():
+    # H1 8:00 (480 s), Dec 6 %, 22 °C -> Tax 14 s -> H1a 494, H2a 523.64,
+    # avg 508.82, HM 21.1 km -> 10736 s = 2:58:56.
+    res = stats.project_hm(480.0, 6.0, temp_c=22.0, distance_km=21.1)
+    assert res["heat_tax_s_per_km"] == 14.0
+    assert res["h1_actual_pace"] == "8:14/km"
+    assert res["projected_s"] == 10736
+    assert res["projected"] == "2:58:56"
+
+
+def test_project_hm_no_temp_means_no_tax():
+    res = stats.project_hm(480.0, 0.0, temp_c=None, distance_km=21.1)
+    assert res["heat_tax_s_per_km"] == 0.0
+    assert res["projected_s"] == 480 * 21.1
+
+
+def test_project_hm_cutoff_walk_budget():
+    # Projektion klar unter Cutoff -> positiver Puffer + endliches Gehbudget.
+    res = stats.project_hm(480.0, 6.0, temp_c=None, distance_km=21.1,
+                           cutoff_time_s=3 * 3600 + 31 * 60, sweep_pace_s=600)
+    cut = res["cutoff"]
+    assert cut["buffer_s"] > 0
+    wb = cut["walk_budget"]
+    assert 0 < wb["km"] <= 21.1                      # nie mehr als das Rennen
+    assert wb["minutes_at_sweep"] > 0
+
+
+def test_project_hm_over_cutoff_zero_budget():
+    res = stats.project_hm(600.0, 10.0, temp_c=30.0, distance_km=21.1,
+                           cutoff_time_s=2 * 3600, sweep_pace_s=600)
+    assert res["cutoff"]["buffer_s"] < 0
+    assert res["cutoff"]["walk_budget"]["km"] == 0.0
+
+
+def test_hm_projection_cli_scenarios(tmp_path):
+    import json as _json
+    import subprocess
+    import sys as _sys
+    sc = tmp_path / "sc.json"
+    sc.write_text(_json.dumps([
+        {"name": "Best", "h1_pace": "7:45", "decoupling_pct": 5, "temp_c": 15},
+        {"name": "Realist", "h1_pace": "8:10", "decoupling_pct": 7, "temp_c": 22},
+    ]), encoding="utf-8")
+    from pathlib import Path
+    script = str(Path(__file__).resolve().parents[1] / ".claude" / "skills"
+                 / "daily-check-skill" / "scripts" / "stats.py")
+    out = subprocess.run([_sys.executable, script, "hm_projection",
+                          "--h1-pace", "8:00", "--scenarios", str(sc)],
+                         capture_output=True, text=True, check=True)
+    res = _json.loads(out.stdout)
+    assert len(res["scenarios"]) == 2
+    assert res["scenarios"][0]["name"] == "Best"
+    assert res["scenarios"][1]["heat_tax_s_per_km"] == 14.0

@@ -153,6 +153,37 @@ def banister(daily_trimp, as_of=None):
     }
 
 
+def step(prev_ctl, prev_atl, trimp_today):
+    """EIN EWMA-Schritt: gestriger CTL/ATL + heutiger TRIMP → neuer CTL/ATL/TSB.
+    Identische Konstanten wie `banister()` — ein Schritt der gleichen Reihe."""
+    c = float(prev_ctl) + (float(trimp_today or 0.0) - float(prev_ctl)) * CTL_LAMBDA
+    a = float(prev_atl) + (float(trimp_today or 0.0) - float(prev_atl)) * ATL_LAMBDA
+    return {"ctl": round(c, 1), "atl": round(a, 1), "tsb": round(c - a, 1)}
+
+
+def compute_incremental(prev_ctl, prev_atl, prev_date, prev_day_trimp, as_of):
+    """Inkrementeller TSB-Pfad (Snapshot-Beschleuniger, KEIN Ersatz):
+    nimmt die letzte persistierte Zeile (Form FÜR `prev_date`, d. h. Stand nach
+    `prev_date`-1) und macht EINEN Schritt mit dem TRIMP von `prev_date` → Form für
+    `as_of`. NUR gültig, wenn `prev_date` EXAKT `as_of`-1 ist (lückenlos) und CTL/ATL
+    vorhanden sind. Sonst → None ⇒ Caller MUSS auf `compute_from_sheet` (Vollrechnung)
+    zurückfallen (Escape-Hatch bei Lücke/fehlendem Snapshot/Anomalie/Deep-Dive)."""
+    pd = _parse_date(prev_date)
+    ao = _parse_date(as_of)
+    if pd is None or ao is None or prev_ctl is None or prev_atl is None:
+        return None
+    if pd != ao - timedelta(days=1):
+        return None  # Lücke (>1 Tag) oder falsche Reihenfolge → Fallback
+    pc = _to_float(prev_ctl)
+    pa = _to_float(prev_atl)
+    if pc is None or pa is None:
+        return None
+    res = step(pc, pa, prev_day_trimp)
+    res.update({"as_of": ao.isoformat(), "mode": "incremental", "prev_date": pd.isoformat(),
+                "prev_day_trimp": round(float(prev_day_trimp or 0.0), 1)})
+    return res
+
+
 def compute_from_sheet(raw_sheet_text, as_of=None):
     """Komplettpfad: dedup → extract → banister. Liefert Banister-Ergebnis + Reports."""
     from dedup_trainings import dedup
@@ -163,6 +194,21 @@ def compute_from_sheet(raw_sheet_text, as_of=None):
         res["dedup_report"] = dedup_report
         res["extract_report"] = extract_report
     return res
+
+
+def day_trimp(raw_sheet_text, day):
+    """DER deterministische Zubringer für den inkrementellen Pfad (SKILL Step 9):
+    Tages-TRIMP für `day` aus dem Roh-Sheet — IMMER über dedup → extract (dieselbe
+    Kette wie die Vollrechnung; Audit-CONFIRMED: eine unspezifizierte gestern_TRIMP-
+    Quelle ohne Dedup-Pflicht macht compute_incremental nicht-reproduzierbar).
+    Ruhetag/kein Eintrag → 0.0 (Zerofill-Konvention der EWMA-Reihe)."""
+    from dedup_trainings import dedup
+    clean, dedup_report = dedup(raw_sheet_text)
+    daily, _ = extract_daily_trimp(clean, dedup_report.get("header"))
+    d = _parse_date(day) if isinstance(day, str) else day
+    if d is None:
+        return 0.0
+    return round(float(daily.get(d, 0.0)), 1)
 
 
 def tsb_ampel(tsb):

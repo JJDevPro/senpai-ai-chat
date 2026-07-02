@@ -341,3 +341,103 @@ def test_hr_source_warn_recording_gap_breaks_stretch():
     assert w["locked_fraction_pct"] < 50.0
     assert w["longest_locked_stretch_s"] < arf.LOCK_MIN_SUSTAIN_S    # ~68 s, NICHT ~137 s
     assert w["optical_cadence_lock_suspected"] is False
+
+
+# ---------------------------------------------- v3.14: Kadenz-Absenz != 0 spm
+def test_cadence_absence_is_not_walking():
+    """Fehlt das cadence-Feld GANZ (Sensor-Dropout/Geraet ohne Kadenz), darf ein
+    langsames Sample NICHT als Gehen (0 spm) fehlklassifiziert werden — Fallback
+    ist Speed-only (NEVER-Regel: Gehen nie aus Signal-Absenz ableiten)."""
+    fit = _FakeFit([
+        # kein cadence-Feld, 2.2 m/s (>2.0) -> run trotz "fehlender" Kadenz
+        {"timestamp": _T0, "heart_rate": 140, "speed": 2.2, "distance": 0.0},
+        # kein cadence-Feld, 1.0 m/s (<2.0) -> walk via Speed-only-Fallback
+        {"timestamp": _T0, "heart_rate": 120, "speed": 1.0, "distance": 10.0},
+        # kein cadence-Feld, 0.2 m/s -> stand
+        {"timestamp": _T0, "heart_rate": 100, "speed": 0.2, "distance": 12.0},
+    ])
+    recs, _ = arf.extract_records(fit)
+    assert recs[0]["spm"] is None and recs[0]["run"] is True
+    assert recs[1]["spm"] is None and recs[1]["walk"] is True
+    assert recs[2]["spm"] is None and recs[2]["stand"] is True
+
+
+def test_cadence_zero_with_standstill_still_stand():
+    """Explizite cadence=0 + Quasi-Stillstand bleibt 'stand' (Verhalten unveraendert)."""
+    fit = _FakeFit([{"timestamp": _T0, "cadence": 0, "speed": 0.1, "distance": 0.0}])
+    recs, _ = arf.extract_records(fit)
+    assert recs[0]["spm"] == 0.0 and recs[0]["stand"] is True
+
+
+# ---------------------------------------------- v3.14: Top-Speed-Spike-Schutz
+def _full_rec(sec, hr, spd, dist):
+    """Record mit ALLEN Keys, die best_values() direkt indiziert."""
+    r = _mkrec(sec, hr, spd)
+    r.update({"dist": dist, "power": None, "gct": None, "vo": None,
+              "stride": None, "vr": None, "alt": None})
+    return r
+
+
+def test_top_speed_ignores_single_gps_spike():
+    base = [_full_rec(i, 150, 3.0, i * 3.0) for i in range(10)]
+    base[5]["spd"] = 9.0                      # einzelner GPS-Spike (2:05/km — absurd)
+    best = arf.best_values(base)
+    # 3-Sample-Median um den Spike = 3.0 -> Top-Speed bleibt ~3.0 m/s (5:33/km)
+    assert best["top_speed"]["pace"] == "5:33/km"
+    assert "Spike" in best["top_speed"]["method"]
+
+
+def test_fastest_km_and_smoothed_top_speed_consistent():
+    """Ein realer schneller Block (mehrere Samples) MUSS als Top-Speed durchkommen."""
+    base = [_full_rec(i, 150, 3.0, i * 3.0) for i in range(10)]
+    for r in base[4:7]:
+        r["spd"] = 4.0                        # 3 zusammenhaengende schnelle Samples
+    best = arf.best_values(base)
+    assert best["top_speed"]["pace"] == "4:10/km"   # 4.0 m/s ueberlebt den Median
+
+
+# ---------------------------------------------- v3.14: Start- vs. Avg-Temp
+def test_pace_at_z2_prefers_records_start_temp():
+    seg = [_mkrec(i, 140, 3.0) for i in range(20)]
+    recs = [_mkrec(0, 140, 3.0, temp=24.0), _mkrec(1, 140, 3.0, temp=30.0)]
+    res = arf.pace_at_z2(seg, {"avg_temperature": 27.0}, recs=recs,
+                         decoupling_pct=3.0, walk_pct=0.0, z4z5_pct=0.0)
+    assert res["start_temp_c"] == 24.0            # erste Records-Lesung, nicht 27-avg
+    assert res["temp_source"] == "records_start"
+    assert res["heat_tax_s_per_km"] == 21.0       # (24-18)*3.5
+
+
+def test_pace_at_z2_falls_back_to_session_avg_labeled():
+    seg = [_mkrec(i, 140, 3.0) for i in range(20)]
+    res = arf.pace_at_z2(seg, {"avg_temperature": 20.0}, recs=[],
+                         decoupling_pct=3.0, walk_pct=0.0, z4z5_pct=0.0)
+    assert res["start_temp_c"] == 20.0
+    assert res["temp_source"] == "session_avg"
+
+
+# ---------------------------------------------- v3.14: §11-Ampeln engine-seitig
+def test_v3_ampeln_bands():
+    seg = [_mkrec(i, 140, 2.8) for i in range(120)]   # EF = 2.8*60/140 = 1.2 -> 🔴
+    summary = {"hr_avg": 145, "duration_s": 60 * 60}
+    form = {"cadence_spm": 168.0, "gct_median_ms": 285.0, "vr_pct_record_weighted": 9.5}
+    dec = {"decoupling_pct": 6.0}
+    amp = arf.v3_ampeln(summary, form, dec, seg, race_effort=False)
+    assert amp["cadence"]["ampel"] == "🟡"            # 166-174
+    assert amp["gct"]["ampel"] == "🟠"                # 280-300
+    assert amp["vertical_ratio"]["ampel"] == "🟡"     # 8-10
+    assert amp["ef"]["ampel"] == "🔴"                 # <1.40
+    assert amp["decoupling"]["ampel"] == "🟡"         # 5-7, steady ok (60 min)
+    assert amp["decoupling"]["valid_steady_state"] is True
+    assert amp["easy_hr_compliance"]["ampel"] == "🟢"  # Ø 145 <= 147
+
+
+def test_v3_ampeln_race_and_short_run_disclaimers():
+    seg = [_mkrec(i, 150, 3.2) for i in range(60)]
+    summary = {"hr_avg": 165, "duration_s": 25 * 60}   # 25 min -> kein Steady-State
+    form = {"cadence_spm": 176.0, "gct_median_ms": 250.0, "vr_pct_record_weighted": 7.0}
+    dec = {"decoupling_pct": 12.0}
+    amp = arf.v3_ampeln(summary, form, dec, seg, race_effort=True)
+    assert amp["decoupling"]["ampel"] == "🟡"          # Disclaimer statt 🔴
+    assert amp["decoupling"]["valid_steady_state"] is False
+    assert amp["easy_hr_compliance"]["ampel"] is None  # Race: HR-Cap N/A
+    assert amp["cadence"]["ampel"] == "🟢" and amp["gct"]["ampel"] == "🟢"

@@ -65,6 +65,14 @@ VO_Z2_RANGE_MM = (85, 92)
 VR_TARGET_PCT = 11.0      # aktives Ziel: <11 %
 VR_WARN_PCT = 12.0        # >12 % = Bouncing-Warnsignal
 
+# ── §11-Ampel-Bänder Lauf-Report (run-bundle §11; Engine analyze_run_fit) ────
+CADENCE_AMPEL = (175, 166, 160)     # 🟢 ≥175 · 🟡 166–174 · 🟠 160–165 · 🔴 <160
+GCT_AMPEL_MS = (260, 280, 300)      # 🟢 <260 · 🟡 260–280 · 🟠 280–300 · 🔴 >300
+VR_AMPEL_PCT = (8.0, 10.0, 12.0)    # 🟢 <8 · 🟡 8–10 · 🟠 10–12 · 🔴 >12
+EF_AMPEL = (1.75, 1.55, 1.40)       # 🟢🟢 >1,75 · 🟢 1,55–1,75 · 🟠 1,40–1,55 · 🔴 <1,40
+DECOUPLING_AMPEL_PCT = (5.0, 7.0, 10.0)  # 🟢 <5 · 🟡 5–7 · 🟠 7–10 · 🔴 >10
+EASY_HR_YELLOW_MAX = 155            # Easy: 🟢 Ø≤147 (HR_Z2_CAP) · 🟡 148–155 · 🔴 >155
+
 # ── Bedtime (zweistufig, Entscheidung 2026-07-02) ────────────────────────────
 # 🟢 ≤00:00 (zaehlt voll) · 🟡 00:00–00:30 (zaehlt halb) · ❌ >00:30
 BEDTIME_FULL_CUTOFF_MIN = 0     # Minuten nach Mitternacht

@@ -39,17 +39,23 @@ Persona/Ton. Acht PR-Etappen:
   baseline_updates, Tonnage-Bänder 50–65/25–35/8–15, Belastungs-Score,
   Bedtime-Ampel, Re-Entry-80 %); PR-Write-Back autonom + sichtbar nach
   baselines.md (SSoT), live.md nur Spiegel.
-- **PR-6 · State-Layer & Drive:** live.md Schema v2 (Kontrakt-Sektionen für
+- **PR-6 · State-Layer & Drive (#29):** live.md Schema v2 (Kontrakt-Sektionen für
   bootstrap/make_ics/session_menu, Race-Countdown = Renn-Kalender-SSoT);
   Payload v2.0 mit PATCH-Semantik statt Voll-Ersatz + skriptiertem KW-Rollup
   (`weekly_rollup.py`: 4 Makro-Ampeln × 7 Tage, Bedtime zweistufig, HRV-/
   Schlaf-Ø, Δ vs Vor-KW); sync-skill Renn-Kalender-Fix; senpai-journal.md
   registriert + Append-Pflicht; CHANGELOG ins Repo; Drive-Write-Backs +
   Putz-Liste als Session-Aktionen.
-- **PR-7 · Privacy strikt + Golden-Tests:** (geplant) Personendaten-Sweep,
-  gehashte Denylist, Golden-/Snapshot-Tests als Kern der Garantie.
-- **PR-8 · CLAUDE.md v10:** (geplant) Hot-Core-Diät, Betriebsmodus Opus 4.8 +
-  ultracode, Verdict-Kontrakt dokumentiert.
+- **PR-7 · Privacy strikt + Golden-Tests (#30):** Identitäts-Tokens nur noch
+  als gesaltete SHA-256-Hashes (tests/denylist.py), Scanner über tests/ +
+  Dateinamen + Koordinaten-Muster; Heim-Strecke/Partner-Layer/Beispielwerte →
+  athlete.md-Pointer. Golden-Tests: FIT-Engine-Vollreport (assemble()-Refactor
+  + Fake-Fit), Daily-Kette, Gym-Engine, Banister-Multi-Step-Drift; Suite ohne
+  Skips.
+- **PR-8 · CLAUDE.md v10.0.0:** Verdict-Kontrakt dokumentiert (Skripte rechnen,
+  LLM spricht), Betriebsmodus präzisiert (Opus 4.8 + ultracode; Workflow erbt
+  Session-Modell, nie Haiku), Pace@Z2-Quick-Command liest live.md-Engine-Wert,
+  Anrede-Platzhalter-Lock, Schwellen-SSoT-Pointer in §5.
 
 ## v9.0.x — SSoT-Edition (Port aus claude.ai)
 

@@ -8,6 +8,7 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 > Senpai lädt diese Datei bei `Sync`, KW-Start, nach Payload-Integration oder bei Driftverdacht.
 > **Zweck:** Senpai auf Live-State + V3 ausrichten. Kurz und bestätigend — KEIN voller Daily Check.
 
+<!-- cc-only:start -->
 > **Daten-Anker:** Dieser Skill liest KEINE Drive-Rohdaten. Er re-ankert aus den
 > persönlichen State-Files, die aus dem privaten Drive-Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`
 > gezogen werden:
@@ -23,6 +24,19 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 > Außerdem `./data/backlog.md` (offene Coaching-/Ideen-Vorhaben) für den Review-Punkt der Checklist.
 > Falls für eine Frage doch frische Werte nötig sind, werden sie on-demand via
 > `lib/pull_drive.py` geholt — Standard für diesen Skill ist aber State-Re-Anchoring, kein Pull.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Daten-Anker:** Dieser Skill liest KEINE Rohdaten. Er re-ankert aus den persönlichen
+> State-Files — `live.md`, `athlete.md`, `trend_snapshot.md`, `backlog.md` sind Drive-synchronisierte
+> **Projekt-Dateien**: ihr Inhalt steht bereits im Kontext, es gibt nichts zu ziehen.
+> Gelesen wird `live.md` (aktueller Live-State, Overrides, Persona-Modus),
+> `athlete.md` (NUR Stammdaten — der Renn-Kalender lebt in `live.md`, §2) und — für den **Multi-Wochen-/Monats-Trend** —
+> `trend_snapshot.md` (schneller Read statt Sheet-Replay; bei Lücke/Deep-Dive → Roh-Daten als Chat-Upload anfordern).
+> Außerdem `backlog.md` (offene Coaching-/Ideen-Vorhaben) für den Review-Punkt der Checklist.
+> Braucht ein Skript eine dieser Dateien, ihren Inhalt nach `./data/<name>` schreiben (vorher `mkdir -p ./data`).
+> Frische Roh-Daten (JSON/FIT/ZIP) NIE per Drive-Connector in den Kontext ziehen — als Chat-Upload
+> anfordern. Standard für diesen Skill ist aber State-Re-Anchoring, kein Daten-Holen.
+cai-only:end -->
 
 ---
 
@@ -41,14 +55,31 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 ## 2. Rekalibrierungs-Checklist (knapp bestätigen)
 
 1. **KW + Datum** — aktuelle ISO-KW, Montag dieser KW (Datum/Wochentag aus der echten Uhr `python3 lib/clock.py`, CLAUDE.md §3 — KEINE TimeAPI, nie raten).
+<!-- cc-only:start -->
 2. **Race-Countdown** — nächstes Race + Tage (**Renn-Kalender-SSoT = `./data/live.md`**; live.md via `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data` ziehen; `athlete.md` liefert nur Stammdaten, keinen Kalender).
 3. **Live-State** — Gewicht, KFA, HRV-Ø, VO2 (aus `./data/live.md`, gezogen via `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data`, oder Payload; Payload gewinnt).
+<!-- cc-only:end -->
+<!-- cai-only:start
+2. **Race-Countdown** — nächstes Race + Tage (**Renn-Kalender-SSoT = `live.md`**, Projekt-Datei im Kontext; `athlete.md` liefert nur Stammdaten, keinen Kalender).
+3. **Live-State** — Gewicht, KFA, HRV-Ø, VO2 (aus `live.md` — Projekt-Datei im Kontext — oder Payload; Payload gewinnt).
+cai-only:end -->
 4. **Aktive Overrides** — Verletzung? Deload/Taper? Hitze-Dome? Gym-Pause (Re-Entry-Status)? (Streak-/Geist-Werte gemäß Medical-Notes im Athleten-Profil NICHT tracken.)
 5. **Protokoll-Anker** — **V3 Heavy Hybrid Polarized** (NICHT V2). Die-Eine-Regel: HR steuert Z2, Pace ist Ergebnis.
+<!-- cc-only:start -->
 6. **Persona-State** — Modus (SCHARF/STOLZ) aus letztem Stand, Default-Anrede {Anrede} (reale Anrede-Stufen aus `./data/athlete.md`).
+<!-- cc-only:end -->
+<!-- cai-only:start
+6. **Persona-State** — Modus (SCHARF/STOLZ) aus letztem Stand, Default-Anrede {Anrede} (reale Anrede-Stufen aus `athlete.md`, Projekt-Datei im Kontext).
+cai-only:end -->
 7. **Offene Learnings** — aus Vor-KW-Payload übernehmen.
+<!-- cc-only:start -->
 8. **Multi-Wochen-Trend** — die letzten ~8 Wochen aus `./data/trend_snapshot.md` kurz anreißen (Gewicht/KFA-Richtung, HRV-Korridor, CTL/ATL/TSB-Verlauf) — schneller Read, kein Sheet-Replay. Fehlt der Snapshot → Pre-Seed-Hinweis, nicht blockieren.
 9. **Backlog-Review** — die **Top-offenen Items** aus `./data/backlog.md` (`## Aktiv`/`## Experimente`/`## Hypothesen`) kurz surfen; wirkt eins erledigt → nachfragen + nach `## Erledigt` (Datum) verschieben, `pull_drive.py --upload --name backlog.md`. Fehlt `backlog.md` → Pre-Seed-Hinweis, nicht blockieren.
+<!-- cc-only:end -->
+<!-- cai-only:start
+8. **Multi-Wochen-Trend** — die letzten ~8 Wochen aus `trend_snapshot.md` (Projekt-Datei im Kontext) kurz anreißen (Gewicht/KFA-Richtung, HRV-Korridor, CTL/ATL/TSB-Verlauf) — schneller Read, kein Sheet-Replay. Fehlt der Snapshot → Pre-Seed-Hinweis, nicht blockieren.
+9. **Backlog-Review** — die **Top-offenen Items** aus `backlog.md` (Projekt-Datei im Kontext; `## Aktiv`/`## Experimente`/`## Hypothesen`) kurz surfen; wirkt eins erledigt → nachfragen + nach `## Erledigt` (Datum) verschieben, dann die BESTEHENDE `backlog.md` im Drive-Ordner „Senpai-AI-Chat" per Drive-Connector aktualisieren (nie ein Duplikat anlegen; schlägt der Connector-Write fehl → kompletten neuen Dateiinhalt als Code-Fence ausgeben, User ersetzt ihn in Drive). Fehlt `backlog.md` → Pre-Seed-Hinweis, nicht blockieren.
+cai-only:end -->
 
 ---
 
@@ -68,10 +99,21 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 ## 3.5 Memory-Konsolidierung (T8 — autonom, sichtbar)
 
 Beim Sync die episodischen Journal-Einträge ins Langzeit-Memory destillieren (claude.ai-artige Memory-Konsolidierung). Autonom + sichtbar (Diff zeigen), idempotent — nie still:
+<!-- cc-only:start -->
 ```bash
 python3 lib/consolidate.py --target learnings  --as-of {heute}   # wiederkehrende Muster → learnings.md
 python3 lib/consolidate.py --target baselines  --as-of {heute}   # neue PRs/Baselines → baselines.md
 ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+Ablauf (Connector-gestützt, gleiche Ziele — wiederkehrende Muster → `learnings.md`, neue PRs/Baselines → `baselines.md`):
+1. `senpai-journal.md`, `learnings.md`, `baselines.md` per Drive-Connector nach `./data/` holen (kleine Textdateien — erlaubt; vorher `mkdir -p ./data`; Journal best-effort — fehlt es, no-op).
+2. Destillieren:
+   ```bash
+   python3 scripts/consolidate.py --local --data-dir ./data
+   ```
+3. Geänderte `learnings.md`/`baselines.md` per Connector-Update in die BESTEHENDEN Dateien im Drive-Ordner „Senpai-AI-Chat" zurückschreiben (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Connector-Write: kompletten neuen Dateiinhalt als Code-Fence ausgeben, User ersetzt ihn in Drive.
+cai-only:end -->
 - Promotet NUR durable Erkenntnisse, dedupt gegen den Bestand (kein Re-Promote), patcht + uploadet `learnings.md`/`baselines.md` sichtbar (gemäß CLAUDE.md §0). Fehlt eine Datei → Pre-Seed-Hinweis, nicht blockieren.
 - Nichts Neues im Journal → no-op (kein leerer Patch). Truth-Ordner + Personal-Module bleiben read-only.
 
@@ -93,3 +135,18 @@ python3 lib/consolidate.py --target baselines  --as-of {heute}   # neue PRs/Base
 
 **Ende sync-skill v1.1.** Kurz, bestätigend, V3-verankert. Drift = sofort korrigieren.
 > **v1.1:** Streak-Override entfernt (Geist-Wert, gemäß Medical-Notes im Athleten-Profil nicht getrackt).
+
+<!-- cai-only:start
+---
+
+## Menu (Trigger: `Menu` / „was kann ich gerade tun?")
+
+Senpais Action-HUD auf Abruf — zeit-/wochentag-bewusste Übersicht der sinnvollen Aktionen + kompletter Skill-Index. Keine Logik hier duplizieren — Routing + Index leben deterministisch im Skript:
+1. `live.md` (Projekt-Datei im Kontext) vorher nach `./data/live.md` schreiben (`mkdir -p ./data`) — für den Race-Countdown; fehlt sie, kein Drama.
+2. Volles HUD generieren:
+   ```bash
+   python3 scripts/session_menu.py --full
+   ```
+   Zeit kommt deterministisch aus der System-Uhr (Europe/Berlin); will der User eine andere Zeit prüfen („was wäre Sa früh?"), `--now 2026-07-04T08:00` durchreichen — **LOKALE Zeit**, kein UTC.
+3. Output = zeit-/wochentag-bewusstes Aktions-HUD (Jetzt-Zeile, Morgen-Ausblick, passender Skill-Trigger zum Slot) + Skill-Index als Cheat-Sheet (pro Eintrag Trigger-Phrase + ein Halbsatz wofür). Das HUD 1:1 als Gerüst nehmen, kurz in Senpais Stimme einordnen (2–4 Emojis/Absatz, Metaphern-Familien rotieren); ≥22:00 → **eine** Bedtime-Zeile. Keine Skills erfinden, die der Index nicht listet. Nur Aggregate/Übersicht, kein Daten-Pull.
+cai-only:end -->

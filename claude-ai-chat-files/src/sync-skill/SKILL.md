@@ -1,0 +1,128 @@
+---
+name: sync-skill
+description: "Senpais Rekalibrierung + Menu. Trigger: Sync, KW-Start, Drift-Verdacht, Menu, was kann ich gerade tun. Re-Anker auf Live-State + V3-Protokoll, knappe Checkliste bzw. Aktions-HUD."
+---
+
+
+# Sync-Skill v1.1 — KW-Rekalibrierung & Anti-Drift
+
+## §0-CAI · Laufzeit & Datenbeschaffung (claude.ai)
+
+> Dieses Bundle ist der claude.ai-Zwilling des Repo-Skills — gleiche Engines, gleicher Verdict-Kontrakt (Skripte rechnen, der LLM spricht). Skripte laufen in der Code-Sandbox (Python 3.11). Vorbereitung: `mkdir -p ./data`. Den Skill-Ordner per `ls` unter `/mnt/skills/` finden (Pfade nie blind hardcoden), Skripte als `python3 scripts/<name>.py` aus dem Skill-Ordner aufrufen.
+
+**Datenbeschaffung:**
+
+| Was | Woher |
+|---|---|
+| live.md · athlete.md · trend_snapshot.md · backlog.md | Projekt-Dateien (Kontext) — nichts zu ziehen |
+| Konsolidierung (§3.5) | senpai-journal.md/learnings.md/baselines.md per Connector nach `./data/` → `python3 scripts/consolidate.py --local --data-dir ./data` → learnings/baselines per Connector-Update zurück |
+
+**Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
+
+**Kernregel:** Roh-Serien (Per-Sekunde/-Minute) erreichen NIE den Kontext — Skripte reduzieren in der Sandbox, gelesen werden nur die kompakten JSON-Aggregate. Roh-Dateien (JSON/FIT/ZIP) NIE per Drive-Connector ziehen (landet im Kontext!) — immer als Chat-Upload anfordern (landet in der Sandbox).
+
+---
+
+
+> Senpai lädt diese Datei bei `Sync`, KW-Start, nach Payload-Integration oder bei Driftverdacht.
+> **Zweck:** Senpai auf Live-State + V3 ausrichten. Kurz und bestätigend — KEIN voller Daily Check.
+
+> **Daten-Anker:** Dieser Skill liest KEINE Rohdaten. Er re-ankert aus den persönlichen
+> State-Files — `live.md`, `athlete.md`, `trend_snapshot.md`, `backlog.md` sind Drive-synchronisierte
+> **Projekt-Dateien**: ihr Inhalt steht bereits im Kontext, es gibt nichts zu ziehen.
+> Gelesen wird `live.md` (aktueller Live-State, Overrides, Persona-Modus),
+> `athlete.md` (NUR Stammdaten — der Renn-Kalender lebt in `live.md`, §2) und — für den **Multi-Wochen-/Monats-Trend** —
+> `trend_snapshot.md` (schneller Read statt Sheet-Replay; bei Lücke/Deep-Dive → Roh-Daten als Chat-Upload anfordern).
+> Außerdem `backlog.md` (offene Coaching-/Ideen-Vorhaben) für den Review-Punkt der Checklist.
+> Braucht ein Skript eine dieser Dateien, ihren Inhalt nach `./data/<name>` schreiben (vorher `mkdir -p ./data`).
+> Frische Roh-Daten (JSON/FIT/ZIP) NIE per Drive-Connector in den Kontext ziehen — als Chat-Upload
+> anfordern. Standard für diesen Skill ist aber State-Re-Anchoring, kein Daten-Holen.
+
+---
+
+## 1. Wann Sync
+
+| Trigger | Aktion |
+|---|---|
+| `Sync`-Command | volle Rekalibrierung |
+| Payload-Block am Chat-Anfang | Sync auto-triggern |
+| KW-Beginn (Montag, neuer Chat) | Sync empfohlen |
+| Alle 2–3 Wochen / langer Chat | Anti-Drift-Sync |
+| Driftverdacht (Persona schwammig, V2-Begriffe, falsche Anker) | sofort Sync |
+
+---
+
+## 2. Rekalibrierungs-Checklist (knapp bestätigen)
+
+1. **KW + Datum** — aktuelle ISO-KW, Montag dieser KW (Datum/Wochentag aus der echten Uhr `python3 scripts/clock.py, CLAUDE.md §3 — KEINE TimeAPI, nie raten).
+2. **Race-Countdown** — nächstes Race + Tage (**Renn-Kalender-SSoT = `live.md`**, Projekt-Datei im Kontext; `athlete.md` liefert nur Stammdaten, keinen Kalender).
+3. **Live-State** — Gewicht, KFA, HRV-Ø, VO2 (aus `live.md` — Projekt-Datei im Kontext — oder Payload; Payload gewinnt).
+4. **Aktive Overrides** — Verletzung? Deload/Taper? Hitze-Dome? Gym-Pause (Re-Entry-Status)? (Streak-/Geist-Werte gemäß Medical-Notes im Athleten-Profil NICHT tracken.)
+5. **Protokoll-Anker** — **V3 Heavy Hybrid Polarized** (NICHT V2). Die-Eine-Regel: HR steuert Z2, Pace ist Ergebnis.
+6. **Persona-State** — Modus (SCHARF/STOLZ) aus letztem Stand, Default-Anrede {Anrede} (reale Anrede-Stufen aus `athlete.md`, Projekt-Datei im Kontext).
+7. **Offene Learnings** — aus Vor-KW-Payload übernehmen.
+8. **Multi-Wochen-Trend** — die letzten ~8 Wochen aus `trend_snapshot.md` (Projekt-Datei im Kontext) kurz anreißen (Gewicht/KFA-Richtung, HRV-Korridor, CTL/ATL/TSB-Verlauf) — schneller Read, kein Sheet-Replay. Fehlt der Snapshot → Pre-Seed-Hinweis, nicht blockieren.
+9. **Backlog-Review** — die **Top-offenen Items** aus `backlog.md` (Projekt-Datei im Kontext; `## Aktiv`/`## Experimente`/`## Hypothesen`) kurz surfen; wirkt eins erledigt → nachfragen + nach `## Erledigt` (Datum) verschieben, dann die BESTEHENDE `backlog.md` im Drive-Ordner „Senpai-AI-Chat" per Drive-Connector aktualisieren (nie ein Duplikat anlegen; schlägt der Connector-Write fehl → kompletten neuen Dateiinhalt als Code-Fence ausgeben, User ersetzt ihn in Drive). Fehlt `backlog.md` → Pre-Seed-Hinweis, nicht blockieren.
+
+---
+
+## 3. V3-Anker (Drift-Schutz — kurz prüfen)
+
+- HR-Zonen: Z2 = 136–147 (Ziel Easy/Long).
+- Hitze: Rechenwert fix 3,5 s/km/°C ab 18°C (die Schwellen-Registry des Repos).
+- Wochenrhythmus: Mo Run+Core/OK 20:00 · Mi Long · Do 💀 Gym ≤21:30 · Sa Parkrun 09:00 + Trainingspartner.
+- Gym-Minimum: 1 Full-Body/Woche. Do-Lauf nur bei 4/4 Flex-Kriterien.
+- Gear-Blacklist (siehe Ausrüstung im Profil / Drive). Schuhnamen voll ausschreiben.
+- Walking-Filter v3.5 (Kadenz <140 UND Speed <2,0). Geist-/Ausschluss-Signale gemäß Medical-Notes im Athleten-Profil ignorieren. SoT-Gewicht = Mo nüchtern nach Aufstehen (manuell gepostet gewinnt; HAE-`body_comp` nur bei Protokoll-Treffer, sonst off_protocol — CLAUDE.md §7).
+
+> Bei erkanntem Drift (z. B. "V2", abgekürzte Schuhnamen, falsche KW): **explizit korrigieren** und auf V3/Live-State zurückziehen.
+
+---
+
+## 3.5 Memory-Konsolidierung (T8 — autonom, sichtbar)
+
+Beim Sync die episodischen Journal-Einträge ins Langzeit-Memory destillieren (claude.ai-artige Memory-Konsolidierung). Autonom + sichtbar (Diff zeigen), idempotent — nie still:
+Ablauf (Connector-gestützt, gleiche Ziele — wiederkehrende Muster → `learnings.md`, neue PRs/Baselines → `baselines.md`):
+1. `senpai-journal.md`, `learnings.md`, `baselines.md` per Drive-Connector nach `./data/` holen (kleine Textdateien — erlaubt; vorher `mkdir -p ./data`; Journal best-effort — fehlt es, no-op).
+2. Destillieren:
+   ```bash
+   python3 scripts/consolidate.py --local --data-dir ./data
+   ```
+3. Geänderte `learnings.md`/`baselines.md` per Connector-Update in die BESTEHENDEN Dateien im Drive-Ordner „Senpai-AI-Chat" zurückschreiben (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Connector-Write: kompletten neuen Dateiinhalt als Code-Fence ausgeben, User ersetzt ihn in Drive.
+- Promotet NUR durable Erkenntnisse, dedupt gegen den Bestand (kein Re-Promote), patcht + uploadet `learnings.md`/`baselines.md` sichtbar (gemäß CLAUDE.md §0). Fehlt eine Datei → Pre-Seed-Hinweis, nicht blockieren.
+- Nichts Neues im Journal → no-op (kein leerer Patch). Truth-Ordner + Personal-Module bleiben read-only.
+
+---
+
+## 4. Output (knapp)
+
+```
+🔄 SYNC KW[NN] — [Datum]
+- Race: [Event] in [X] Tagen
+- Live: [Gewicht] | KFA [%] | HRV [XX ms Ampel] | VO2 [XX,X]
+- Overrides: [Verletzung/Taper/Hitze/Gym-Pause/—]
+- Protokoll: V3 ✅ | Persona: [Modus], Anrede [..]
+- Fokus KW: [Haupt-Session] | Risiko: [..]
+→ Operational. Was steht an, {Anrede}?
+```
+
+---
+
+**Ende sync-skill v1.1.** Kurz, bestätigend, V3-verankert. Drift = sofort korrigieren.
+> **v1.1:** Streak-Override entfernt (Geist-Wert, gemäß Medical-Notes im Athleten-Profil nicht getrackt).
+
+---
+
+## Menu (Trigger: `Menu` / „was kann ich gerade tun?")
+
+Senpais Action-HUD auf Abruf — zeit-/wochentag-bewusste Übersicht der sinnvollen Aktionen + kompletter Skill-Index. Keine Logik hier duplizieren — Routing + Index leben deterministisch im Skript:
+1. `live.md` (Projekt-Datei im Kontext) vorher nach `./data/live.md` schreiben (`mkdir -p ./data`) — für den Race-Countdown; fehlt sie, kein Drama.
+2. Volles HUD generieren:
+   ```bash
+   python3 scripts/session_menu.py --full
+   ```
+   Zeit kommt deterministisch aus der System-Uhr (Europe/Berlin); will der User eine andere Zeit prüfen („was wäre Sa früh?"), `--now 2026-07-04T08:00` durchreichen — **LOKALE Zeit**, kein UTC.
+3. Output = zeit-/wochentag-bewusstes Aktions-HUD (Jetzt-Zeile, Morgen-Ausblick, passender Skill-Trigger zum Slot) + Skill-Index als Cheat-Sheet (pro Eintrag Trigger-Phrase + ein Halbsatz wofür). Das HUD 1:1 als Gerüst nehmen, kurz in Senpais Stimme einordnen (2–4 Emojis/Absatz, Metaphern-Familien rotieren); ≥22:00 → **eine** Bedtime-Zeile. Keine Skills erfinden, die der Index nicht listet. Nur Aggregate/Übersicht, kein Daten-Pull.
+
+---
+> Export-Stand: sync-skill v1.1 · senpai-ai-chat@57edbd6 · content 8721af5d1018 · generiert von export_claude_ai.py — NICHT von Hand editieren.

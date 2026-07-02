@@ -6,8 +6,14 @@ description: "AI Coach Ernährungs-Engine für den Athleten. PFLICHT laden, soba
 # Nutrition-Skill v1.1 — Senpai Ernährungs-Engine
 
 > Diese Datei greift bei Ernährungs-/Makro-/Supplement-Fragen oder dem `Macros`-Command.
+<!-- cc-only:start -->
 > **Daten-Hierarchie:** User-Input (inkl. App-Screenshots) > gepullte HAE-JSON (`./data`) > `./data/live.md` (gepullt aus der Drive-Personal-Folder, s.u.) > dieses Modul.
 > **Personal-State pullen:** `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data` → dann `./data/live.md` lesen.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Daten-Hierarchie:** User-Input (inkl. App-Screenshots) > HAE-JSON aus dem Chat-Upload (nach `./data` kopiert) > `live.md` (Drive-synchronisierte Projekt-Datei, Inhalt steht im Kontext) > dieses Modul.
+> **Personal-State:** `live.md` ist Projekt-Datei — der Inhalt steht bereits im Kontext, kein Pull nötig. Braucht ein Skript den Inhalt, ihn nach `./data/live.md` schreiben (vorher `mkdir -p ./data`).
+cai-only:end -->
 > **Ampel-Logik = Instructions §5 (Hot-Core).** Dieses Modul liefert die Caps + Regeln, gegen die bewertet wird.
 
 ---
@@ -21,7 +27,12 @@ description: "AI Coach Ernährungs-Engine für den Athleten. PFLICHT laden, soba
 - **Pre-Logging:** Mahlzeiten VOR dem Essen eintragen, besonders die 12:00-Entscheidung.
 - **Energie-Baseline (Konkrete Zahlen aus Athleten-Profil / live.md):** BMR + sedentärer TDEE aus dem Profil; Lauf-Verbrauch ≈ kcal/km × dem Körpergewicht (~aus Profil); Gym ~200 kcal (Core/OK) / ~350 kcal (Full Body). Die personenspezifischen Absolutwerte (BMR, TDEE, kcal/km @ Körpergewicht) stehen in `./data/live.md` bzw. dem Athleten-Profil — von dort ziehen, nicht hier hardcoden.
 - **Kalorien-App-Setup (Werte aus Athleten-Profil / live.md):** customTDEE, Adjustment, Protein g/kg, Modus "Weniger Fett", Apple Health verbunden — die konkreten App-Parameter stehen im Profil.
+<!-- cc-only:start -->
 - **Gewichts-Update:** Live-State aus der Drive-Personal-Folder ziehen (`python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data`), neuen Wert (Datum + kg) in `./data/live.md` schreiben und zurückschreiben (`python3 lib/pull_drive.py --upload ./data/live.md --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --name live.md` — die Datei muss vom User vorab angelegt sein, da der Service-Account in My Drive nur updaten, nicht anlegen kann) — das ist der persistente Live-Stand, gegen den Caps/Lauf-kcal (≈ kcal/km × dem Körpergewicht aus Profil) gerechnet werden.
+<!-- cc-only:end -->
+<!-- cai-only:start
+- **Gewichts-Update:** Neuen Wert (Datum + kg) in `live.md` einpflegen: kompletten aktualisierten Inhalt lokal nach `./data/live.md` schreiben, dann per Google-Drive-Connector die BESTEHENDE `live.md` im Drive-Ordner „Senpai-AI-Chat" aktualisieren — NIE ein Duplikat anlegen. Schlägt der Connector-Write fehl: den neuen `live.md`-Inhalt komplett als Code-Fence ausgeben, der User ersetzt ihn in Drive. Das ist der persistente Live-Stand, gegen den Caps/Lauf-kcal (≈ kcal/km × dem Körpergewicht aus Profil) gerechnet werden.
+cai-only:end -->
 
 ---
 
@@ -102,9 +113,20 @@ Rest-Tag 3,5–4L · Do 4L · Mo/Sa 4,5L · Mi 5L. Über 20°C: +0,5L. Heavy Swe
 **Ist-Wasser aus JSON:** `dietary_water` liefert den echten Tageswert in ml (z. B. 4000) — gegen das Tagesziel stellen statt „mental 4L". Fehlt der Wert im Export → Ziel nennen, NICHT 0 annehmen.
 
 Beschaffung (nur wenn der Ist-Wert gebraucht wird):
+<!-- cc-only:start -->
 ```bash
 # 1) HAE-JSON des Zieltags aus Drive nach ./data ziehen
 python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthAutoExport-YYYY-MM-DD" --out ./data
+```
+<!-- cc-only:end -->
+<!-- cai-only:start
+```bash
+# 1) HAE-JSON des Zieltags als Chat-Upload anfordern (Roh-JSON NIE per Drive-Connector in den Kontext ziehen — Kernregel: nur Aggregate)
+#    Upload-Verzeichnis per ls verifizieren (nie blind hardcoden), dann nach ./data kopieren:
+mkdir -p ./data && cp <upload-verzeichnis>/HealthAutoExport-YYYY-MM-DD.json ./data/
+```
+cai-only:end -->
+```bash
 # 2) Signale (inkl. dietary_water_ml) extrahieren
 python3 .claude/skills/daily-check-skill/scripts/daily_signals.py ./data/<gezogene-datei>.json
 ```

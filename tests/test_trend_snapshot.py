@@ -11,6 +11,8 @@ DRIVE-FREI: nur die puren rollup/render/backfill-Funktionen, kein Google-Drive.
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / ".claude" / "skills" / "daily-check-skill" / "scripts"
 if str(SCRIPTS) not in sys.path:
@@ -165,3 +167,60 @@ def test_backfill_csv_appends_rows_with_canonical_header(trainings_csv_text):
     dates = [ln.split(",")[0] for ln in lines[1:]]
     assert dates == sorted(dates)
     assert all(len(ln.split(",")) == len(rh.HEADER) for ln in lines if ln.strip())
+
+
+# --------------------------------------------------------------------------- #
+# Local-Mode (--local --history --out-file): KEIN Drive, kein pull_drive-Import
+# --------------------------------------------------------------------------- #
+def _write_history(tmp_path):
+    """Synthetische readiness-history.csv nach tmp_path schreiben (data-free)."""
+    hist = tmp_path / "readiness-history.csv"
+    hist.write_text(_csv(SAMPLE), encoding="utf-8")
+    return hist
+
+
+def test_local_mode_writes_snapshot_and_prints_summary(tmp_path, capsys):
+    hist = _write_history(tmp_path)
+    out = tmp_path / "trend_snapshot.md"
+    rc = ts.main(["--local", "--history", str(hist), "--out-file", str(out),
+                  "--as-of", "2026-06-29"])
+    assert rc == 0
+    md = out.read_text(encoding="utf-8")
+    # identische Logik wie Drive-Modus: byte-gleich zu build_from_csv_text
+    assert md == ts.build_from_csv_text(_csv(SAMPLE), as_of="2026-06-29")
+    assert "### 📅 Letzte Wochen" in md and "### 🗓️ Letzte Monate" in md
+    # KW19 = abgeschlossen (kein Marker), Juni = LAUFENDER Monat bei as_of → ⏳-Marker
+    assert "| 2026-KW19 |" in md and "| 2026-06 ⏳2d (laufend) |" in md
+    assert "Stand 2026-06-29" in md
+    # CLI druckt Pfad + kompakte Zusammenfassung
+    printed = capsys.readouterr().out
+    assert str(out) in printed
+    assert "4 Tageszeilen" in printed and "2 Wochen-Buckets" in printed
+
+
+def test_local_mode_never_imports_pull_drive(tmp_path, monkeypatch):
+    """Forbidden-Token-Simulation: Umgebung OHNE google-Libs — jeder
+    pull_drive-Import würde ImportError werfen. Local-Mode muss trotzdem laufen."""
+    monkeypatch.delitem(sys.modules, "pull_drive", raising=False)
+    monkeypatch.setitem(sys.modules, "pull_drive", None)  # import → ImportError
+    hist = _write_history(tmp_path)
+    out = tmp_path / "sub" / "trend_snapshot.md"   # Parent-Ordner wird angelegt
+    rc = ts.main(["--local", "--history", str(hist), "--out-file", str(out),
+                  "--as-of", "2026-06-29"])
+    assert rc == 0
+    assert out.is_file()
+
+
+def test_local_mode_missing_history_exits_2(tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        ts.main(["--local", "--history", str(tmp_path / "gibts-nicht.csv"),
+                 "--out-file", str(tmp_path / "snap.md")])
+    assert exc.value.code == 2
+    assert not (tmp_path / "snap.md").exists()
+
+
+def test_local_mode_requires_history_and_out_file(tmp_path):
+    hist = _write_history(tmp_path)
+    assert ts.main(["--local"]) == 1
+    assert ts.main(["--local", "--history", str(hist)]) == 1
+    assert ts.main(["--local", "--out-file", str(tmp_path / "snap.md")]) == 1

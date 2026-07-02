@@ -306,3 +306,120 @@ def test_pr_detection_is_case_sensitive():
     journal = "## [run] 2026-06-27\n- pr-team meeting war zäh\n"
     cands = consolidate.extract_candidates(journal)
     assert [c for c in cands if c["source"] == "run"] == []
+
+
+# --------------------------------------------------------------------------- #
+# Local-Mode (--local --data-dir): Roundtrip ohne jeden Drive-/pull_drive-Zugriff
+# --------------------------------------------------------------------------- #
+# Kombiniertes synthetisches Journal: ein wiederkehrendes Muster (-> learnings)
+# UND ein PR + eine Baseline (-> baselines) — data-free, keine echten Werte.
+JOURNAL_LOCAL = JOURNAL_RECURRING + "\n" + JOURNAL_WITH_PR
+
+
+def _seed_local(tmp_path, journal=JOURNAL_LOCAL, learnings="", baselines=""):
+    """Seed ein Local-Mode-Datenverzeichnis mit den drei erwarteten Dateien."""
+    (tmp_path / "senpai-journal.md").write_text(journal, encoding="utf-8")
+    (tmp_path / "learnings.md").write_text(learnings, encoding="utf-8")
+    (tmp_path / "baselines.md").write_text(baselines, encoding="utf-8")
+
+
+def _block_drive(monkeypatch):
+    """Simuliere eine Umgebung OHNE google-Libs: jeder Import von pull_drive/google
+    schlaegt fehl. Der Local-Mode MUSS trotzdem durchlaufen (lazy import)."""
+    for mod in ("pull_drive", "google", "google.oauth2", "googleapiclient"):
+        monkeypatch.setitem(sys.modules, mod, None)  # import -> ImportError
+
+
+def test_local_mode_roundtrip_without_pull_drive(monkeypatch, tmp_path, capsys):
+    _seed_local(tmp_path)
+    _block_drive(monkeypatch)  # KEIN Drive-Zugriff im Local-Mode — hart erzwungen
+
+    rc = consolidate.main(
+        ["--local", "--data-dir", str(tmp_path), "--as-of", "2026-06-28"]
+    )
+    assert rc == 0
+
+    # learnings.md erhaelt das wiederkehrende Muster, baselines.md die Fakten.
+    learnings = (tmp_path / "learnings.md").read_text(encoding="utf-8")
+    baselines = (tmp_path / "baselines.md").read_text(encoding="utf-8")
+    assert "Bedtime nach 00:30" in learnings
+    assert "[2026-06-28] (pattern)" in learnings
+    assert "Bedtime" not in baselines
+    assert "Pace@Z2 PR" in baselines and "VO2-Baseline" in baselines
+    assert consolidate._MARK in learnings and consolidate._MARK in baselines
+
+    # Kompakte Zusammenfassung auf stdout: beide Targets + appendete Zeilen.
+    out = capsys.readouterr().out
+    assert "consolidated (local) -> learnings.md" in out
+    assert "consolidated (local) -> baselines.md" in out
+    assert "+ [2026-06-28]" in out
+
+
+def test_local_mode_idempotent_and_reports_dedup(tmp_path, capsys):
+    _seed_local(tmp_path)
+    args = ["--local", "--data-dir", str(tmp_path), "--as-of", "2026-06-28"]
+
+    assert consolidate.main(args) == 0
+    state_l = (tmp_path / "learnings.md").read_text(encoding="utf-8")
+    state_b = (tmp_path / "baselines.md").read_text(encoding="utf-8")
+    capsys.readouterr()  # ersten Report verwerfen
+
+    # Zweiter Lauf: NICHTS Neues, States byte-identisch, alles als dedup gemeldet.
+    assert consolidate.main(args) == 0
+    assert (tmp_path / "learnings.md").read_text(encoding="utf-8") == state_l
+    assert (tmp_path / "baselines.md").read_text(encoding="utf-8") == state_b
+    out = capsys.readouterr().out
+    assert "0 new" in out and "(idempotent)" in out
+    assert "= dedup:" in out  # die schon bekannten Kandidaten werden benannt
+    assert "+ [" not in out  # nichts appendet
+
+
+def test_local_mode_dedups_against_preseeded_state(tmp_path):
+    # Der PR steht schon im lokalen baselines-State -> kein Re-Promote.
+    preseeded = (
+        "- [2026-06-20] (run) Pace@Z2 PR: 8:42/km bei HR 145.   "
+        + consolidate._MARK
+        + "\n"
+    )
+    _seed_local(tmp_path, baselines=preseeded)
+
+    results = consolidate.run_consolidate_local(
+        day="2026-06-28",
+        journal_name="senpai-journal.md",
+        learnings_name="learnings.md",
+        baselines_name="baselines.md",
+        data_dir=str(tmp_path),
+    )
+    by_name = {name: (promoted, deduped) for name, promoted, deduped in results}
+    promoted_b, deduped_b = by_name["baselines.md"]
+    assert not any("8:42/km" in t for t in promoted_b)  # nicht re-promotet
+    assert any("8:42/km" in t for t in deduped_b)  # aber sichtbar als dedup gemeldet
+    assert any("VO2-Baseline" in t for t in promoted_b)  # das Neue kommt durch
+    # Der State bleibt Append-only: Alt-Zeile erhalten, Neues dahinter.
+    final = (tmp_path / "baselines.md").read_text(encoding="utf-8")
+    assert final.startswith(preseeded.rstrip("\n"))
+    assert "VO2-Baseline" in final
+
+
+def test_local_mode_missing_state_errors_and_creates_nothing(tmp_path, capsys):
+    # Journal da, aber learnings.md fehlt -> klare Anweisung, non-zero, kein Anlegen.
+    (tmp_path / "senpai-journal.md").write_text(JOURNAL_LOCAL, encoding="utf-8")
+    (tmp_path / "baselines.md").write_text("", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc:
+        consolidate.main(["--local", "--data-dir", str(tmp_path), "--as-of", "2026-06-28"])
+    assert exc.value.code != 0
+    err = capsys.readouterr().err
+    assert "learnings.md" in err
+    assert "Local-Mode" in err
+    assert not (tmp_path / "learnings.md").exists()  # NIE eine Datei angelegt
+
+
+def test_local_mode_missing_journal_errors(tmp_path, capsys):
+    (tmp_path / "learnings.md").write_text("", encoding="utf-8")
+    (tmp_path / "baselines.md").write_text("", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc:
+        consolidate.main(["--local", "--data-dir", str(tmp_path)])
+    assert exc.value.code != 0
+    assert "senpai-journal.md" in capsys.readouterr().err

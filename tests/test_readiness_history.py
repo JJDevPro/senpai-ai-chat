@@ -13,6 +13,9 @@ orchestrator with `pull_drive` fully monkeypatched to a local in-memory fake
      Drive's create-path is NEVER called (we never create the file).
   6. a PRESENT CSV -> download, append, files.update (upload) round-trip.
   7. a bad --as-of -> non-zero exit + JSON error object (deterministic, no clock).
+  8. LOCAL mode (--csv-path): no Drive at all (pull_drive import poisoned), missing
+     CSV is created WITH header, same-date re-run never duplicates the row, and the
+     CLI prints the compact JSON summary incl. "csv": <path>.
 
 The aggregates here are SYNTHETIC (authored in-test) — no real personal/health data.
 """
@@ -309,3 +312,96 @@ def test_main_bad_as_of_json_error(capsys):
     out = capsys.readouterr().out.strip()
     obj = json.loads(out)
     assert "error" in obj
+
+
+# --------------------------------------------------------------------------- #
+# Local-Mode (--csv-path): KEIN Drive — pull_drive-Import hier hart vergiftet.
+# Synthetische Aggregate wie oben, alles in tmp_path (data-free, netz-frei).
+# --------------------------------------------------------------------------- #
+def _write_json(tmp_path, name, obj):
+    p = tmp_path / name
+    p.write_text(json.dumps(obj), encoding="utf-8")
+    return str(p)
+
+
+def test_local_mode_roundtrip_create_append_idempotent(tmp_path, monkeypatch, capsys):
+    """Voller Local-Mode-Roundtrip über die CLI:
+      1. fehlende CSV -> wird MIT Header-Zeile neu angelegt (+1 Datenzeile),
+      2. zweiter Lauf am GLEICHEN Tag -> Update statt Duplikat: die Datei behält
+         genau EINE Zeile für das Datum (append_row-Idempotenz wie im Drive-Modus,
+         Original bleibt — keine stille Überschreibung),
+      3. neuer Tag -> hängt normal an (rollende Historie).
+    pull_drive darf im Local-Mode NIE importiert werden — sys.modules-Eintrag auf
+    None gesetzt macht jeden `import pull_drive` zum sofortigen ImportError."""
+    monkeypatch.setitem(sys.modules, "pull_drive", None)  # Import-Giftpille
+
+    csv_path = tmp_path / "state" / "readiness-history.csv"  # Elternordner fehlt auch
+
+    # Lauf 1: CSV existiert nicht -> anlegen + eine Zeile.
+    rc = rh.main([
+        "--as-of", "2026-06-28",
+        "--readiness", _write_json(tmp_path, "r1.json", _readiness(score=72)),
+        "--body-battery", _write_json(tmp_path, "bb.json", _body_battery()),
+        "--banister", _write_json(tmp_path, "ba.json", _banister()),
+        "--csv-path", str(csv_path),
+    ])
+    assert rc == 0
+    summary = json.loads(capsys.readouterr().out.strip())
+    assert summary == {"date": "2026-06-28", "appended": True, "rows": 1,
+                       "csv": str(csv_path)}
+
+    text = csv_path.read_text(encoding="utf-8")
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    assert lines[0] == ",".join(rh.HEADER)          # Header wurde korrekt angelegt
+    parsed = list(__import__("csv").DictReader(io.StringIO(text)))
+    assert len(parsed) == 1
+    assert parsed[0]["date"] == "2026-06-28"
+    assert parsed[0]["readiness_score"] == "72"
+    assert parsed[0]["tsb"] == "-4.2"
+
+    # Lauf 2: GLEICHER Tag, andere Werte -> Update statt Duplikat (1 Zeile bleibt).
+    rc = rh.main([
+        "--as-of", "2026-06-28",
+        "--readiness", _write_json(tmp_path, "r2.json", _readiness(score=99, band="high")),
+        "--csv-path", str(csv_path),
+    ])
+    assert rc == 0
+    summary2 = json.loads(capsys.readouterr().out.strip())
+    assert summary2["appended"] is False            # No-op signalisiert
+    assert summary2["rows"] == 1
+    assert summary2["csv"] == str(csv_path)
+    parsed2 = list(__import__("csv").DictReader(
+        io.StringIO(csv_path.read_text(encoding="utf-8"))))
+    assert len(parsed2) == 1                        # KEIN Duplikat
+    assert parsed2[0]["readiness_score"] == "72"    # idempotent wie Drive-Modus
+
+    # Lauf 3: NEUER Tag -> normale Fortschreibung der Historie.
+    rc = rh.main([
+        "--as-of", "2026-06-29",
+        "--readiness", _write_json(tmp_path, "r3.json", _readiness(score=80)),
+        "--csv-path", str(csv_path),
+    ])
+    assert rc == 0
+    summary3 = json.loads(capsys.readouterr().out.strip())
+    assert summary3 == {"date": "2026-06-29", "appended": True, "rows": 2,
+                        "csv": str(csv_path)}
+    parsed3 = list(__import__("csv").DictReader(
+        io.StringIO(csv_path.read_text(encoding="utf-8"))))
+    assert [p["date"] for p in parsed3] == ["2026-06-28", "2026-06-29"]
+    assert [p["readiness_score"] for p in parsed3] == ["72", "80"]
+
+
+def test_run_history_local_on_existing_header_only_csv(tmp_path, monkeypatch):
+    """run_history_local direkt: bestehende Header-only-CSV -> +1 Zeile, Summary-
+    Felder korrekt. Auch hier: pull_drive vergiftet (Local-Pfad importiert nie)."""
+    monkeypatch.setitem(sys.modules, "pull_drive", None)
+
+    p = tmp_path / "hist.csv"
+    p.write_text(",".join(rh.HEADER) + "\n", encoding="utf-8")
+
+    row = rh.build_row("2026-06-27", readiness=_readiness(score=60))
+    s = rh.run_history_local(row_dict=row, csv_path=str(p))
+    assert s == {"date": "2026-06-27", "appended": True, "rows": 1, "csv": str(p)}
+    parsed = list(__import__("csv").DictReader(io.StringIO(p.read_text(encoding="utf-8"))))
+    assert len(parsed) == 1
+    assert parsed[0]["readiness_score"] == "60"

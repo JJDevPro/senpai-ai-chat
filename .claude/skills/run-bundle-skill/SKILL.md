@@ -3,13 +3,28 @@ name: run-bundle-skill
 description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integriert. PFLICHT laden bei jeder Lauf-Analyse: der runanalyse-Command, Phrasen wie analysier den Lauf/Lauf-Report/wie war mein Lauf, oder ein absolvierter Lauf in den letzten 24h. Parst FIT (fitparse, Kadenz x2, enhanced_speed) und HealthAutoExport-JSON, wendet Walking-Filter v3.5 an, liefert Splits, Lauf-Form (GCT/VO/Stride/VR), Decoupling, Pace@Z2, Schuh-Check und Senpai-Verdict. NICHT für Gym (gym-bundle-skill), Ernährung (nutrition-skill) oder reine Tages-Werte (daily-check-skill)."
 ---
 
+<!-- cc-only:start -->
 # Run-Bundle-Analyse-Skill v3.14 — pull_drive · V3-only · Kadenz-Walking-Filter · Strava-Enrichment
+<!-- cc-only:end -->
+<!-- cai-only:start
+# Run-Bundle-Analyse-Skill v3.14 — Chat-Upload · V3-only · Kadenz-Walking-Filter · Strava-Enrichment
+cai-only:end -->
 
+<!-- cc-only:start -->
 > **Primärquelle:** FIT-Datei + Trainings_v5 + Gesundheitsdaten_v5, on-demand via `python3 lib/pull_drive.py` nach `./data` gezogen (Drive bleibt read-only Single Source of Truth, nie geschrieben).
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Primärquelle:** FIT-Datei als Chat-Upload (HealthFit-Share vom iPhone), nach `./data` kopiert; CTL/ATL-Kontext aus dem readiness-history.csv-Anker (Drive-synchronisierte Projekt-Datei, §1b SCHRITT 4).
+cai-only:end -->
 > **Fallback:** CSV (Apple-Watch HealthFit-Export, gleicher Folder — Engine `scripts/analyze_run.py`, gleicher Aggregat-Kontrakt) → lokales ZIP in `./data` (Legacy, siehe §1c).
 > **V3 Protocol v0.5 ist der einzige Bewertungs-Modus.** Alle Läufe — egal welches Datum — werden nach V3 bewertet. Kein V2-Modus, keine Backward-Compatibility. (Pre-V3-Läufe vor 27.05.2026 → §0i: historische Referenz, nicht V3-benotet.)
 > **v3.14:** Engine liefert §11-Ampeln + EF selbst (`v3_ampeln`, `{value, ampel}`), 7 Bestwerte inkl. `fastest_km`, GPS-Spike-geschützten Top-Speed, `temp_source`, Kadenz-Absenz-Fallback (≠ 0 spm), `schema_version`; CSV-Fallback = echte Engine; HM-Buffer-Math skriptiert (`stats.py hm_projection`, §7).
+<!-- cc-only:start -->
 > **Versions-Historie:** lebt im `CHANGELOG.md` (Drive-Personal-Ordner, via `pull_drive.py` bei Trigger `Changelog`) — nicht mehr hier im Hot-Pfad.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Versions-Historie:** lebt im `CHANGELOG.md` (Drive-Personal-Ordner „Senpai-AI-Chat", bei Trigger `Changelog` via Google-Drive-Connector lesen) — nicht mehr hier im Hot-Pfad.
+cai-only:end -->
 
 ---
 
@@ -167,16 +182,33 @@ V3 gilt erst **seit 27.05.2026** (post-Japan-Rückkehr). Die Engine setzt `meta.
 
 | Trigger | Aktion |
 |---|---|
+<!-- cc-only:start -->
 | „analysier den letzten Lauf" / „Run-Analyse" / „Run-Report" / `/runanalyse` | Pull-Workflow (§1b) |
 | Lauf <24h her + neue Session in Drive erkannt | Senpai fragt proaktiv |
 
 **Proaktive Frage:**
 > „Letzter Lauf liegt in Drive. Soll ich ihn nach ./data pullen und analysieren?"
+<!-- cc-only:end -->
+<!-- cai-only:start
+| „analysier den letzten Lauf" / „Run-Analyse" / „Run-Report" / `/runanalyse` | Upload-Workflow (§1b) |
+| FIT/ZIP/CSV eines Laufs im Chat hochgeladen | Direkt analysieren (§1b) |
 
+**Proaktive Frage (wenn kein Upload im Chat liegt):**
+> „Kein FIT im Chat. Teile den Lauf als HealthFit-Export (FIT/ZIP) — ohne Datei keine Analyse, geraten wird nicht."
+cai-only:end -->
+
+<!-- cc-only:start -->
 ### 1b. Pull-Workflow (pull_drive → ./data → analyze_run_fit.py)
 
 **FIT-FIRST mit CSV-Fallback. Apple Watch sync hat erst seit 27.05.2026 FIT als Default — vorher CSV. Bei zukünftigen Runs sind FITs Standard. Beide Formate liegen im selben HealthFit-Folder (`1dpQUVeU3rjLFzA-xRANbC88RDV1JZwxf`).** Alle Befehle laufen aus dem Repo-Root. `pull_drive.py` zieht nur die nötige Datei nach `./data` und druckt NUR den lokalen Pfad — nie den Inhalt; Drive bleibt read-only.
+<!-- cc-only:end -->
+<!-- cai-only:start
+### 1b. Upload-Workflow (Chat-Upload → ./data → analyze_run_fit.py)
 
+**FIT-FIRST mit CSV-Fallback. Apple Watch sync hat erst seit 27.05.2026 FIT als Default — vorher CSV. Bei zukünftigen Runs sind FITs Standard. Beide Formate kommen als Chat-Upload (HealthFit-Share vom iPhone).** Upload nach `./data` kopieren und dort analysieren — nur die Engine-Aggregate erreichen den Kontext; ohne Upload keine Analyse (aktiv anfordern, nie raten).
+cai-only:end -->
+
+<!-- cc-only:start -->
 ```
 SCHRITT 0: PERSONEN-State + personenbezogene Module aus dem PRIVATEN Drive-Ordner pullen
   → python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde \
@@ -254,19 +286,117 @@ SCHRITT 8: TREND-HISTORY (best-effort, NON-BLOCKING) — Tageszeile in readiness
   → Idempotent auf Datum: hat der Daily-Check heute schon geschrieben, ist das ein No-op. Fehlt die
     CSV → Pre-Seed-Hinweis, NICHT blockieren.
 ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+```
+SCHRITT 0: PERSONEN-State + personenbezogene Module bereitstellen
+  → State-Dateien (live.md, athlete.md, baselines.md, learnings.md, coaching_cues.md,
+    gear.md, readiness-history.csv) sind Drive-synchronisierte PROJEKT-DATEIEN — der
+    Inhalt steht im Kontext. Für die Skripte: mkdir -p ./data, dann den jeweils
+    benötigten Inhalt 1:1 nach ./data/<name> schreiben (z.B. ./data/live.md).
+  → gear.md (Schuh-km + Segment-Baselines, §18) für das Strava-Enrichment mit bereitstellen.
+  → Personenbezogene Module (Schuhe_Ausruestung.md, Race_Strategie.md) bei Bedarf via
+    Google-Drive-Connector aus dem Ordner „Senpai-AI-Chat" lesen (read-only) und nach
+    ./data/<name> legen. Jede „./data/<file>"-Referenz unten setzt diesen Schritt voraus.
+  → METHOD-Module (V3_Protocol.md, Daten_Parsing.md) liegen als Projekt-Dateien vor.
 
+SCHRITT 1: FIT-Datei = CHAT-UPLOAD (HealthFit-Share vom iPhone), priorisiert
+  → Upload im Sandbox-Dateisystem lokalisieren (typisch /mnt/user-data/uploads —
+    IMMER per ls verifizieren, nie blind hardcoden) und nach ./data kopieren.
+  → KEIN passender Upload im Chat → FIT/ZIP aktiv anfordern („Teile den Lauf als
+    HealthFit-Export"), NIE raten, NIE aus dem Gedächtnis analysieren.
+  → ⛔ Roh-Daten (FIT/ZIP/JSON) NIE per Drive-Connector in den Kontext ziehen
+    (§0-Kernregel: nur Aggregate) — der einzige Weg ist Chat-Upload + lokale Reduktion.
+
+SCHRITT 2: Wenn KEINE FIT für gewünschtes Datum → CSV-Fallback (ebenfalls Chat-Upload)
+  → Hinweis im Verdict: „FIT für [Datum] nicht verfügbar — CSV als Fallback verwendet."
+  → CSV hat dasselbe Stream-Schema (HR/Speed/Cadence/Power/GPS/Elevation/GCT/VO/Stride/VR),
+     ABER kein Aggregat avg_vertical_ratio + keine workout/event-Messages → Triangulation aufpassen
+
+SCHRITT 3: FIT analysieren (REAL ENGINE — v3.5 Walking-Filter, Splits, Form, Topo)
+  → python3 .claude/skills/run-bundle-skill/scripts/analyze_run_fit.py <fit_path> --as-of YYYY-MM-DD
+  → liest die FIT (fitparse, Kadenz×2, enhanced_speed/altitude), wendet den
+    Walking-Filter v3.5 an (§4) und emittiert KOMPAKTES Aggregate-JSON auf stdout:
+    meta · summary · splits_km · splits_lap · hr_zones · run_form · best_values ·
+    sprint_last_60s · decoupling · pace_at_z2 · topography (NIE Roh-Records).
+  → --as-of = HEUTE (Datum aus Kontext). Dieses JSON ist die Quelle für §2/§4/§6/§12.
+  → CSV-Pfad (Fallback): scripts/analyze_run.py ist die CSV-Engine (importierbares
+    Modul, siehe §2c) — nur wenn keine FIT existiert.
+
+SCHRITT 3S/3T2/3T3: STRAVA-ENRICHMENT (non-blocking, Detail §18)
+  → Nach der FIT-Analyse die Strava-Aktivität via mcp__Strava__list_activities ZUORDNEN
+    (Startzeit ±5 min UND Distanz ±2 %; KEIN Trigger — die .fit kommt als Chat-Upload).
+  → Tier 2 (immer, auch mit FIT): §0-sichere MCP-Aggregate anreichern — Schuh-km + Rotation
+    (get_gear → gear.md), Segment-Δ (get_activity_performance.segment_efforts → gear.md),
+    Titel/Beschreibung, Parkrun-Counter (Titel → live.md), Race-Tag, Parkrun-Partner-Layer (§18.4).
+  → Tier 3 (nur wenn KEINE FIT/CSV): FIT-lite-Report aus laps/best_efforts/segments + hartes
+    „kein-Form"-Label. ⛔ mcp__Strava__get_activity_streams NIE (§0-Bruch). Voller Workflow: §18.
+
+SCHRITT 4: CTL/ATL/TSB aus dem readiness-history-Anker (KEIN Sheet-Replay auf claude.ai)
+  → Projekt-Datei readiness-history.csv nach ./data/readiness-history.csv schreiben (SCHRITT 0).
+  → Letzte Zeile = Anker (ctl/atl, prev_date, Tages-TRIMP) → banister.py
+    compute_incremental() = EIN deterministischer EWMA-Schritt, gleiche 42/7-Konstanten
+    wie die Vollrechnung (§6c).
+  → Lücke >1 Tag / Anker fehlt → compute_incremental liefert None → CTL/ATL/TSB
+    qualitativ + Hinweis, KEINE erfundenen Zahlen. (Das Trainings_v5-Voll-Replay
+    inkl. §6b-Dedup bleibt dem Repo-Zwilling vorbehalten.)
+
+SCHRITT 5: HRV/VO2-Kontext aus dem State (statt Gesundheitsdaten-Sheet)
+  → HRV Vortag + heute (Recovery-Check) + VO2Max aktuell aus ./data/live.md bzw.
+    den hrv_ms/vo2-Spalten von ./data/readiness-history.csv lesen.
+  → Wert fehlt → als fehlend benennen (WO gesucht, WARUM leer), nicht raten.
+
+SCHRITT 6: Analyse + Report (siehe §12 Output-Template)
+SCHRITT 7: JOURNAL (NACH dem Report, OPTIONAL, best-effort, NON-BLOCKING) — Verdict ins rollende Journal:
+  → senpai-journal.md via Google-Drive-Connector lesen, Verdict-Sektion anhängen und
+    DIESELBE Datei aktualisieren (nie ein Duplikat anlegen). Connector-Write schlägt
+    fehl → Sektion als Code-Fence ausgeben (User hängt sie an). Fehlt die Datei →
+    Hinweis melden, NICHT blockieren (Report steht bereits).
+SCHRITT 8: TREND-HISTORY (best-effort, NON-BLOCKING) — Tageszeile in readiness-history.csv halten,
+  damit die Tageskette lückenlos bleibt (sonst reißt der inkrementelle Banister-Anker ab):
+  → python3 .claude/skills/daily-check-skill/scripts/readiness_history.py --as-of {lauf_datum} \
+       --banister <banister_json> --tolerance <tolerance_json> --csv-path ./data/readiness-history.csv
+  → Local-Mode (--csv-path): kein Drive-Zugriff, idempotent auf Datum (hat der Daily-Check heute
+    schon geschrieben, ist das ein No-op). Danach die aktualisierte ./data/readiness-history.csv
+    via Google-Drive-Connector in die BESTEHENDE Drive-Datei zurückschreiben (nie ein Duplikat;
+    Fallback: kompletter Inhalt als Code-Fence, User ersetzt ihn in Drive).
+```
+cai-only:end -->
+
+<!-- cc-only:start -->
 **Monats-CSV (Daily-Aggregate, für Daily-Check-Kontext):** Folder/Sheet `1NLywaCKVZQlw8O4eZt20o2B14qgPIyFJ` (HealthMetrics-YYYY-MM.csv) — Komma-Delimiter, deutsche Dezimalzahlen. **Achtung: aktualisiert sich über den Tag → frühe Tageswerte (RHR/HRV) sind vorläufig, finalisieren über Nacht.**
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Monats-CSV (Daily-Aggregate, für Daily-Check-Kontext):** HealthMetrics-YYYY-MM.csv bei Bedarf als Chat-Upload anfordern — Komma-Delimiter, deutsche Dezimalzahlen. **Achtung: aktualisiert sich über den Tag → frühe Tageswerte (RHR/HRV) sind vorläufig, finalisieren über Nacht.**
+cai-only:end -->
 
+<!-- cc-only:start -->
 **Duplikat-Handling:** Bei zwei FITs gleichen Datums → `--newest` (modifiedTime desc) zieht die neuere.
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Duplikat-Handling:** Bei zwei hochgeladenen FITs gleichen Datums → die neuere Datei (Timestamp im Dateinamen) verwenden, im Zweifel den User fragen.
+cai-only:end -->
 
 **Format-Hierarchie pro Lauf-Datum:**
+<!-- cc-only:start -->
 1. FIT mit `.fit`-Endung und neuestem `modifiedTime` → bevorzugt
 2. CSV mit `.csv`-Endung und neuestem `modifiedTime` → nur wenn keine FIT existiert
 3. Lokales ZIP in `./data` (§1c) → nur wenn weder FIT noch CSV in Drive
+<!-- cc-only:end -->
+<!-- cai-only:start
+1. FIT mit `.fit`-Endung (neuester Upload) → bevorzugt
+2. CSV mit `.csv`-Endung → nur wenn keine FIT hochgeladen wurde
+3. Lokales ZIP in `./data` (§1c) → nur wenn weder FIT noch CSV als Upload vorliegen
+cai-only:end -->
 
 **Zeit-Konvention:** FIT-Timestamps sind **UTC**. Lokalzeit (MESZ = UTC+2 / MEZ = UTC+1) aus Dateinamen (`YYYY-MM-DD-HHMMSS`) ableiten. Session `start_time` ist UTC.
 
+<!-- cc-only:start -->
 **Pull-Fehler-Fallback:** Wenn ein `pull_drive.py`-Aufruf für ein Sheet fehlschlägt → silent skippen, ./data/live.md für CTL/ATL/HRV verwenden, dezenter Hinweis im Verdict: „Trainings_v5 momentan nicht verfügbar — Werte aus ./data/live.md."
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Trend-Daten-Fallback:** Ist der readiness-history-Anker nicht nutzbar (Datei fehlt / Lücke >1 Tag) → ./data/live.md für CTL/ATL/HRV verwenden, dezenter Hinweis im Verdict: „Trend-Anker momentan nicht verfügbar — Werte aus ./data/live.md."
+cai-only:end -->
 
 ### 1c. Lokales ZIP (Legacy-Fallback)
 
@@ -319,7 +449,12 @@ SCHRITT 8: TREND-HISTORY (best-effort, NON-BLOCKING) — Tageszeile in readiness
 
 **FIT bleibt König** 👑 — Session-Aggregate sind autoritativ. Aber HealthAutoExport-JSON trägt AUCH Lauf-Form-Metriken:
 `running_speed`, `running_power`, `running_ground_contact_time`, `running_vertical_oscillation` (cm), `running_stride_length` (m).
+<!-- cc-only:start -->
 - **Fallback (KEINE FIT verfügbar/gepullt):** Form-Read aus diesen JSON-Feldern (HealthAutoExport-JSON via `python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F` nach ./data) statt gar nichts. **Gröber** (stündlich aggregiert → Managed/Beast-Split verschwimmt) → klar labeln „aus JSON, FIT fehlt — grobe Schätzung", KEINE Sub-Lap-Forensik vortäuschen.
+<!-- cc-only:end -->
+<!-- cai-only:start
+- **Fallback (KEINE FIT verfügbar):** Form-Read aus diesen JSON-Feldern (HealthAutoExport-JSON als Chat-Upload anfordern — NIE per Drive-Connector in den Kontext ziehen — und nach ./data legen) statt gar nichts. **Gröber** (stündlich aggregiert → Managed/Beast-Split verschwimmt) → klar labeln „aus JSON, FIT fehlt — grobe Schätzung", KEINE Sub-Lap-Forensik vortäuschen.
+cai-only:end -->
 - **Cross-Check (FIT da):** JSON-Werte als Sanity-Check (matchen grob? GCT/VO/Stride im selben Bereich?). Bei FIT-Vorhandensein bleibt FIT die Quelle.
 - **Einheiten-Falle:** JSON `running_vertical_oscillation` in **cm** (8,9 → 89 mm), `running_stride_length` in **m** (0,75 → 750 mm). Vor Vergleich/Anzeige umrechnen.
 
@@ -518,6 +653,10 @@ Lies diese JSON-Felder — rekonstruiere keine FIT-Logik im Kopf. **CSV-Fallback
 
 `Trainings_v5` enthält durch einen mehrfach schreibenden Sync **doppelte Session-Zeilen** (real: HM 489 ×4, Di-Lauf 78 ×2). Über Duplikate gerechnet **explodiert die ATL** (z.B. 122 statt 42) → CTL/TSB verfälscht. Daher **immer deduplizieren, bevor** CTL/ATL/TSB oder die Session-Historie verwendet werden — identische Routine wie im `daily-check-skill`.
 
+<!-- cai-only:start
+> **CAI-Twin-Notiz (§6b+§6c):** Auf claude.ai gibt es kein Trainings_v5-Sheet-Replay — §6b-Dedup + §6c-Vollrechnung bleiben dem Repo-Zwilling vorbehalten. CTL/ATL/TSB kommen hier aus dem readiness-history.csv-Anker + `banister.py compute_incremental()` (§1b SCHRITT 4); reißt der Anker (Lücke >1 Tag) → qualitativ + Hinweis, KEINE erfundenen Zahlen. Das gilt auch für den 💖-Block in §12 und alle Trainings_v5-Referenzen (§10, §14b, §17).
+cai-only:end -->
+
 ```
 # Trainings_v5 zuvor nach ./data gepullt (SCHRITT 4), dann:
 python3 .claude/skills/run-bundle-skill/scripts/dedup_trainings.py ./data/Trainings_v5.csv
@@ -656,7 +795,12 @@ RACE-TAG → das ist KEIN Z2-Training. Z3/Z4 ist das Zuhause, Cardiac Drift
 
 **Normalisierung (provisorisch):** `pace_z2_run − (Starttemp − 18°C) × 3,5 sek/km`
 
+<!-- cc-only:start -->
 **Baseline-Referenz = ./data/live.md** (kanonischer Pace@Z2-Referenzwert; zuvor via `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data` aus dem privaten Drive-Ordner gepullt — SCHRITT 0). **NIE im Skill hardcoden, NIE im Report eine Vergleichszahl erfinden.** Wenn kein Referenzwert in ./data/live.md steht → „Referenz noch nicht etabliert" ausweisen, kein „Δ vs Baseline" rechnen. Ein neuer Lauf löst die Referenz **nur** ab, wenn er sauber ist: durchgehender Z2 (Run-Walk ≤~5%), **≤22°C**, Decoupling <8%. Hitze-Run-Walk-Z2 = provisorisch, NIE als neue Baseline.
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Baseline-Referenz = ./data/live.md** (kanonischer Pace@Z2-Referenzwert; die Drive-synchronisierte Projekt-Datei live.md wurde in SCHRITT 0 nach ./data geschrieben). **NIE im Skill hardcoden, NIE im Report eine Vergleichszahl erfinden.** Wenn kein Referenzwert in ./data/live.md steht → „Referenz noch nicht etabliert" ausweisen, kein „Δ vs Baseline" rechnen. Ein neuer Lauf löst die Referenz **nur** ab, wenn er sauber ist: durchgehender Z2 (Run-Walk ≤~5%), **≤22°C**, Decoupling <8%. Hitze-Run-Walk-Z2 = provisorisch, NIE als neue Baseline. Neue Referenz → live.md via Google-Drive-Connector aktualisieren (bestehende Datei; Fallback: Code-Fence).
+cai-only:end -->
 
 **Tracking-Sektion bei jedem Z2-Lauf am Report-Ende:**
 
@@ -1023,8 +1167,14 @@ KEINE Cutoff-Panik aus methodisch ungültigen Metriken oder neuromuskulärer Erm
 
 ## 12d. 🔁 COACHING-CUE-LOOP (session-übergreifend)
 
+<!-- cc-only:start -->
 Geschlossene Schleife über `coaching_cues.md` (Drive-State, §11-registriert; pull via
 `pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match coaching_cues.md --out ./data`).
+<!-- cc-only:end -->
+<!-- cai-only:start
+Geschlossene Schleife über `coaching_cues.md` (Drive-synchronisierte Projekt-Datei, §11-registriert;
+Inhalt in SCHRITT 0 nach ./data/coaching_cues.md geschrieben).
+cai-only:end -->
 Run-Typ-Sektionen: **Easy/Z2 · Long · Race-Sim · Parkrun · Tempo/Intervalle**.
 
 **1. CUE-CHECK (Verify):** die OPEN-Cues des HEUTIGEN Run-Typs gegen die heutigen `run_form`-Werte
@@ -1036,9 +1186,17 @@ Form-Ziel-Tabelle + Cue-Spalte; **VR-Ziel <11 %** aus `learnings.md`) einen OPEN
 schreiben/auffrischen — **max ~3 offene/Typ** (schärfste Defizite); vorhandenen Cue derselben Metrik
 NICHT duplizieren, nur Datum/Ist aktualisieren.
 
+<!-- cc-only:start -->
 **3. WRITE-BACK:** `coaching_cues.md` lokal regenerieren + `pull_drive.py --upload … --name coaching_cues.md`
 (sichtbar, wie State-Files). Fehlt die Datei in Drive → PRE-SEED-Hinweis (`drive-seed/`), NICHT
 blockieren, NIE selbst anlegen.
+<!-- cc-only:end -->
+<!-- cai-only:start
+**3. WRITE-BACK:** `coaching_cues.md` lokal regenerieren + via Google-Drive-Connector die BESTEHENDE
+Datei im Ordner „Senpai-AI-Chat" aktualisieren (nie ein Duplikat anlegen; sichtbar, wie State-Files).
+Connector-Write fehlgeschlagen → kompletten neuen Dateiinhalt als Code-Fence ausgeben (User ersetzt
+ihn in Drive). Fehlt die Datei in Drive → Hinweis, NICHT blockieren, NIE selbst anlegen.
+cai-only:end -->
 
 **Format:** `- [YYYY-MM-DD → OPEN] <Metrik> <Ist> vs Ziel <Ziel> (Ref). Cue: "<Phrase>". Verify: <KPI> nächster <Typ>.`
 · `- [YYYY-MM-DD → CLOSED YYYY-MM-DD] <Metrik> <Ist→Neu> ✅`
@@ -1046,11 +1204,21 @@ blockieren, NIE selbst anlegen.
 **Pre-Lauf-Kopplung:** `weather-runprep-skill` §5 zeigt die OPEN-Cues des Slot-Typs als „🎯 Mental Cues"
 VOR dem Lauf → Pre-Run nennt das Ziel, Post-Run prüft die Umsetzung. Der Kreis schließt sich.
 
+<!-- cc-only:start -->
 **Backlog-Kopplung (PR3, best-effort, NON-BLOCKING):** Bleibt ein Form-Defizit über **mehrere gleichartige
 Läufe** offen (Cue carry-forward ≥2×) → daraus ein **Experiment** in `backlog.md` (`## Experimente`) machen
 (`pull_drive.py --match backlog.md`; dedup gegen Bestand; lokal regenerieren + `--upload --name backlog.md`).
 Schließt der heutige Lauf ein Backlog-Experiment (VR-Ziel erreicht) → Item nach `## Erledigt`. Fehlt `backlog.md`
 → Pre-Seed-Hinweis, nicht blockieren. (`coaching_cues.md` = pro-Lauf-Form-Cues; `backlog.md` = mehrwöchige Vorhaben.)
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Backlog-Kopplung (PR3, best-effort, NON-BLOCKING):** Bleibt ein Form-Defizit über **mehrere gleichartige
+Läufe** offen (Cue carry-forward ≥2×) → daraus ein **Experiment** in `backlog.md` (`## Experimente`) machen
+(backlog.md = Drive-synchronisierte Projekt-Datei; dedup gegen Bestand; lokal regenerieren + via
+Google-Drive-Connector die bestehende Datei aktualisieren, Fallback: Code-Fence). Schließt der heutige Lauf
+ein Backlog-Experiment (VR-Ziel erreicht) → Item nach `## Erledigt`. Fehlt `backlog.md` → Hinweis, nicht
+blockieren. (`coaching_cues.md` = pro-Lauf-Form-Cues; `backlog.md` = mehrwöchige Vorhaben.)
+cai-only:end -->
 
 ---
 
@@ -1066,7 +1234,12 @@ Weggelassen: Topografie-Detail, Bestwerte, HM-Projektion.
 
 ## 14. Coaching-Hooks · Athleten-Kontext
 
+<!-- cc-only:start -->
 > **SSoT-Pointer:** Live-Werte (Gewicht/KFA/Viszeralfett/HRV/PRs/Parkrun-Counter) = **./data/live.md** (aus Personen-Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` gepullt, SCHRITT 0). Schuh-Detail = `./data/Schuhe_Ausruestung.md` (`pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match Schuhe_Ausruestung.md --out ./data`). Race-Pacing = `./data/Race_Strategie.md` (gleicher Pull, `--match Race_Strategie.md`). Rotationsregel = `modules/V3_Protocol.md` (METHOD, bleibt im Repo). Hier nur Analyse-Schnellref — bei Konflikt gewinnt der Live-State.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **SSoT-Pointer:** Live-Werte (Gewicht/KFA/Viszeralfett/HRV/PRs/Parkrun-Counter) = **./data/live.md** (Projekt-Datei live.md → ./data, SCHRITT 0). Schuh-Detail = `./data/Schuhe_Ausruestung.md`, Race-Pacing = `./data/Race_Strategie.md` (beide via Google-Drive-Connector aus „Senpai-AI-Chat" lesen und nach ./data legen, SCHRITT 0). Rotationsregel = `modules/V3_Protocol.md` (METHOD, Projekt-Datei). Hier nur Analyse-Schnellref — bei Konflikt gewinnt der Live-State.
+cai-only:end -->
 
 **Body Comp:** Gewicht + KFA (+ Bauchumfang, falls gepostet) **aus ./data/live.md** (nie hier hardcoden). „Jeder kg = +0,025 W/kg" + „−0,9 kcal/km". Post-HM: Recomp-Fokus (Gym-Restart + Casein + Tracking).
 
@@ -1082,7 +1255,12 @@ Weggelassen: Topografie-Detail, Bestwerte, HM-Projektion.
 - **Walking-/Post-Race-Schuh** = Walking-Rotation + Post-Race-Schuhwechsel. NIEMALS „Race-Schuh", NIEMALS zum Laufen.
 
 **Race-Historie:**
+<!-- cc-only:start -->
 - **Letzter HM ABGESCHLOSSEN** (Distanz/Zeit/HR-Detail aus ./data/live.md bzw. Renn-Kalender). Sub-3 knapp verpasst (Wertungsgrenze), real-Cutoff 3:31 souverän gehalten. Limit = Füße km 17–19 (rein muskulär, Fueling hielt). Race-Strategie aus `./data/Race_Strategie.md` (`pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match Race_Strategie.md --out ./data`).
+<!-- cc-only:end -->
+<!-- cai-only:start
+- **Letzter HM ABGESCHLOSSEN** (Distanz/Zeit/HR-Detail aus ./data/live.md bzw. Renn-Kalender). Sub-3 knapp verpasst (Wertungsgrenze), real-Cutoff 3:31 souverän gehalten. Limit = Füße km 17–19 (rein muskulär, Fueling hielt). Race-Strategie aus `./data/Race_Strategie.md` (via Google-Drive-Connector aus „Senpai-AI-Chat" lesen, nach ./data legen).
+cai-only:end -->
 
 **Nächste Events:** (aus Renn-Kalender, live.md) — kommende Races + nächstes Runniversary; Distanzen/Daten aus dem Kalender ziehen, nicht hier hardcoden.
 
@@ -1156,8 +1334,14 @@ Weggelassen: Topografie-Detail, Bestwerte, HM-Projektion.
 
 | Fall | Handling |
 |---|---|
+<!-- cc-only:start -->
 | Kein FIT in Drive (Pull leer) | CSV-Pull versuchen, sonst nach lokalem ZIP in ./data fragen |
 | pull_drive.py-Fehler (Auth/Netzwerk) | Sheets-Pull skip + ./data/live.md Fallback + Hinweis im Verdict |
+<!-- cc-only:end -->
+<!-- cai-only:start
+| Kein FIT-Upload im Chat | FIT/ZIP (HealthFit-Share) aktiv anfordern; sonst CSV-Upload, sonst lokales ZIP in ./data |
+| Trend-/State-Daten fehlen (Anker-Lücke) | Block qualitativ + ./data/live.md Fallback + Hinweis im Verdict |
+cai-only:end -->
 | FIT ohne `lap`-Messages | KM-Bucketing via `record` Distance |
 | Keine `workout`-Messages | Runna-Kontext skippen, Run-Typ aus Wochentag |
 | FIT mit nur `speed`/`altitude` (kein enhanced) | Standard-Felder + Hinweis „Apple-Watch-FIT" |
@@ -1176,8 +1360,14 @@ Weggelassen: Topografie-Detail, Bestwerte, HM-Projektion.
 | Walking-Anteil >10% in Workout | Quellen-Disziplin PFLICHT (beide Werte) |
 | Hoher Geh-Wert bei harter Session | Plausibilisierung: Kadenz-Verteilung der Geh-Records + User-Erinnerung |
 | Langsamster KM bei niedrigster HR | NIEMALS Kardio-Limit → neuromuskulär/Glykogen, Taper-fokussiert (§7b) |
+<!-- cc-only:start -->
 | FIT Duplikat in Drive | `--newest` (neuere nach `modifiedTime`) pullen |
 | Trainings_v5 nicht pullbar | ./data/live.md als Fallback |
+<!-- cc-only:end -->
+<!-- cai-only:start
+| Doppelte FIT-Uploads gleichen Datums | neuere Datei (Dateiname/Timestamp) verwenden, im Zweifel User fragen |
+| readiness-history-Anker lückenhaft/fehlt | ./data/live.md als Fallback |
+cai-only:end -->
 | `fitparse` nicht installiert | `pip install fitparse --break-system-packages` |
 | Temp >26°C im Lauf | Wetter-Ampel 🔴, „Startzeit verschieben" Empfehlung |
 | HR Ø >Z2-Cap in Easy/Long-Run | V3-Bruch flaggen im Verdict (RACE ausgenommen) |
@@ -1241,7 +1431,12 @@ Nur **Parkrun** ist aktiv (andere Clubs = passive Mitgliedschaft → Events IGNO
 4. **Partner-Faktor NUR bei (3):** KM1-Drossel + Pace-Varianz-Dämpfung + W/kg-Parität als Auswertungs-Linse — **die konkreten Zahlen leben in `athlete.md`/`learnings.md` (Drive), nie hier.** KM1-Schnellstart ist dann KEIN Fehler.
 
 ### 18.5 `gear.md` — State-Schema (Drive-State, §11-registriert)
+<!-- cc-only:start -->
 Eigenes mutables State-File (wie `coaching_cues.md`). `Schuhe_Ausruestung.md` bleibt read-only Regel-Modul (keine km). Pull in SCHRITT 0; Write-Back via `pull_drive.py --upload --name gear.md`. Fehlt in Drive → PRE-SEED-Hinweis (`drive-seed/gear.md`), NICHT blockieren/selbst anlegen.
+<!-- cc-only:end -->
+<!-- cai-only:start
+Eigenes mutables State-File (wie `coaching_cues.md`). `Schuhe_Ausruestung.md` bleibt read-only Regel-Modul (keine km). Bereitstellung in SCHRITT 0 (Projekt-Datei gear.md → ./data/gear.md); Write-Back via Google-Drive-Connector auf die BESTEHENDE gear.md in „Senpai-AI-Chat" (nie ein Duplikat; Fallback: kompletter Inhalt als Code-Fence). Fehlt in Drive → Hinweis, NICHT blockieren/selbst anlegen.
+cai-only:end -->
 
 | Block | Spalten |
 |---|---|
@@ -1257,4 +1452,9 @@ Eigenes mutables State-File (wie `coaching_cues.md`). `Schuhe_Ausruestung.md` bl
 
 **Ende der Skill-Definition v3.14.**
 
+<!-- cc-only:start -->
 Senpai liest diese Datei bei Run-Analyse-Trigger. Pull-Workflow ist Default — `python3 lib/pull_drive.py` zieht die FIT nach `./data`, `analyze_run_fit.py` reduziert sie; FIT bevorzugt, CSV-Fallback wenn keine FIT für gewünschtes Datum, lokales ZIP nur als Legacy. Walking-Diskriminator ist Kadenz (§4), Wand-Diagnose via Kardio-vs-Neuromuskulär (§7b).
+<!-- cc-only:end -->
+<!-- cai-only:start
+Senpai liest diese Datei bei Run-Analyse-Trigger. Chat-Upload ist Default — die FIT kommt als HealthFit-Share in den Chat und wird nach `./data` kopiert, `analyze_run_fit.py` reduziert sie; FIT bevorzugt, CSV-Fallback wenn keine FIT für gewünschtes Datum, lokales ZIP nur als Legacy. Walking-Diskriminator ist Kadenz (§4), Wand-Diagnose via Kardio-vs-Neuromuskulär (§7b).
+cai-only:end -->

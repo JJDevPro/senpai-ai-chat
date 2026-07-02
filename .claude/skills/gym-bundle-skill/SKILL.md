@@ -5,8 +5,14 @@ description: "AI Coach Gym-Analyse für den Athleten — Drive-native. PFLICHT l
 
 # Gym-Bundle-Analyse-Skill v2.0 — Drive-Native · Engine-Kontrakt
 
+<!-- cc-only:start -->
 > Modul-Datei. Senpai folgt diesem Workflow, wenn eine HealthFit-Gym-Markdown-ZIP (`*-Funktionelles_Krafttraining-*.zip` oder `*-Krafttraining-*.zip`) aus Drive analysiert werden soll — oder explizit per `/gymanalyse` aufgerufen wird.
 > **Primärquelle:** Google Drive (Gym-ZIP im HAE/Daily-Folder) → lokal nach `./data` via `lib/pull_drive.py`. Drive-Truth bleibt read-only; **State-Write-Back (baselines.md/live.md) via `--upload` ist erlaubt und bei PRs Pflicht (§6).**
+<!-- cc-only:end -->
+<!-- cai-only:start
+> Modul-Datei. Senpai folgt diesem Workflow, wenn eine HealthFit-Gym-Markdown-ZIP (`*-Funktionelles_Krafttraining-*.zip` oder `*-Krafttraining-*.zip`) als Chat-Upload ankommt — oder eine Gym-Analyse explizit angefragt wird („gymanalyse").
+> **Primärquelle:** Chat-Upload (Apple-Watch/HealthFit-Export) → Sandbox-Dateisystem. Uploads bleiben read-only Roh-Daten; **State-Write-Back (baselines.md/live.md) läuft per Drive-Connector-Update und ist bei PRs Pflicht (§6).**
+cai-only:end -->
 > **v2.0 — Engine-Kontrakt:** `scripts/analyze_gym.py` ist jetzt die deterministische Engine (nach analyze_run_fit-Muster): Übungs-Parsing, Segment-Mapping, Tonnage/Muskelgruppe, PR-Detection, Belastungs-Score, Bedtime-Ampel — ALLES als Aggregat-JSON aus dem Script. **Der Report übersetzt die Engine-Werte in Persona-Text, er rechnet sie NICHT nach** (Verdict-Kontrakt). Versions-Historie → `CHANGELOG.md` (Drive).
 
 ---
@@ -15,13 +21,25 @@ description: "AI Coach Gym-Analyse für den Athleten — Drive-native. PFLICHT l
 
 | Trigger | Aktion |
 |---|---|
+<!-- cc-only:start -->
 | Gym-ZIP `*-Funktionelles_Krafttraining-*.zip` auf Drive (oder lokaler Pfad genannt) | Auto-Workflow ausführen |
 | Gym-ZIP `*-Krafttraining-*.zip` auf Drive (oder lokaler Pfad genannt) | Auto-Workflow ausführen |
+<!-- cc-only:end -->
+<!-- cai-only:start
+| Gym-ZIP `*-Funktionelles_Krafttraining-*.zip` als Chat-Upload (oder Sandbox-Pfad genannt) | Auto-Workflow ausführen |
+| Gym-ZIP `*-Krafttraining-*.zip` als Chat-Upload (oder Sandbox-Pfad genannt) | Auto-Workflow ausführen |
+cai-only:end -->
 | Klartext: "analysier den Gym" / "Gym-Report" / "Gym fertig" | Skill-Workflow aufrufen (auch ohne ZIP — dann nur Text-Analyse) |
 | `/gymanalyse` Command | Skill-Workflow aufrufen |
 
+<!-- cc-only:start -->
 **Auto-Run:** Sobald eine Gym-ZIP auf Drive identifiziert (oder ein lokaler ZIP-Pfad genannt) ist, startet Senpai OHNE Nachfrage den Workflow.
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Auto-Run:** Sobald eine Gym-ZIP im Chat hochgeladen (oder ein Sandbox-Pfad genannt) ist, startet Senpai OHNE Nachfrage den Workflow.
+cai-only:end -->
 
+<!-- cc-only:start -->
 **Daten holen (Drive → lokal):**
 ```bash
 # Neueste Gym-ZIP aus dem HAE/Daily-Drive-Folder ziehen
@@ -30,16 +48,32 @@ python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "Kr
 # → druckt den lokalen ZIP-Pfad (nur Pfad, nie Inhalt)
 ```
 Liegt keine ZIP auf Drive → **Text-Only-Modus** (der Athlet tippt Gerätenummern + Gewichte direkt in den Chat).
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Daten holen (Chat-Upload → Sandbox):**
+Die Gym-ZIP kommt als Chat-Upload (Apple-Watch/HealthFit-Export) — Upload-Pfad per `ls` verifizieren, `unzip_gym.py` (§2) arbeitet direkt darauf. Fehlt die ZIP → Upload anfordern, NIE per Drive-Connector in den Kontext ziehen (Kernregel: nur Aggregate).
+Liegt keine ZIP im Chat → **Text-Only-Modus** (der Athlet tippt Gerätenummern + Gewichte direkt in den Chat).
+cai-only:end -->
 
+<!-- cc-only:start -->
 **Personal-State holen (Drive-Personal-Folder → lokal):** PR-Baseline und Live-State liegen NICHT im Repo, sondern im privaten Drive-Folder `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`. Vor PR-Detection / State-Update ziehen:
 ```bash
 # PR-Wahrheitsquelle + Live-State aus dem Personal-Folder nach ./data
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match baselines.md --out ./data   # → ./data/baselines.md
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data        # → ./data/live.md
 ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Personal-State bereitstellen (Projekt-Dateien → `./data`):** `baselines.md` (PR-Wahrheitsquelle) und `live.md` sind Drive-synchronisierte Projekt-Dateien — ihr Inhalt steht im Kontext. Vor PR-Detection / State-Update: `mkdir -p ./data`, dann den Inhalt 1:1 nach `./data/baselines.md` bzw. `./data/live.md` schreiben (die Engine liest von dort).
+cai-only:end -->
 
 **Zwei Modi:**
+<!-- cc-only:start -->
 - **Voll-Modus:** ZIP (aus Drive) + Text-Message → komplette Analyse mit HR-Profil pro Übung
+<!-- cc-only:end -->
+<!-- cai-only:start
+- **Voll-Modus:** ZIP (Chat-Upload) + Text-Message → komplette Analyse mit HR-Profil pro Übung
+cai-only:end -->
 - **Text-Only-Modus:** nur die Text-Message des Athleten ohne ZIP → reduzierte Analyse ohne HR-Daten, aber mit Tonnage + PR-Detection + Lauf-Carry-Over
 
 ---
@@ -52,12 +86,27 @@ python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match liv
 | **Master-Markdown** (`*.md`) | Session-Aggregate (Dauer, TRIMP, CTL, ATL, kcal) | IMMER lesen |
 | **Segmente-CSV** (`*-segmente.csv`) | Auto-erkannte Übungs-Segmente mit HR + Energy + Dauer | IMMER lesen |
 | **Master-CSV** (`*-funktionelles-krafttraining-*.csv`) | HR-Verlauf 4-Sek-Sampling + Lap-Numerierung | On-demand für Set-Density-Analyse |
+<!-- cc-only:start -->
 | **`./data/baselines.md`** (Gym PRs, aus Drive-Personal-Folder gezogen) | **Primäre PR-Wahrheitsquelle** | IMMER für PR-Detection |
+<!-- cc-only:end -->
+<!-- cai-only:start
+| **`./data/baselines.md`** (Gym PRs, aus der Projekt-Datei `baselines.md` geschrieben) | **Primäre PR-Wahrheitsquelle** | IMMER für PR-Detection |
+cai-only:end -->
 | **JPEGs** | Visual-Drill-Down | Nur on demand |
 
+<!-- cc-only:start -->
 **WICHTIG:** Live-Gym-PRs leben in **`baselines.md`** (Abschnitt Gym PRs) im Drive-Personal-Folder `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` — vor Gebrauch via `pull_drive.py` nach `./data` ziehen (siehe §1), NIE eine externe `Gym_Historie.md` anlegen. **baselines.md ist die PR-SSoT** — neue PRs schreibt Senpai **autonom + sichtbar** dorthin zurück (Diff im Chat, §6); `live.md` spiegelt nur.
+<!-- cc-only:end -->
+<!-- cai-only:start
+**WICHTIG:** Live-Gym-PRs leben in **`baselines.md`** (Abschnitt Gym PRs) — Drive-synchronisierte Projekt-Datei; vor Gebrauch nach `./data/baselines.md` schreiben (siehe §1), NIE eine externe `Gym_Historie.md` anlegen. **baselines.md ist die PR-SSoT** — neue PRs schreibt Senpai **autonom + sichtbar** dorthin zurück (Diff im Chat, Drive-Connector-Update, §6); `live.md` spiegelt nur.
+cai-only:end -->
 
+<!-- cc-only:start -->
 **ZIP entpacken + Engine fahren (lokal, nach Drive-Pull):**
+<!-- cc-only:end -->
+<!-- cai-only:start
+**ZIP entpacken + Engine fahren (in der Sandbox — `./data/<gym-bundle>.zip` steht für den per `ls` verifizierten Upload-Pfad):**
+cai-only:end -->
 ```bash
 # 1) ZIP entpacken → lokalisiert Master-Markdown + Segmente-CSV (druckt nur Pfade, nie Inhalte)
 python3 .claude/skills/gym-bundle-skill/scripts/unzip_gym.py ./data/<gym-bundle>.zip --out ./data
@@ -157,6 +206,7 @@ Das Aufwärm-Segment liefert die **Baseline für den Belastungs-Score** (`strain
 
 **⚡ State-Update bei neuen PRs — AUTONOM + SICHTBAR (Entscheidung #16, Split-Brain-Fix):**
 **`baselines.md` ist die PR-SSoT** — der Write-Back geht DORTHIN; `live.md` wird nur als Spiegel nachgezogen. Keine Rückfrage („Soll ich eintragen?" ist abgeschafft), aber IMMER sichtbar: **der Diff (alt→neu je Übung) steht im Report-PR-Block.**
+<!-- cc-only:start -->
 ```bash
 # 1) ./data/baselines.md lokal editieren: im Abschnitt "Gym PRs" je Übung aus
 #    pr.baseline_updates die Zeile aktualisieren ([Übung] [alt]→[neu] kg, Datum)
@@ -165,6 +215,14 @@ python3 lib/pull_drive.py --upload ./data/baselines.md --folder 1OiTTKvxCn0fribZ
 # 3) Spiegel: die "Gym PRs (Stand KWxx)"-Zeile in ./data/live.md nachziehen + uploaden
 python3 lib/pull_drive.py --upload ./data/live.md --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --name live.md
 ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Write-Back-Ablauf (PFLICHT bei PRs — sichtbar im Report berichten):**
+1. `./data/baselines.md` lokal editieren: im Abschnitt „Gym PRs" je Übung aus `pr.baseline_updates` die Zeile aktualisieren ([Übung] [alt]→[neu] kg, Datum).
+2. Per Google-Drive-Connector die BESTEHENDE `baselines.md` im Drive-Ordner „Senpai-AI-Chat" mit dem neuen Inhalt aktualisieren — nie ein Duplikat anlegen.
+3. Spiegel: die „Gym PRs (Stand KWxx)"-Zeile in `./data/live.md` nachziehen und `live.md` ebenso per Connector-Update aktualisieren.
+Schlägt ein Connector-Write fehl → kompletten neuen Dateiinhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
+cai-only:end -->
 Kein neuer PR (`pr.baseline_updates` leer) → KEIN Write-Back (kein Noise-Upload).
 
 **Was als PR gilt:**
@@ -190,7 +248,12 @@ gesund wenn **Beine 50–65 % · Oberkörper 25–35 % · Core 8–15 %** — Am
 
 ## 8. Workflow-Sequenz
 
+<!-- cc-only:start -->
 1. **Daten holen** → Gym-ZIP aus Drive nach `./data` (`lib/pull_drive.py`, siehe §1); fehlt sie → Text-Only-Modus
+<!-- cc-only:end -->
+<!-- cai-only:start
+1. **Daten holen** → Gym-ZIP als Chat-Upload in der Sandbox lokalisieren (per `ls`, siehe §1) + `baselines.md`/`live.md` aus den Projekt-Dateien nach `./data` schreiben (§1); fehlt die ZIP → Text-Only-Modus
+cai-only:end -->
 2. **Übungs-Text des Athleten** in `./data/uebungen.txt` schreiben (oder via stdin `-`)
 3. **ZIP entpacken** (wenn vorhanden) → `scripts/unzip_gym.py` (liefert `md=` + `segments=` Pfade)
 4. **Master-Markdown lesen** → Session-Aggregate (TRIMP, CTL/ATL, kcal — Cross-Check zur Engine)
@@ -199,7 +262,12 @@ gesund wenn **Beine 50–65 % · Oberkörper 25–35 % · Core 8–15 %** — Am
    → Übungs-Parsing + Segment-Mapping (§5) + PR-Detection (§6) + Tonnage/Gruppen (§7) + HR-Profil + Belastungs-Score + Bedtime-Ampel (§12), alles als Aggregat-JSON.
 6. **Lauf-Carry-Over-Analyse** generieren (PFLICHT, siehe §10 — der einzige LLM-Analyse-Anteil)
 7. **Markdown-Report** nach Template (§9) rendern — Zahlen/Ampeln 1:1 aus dem Engine-JSON, NIE nachgerechnet
+<!-- cc-only:start -->
 8. **PR-State-Update ausführen** (autonom + sichtbar, §6): `pr.baseline_updates` → `baselines.md` (SSoT) + `live.md`-Spiegel + Upload; Diff im Report
+<!-- cc-only:end -->
+<!-- cai-only:start
+8. **PR-State-Update ausführen** (autonom + sichtbar, §6): `pr.baseline_updates` → `baselines.md` (SSoT) + `live.md`-Spiegel per Drive-Connector-Update; Diff im Report
+cai-only:end -->
 
 ---
 
@@ -383,8 +451,18 @@ Selbst bei einer durchschnittlichen Session sollte Senpai einen Lauf-Bezug ziehe
 
 ## 15. Versions-Historie
 
+<!-- cc-only:start -->
 → `CHANGELOG.md` (Drive-Personal-Folder, via `pull_drive.py` bei Trigger `Changelog`). Kurzform: v1.0 Initial (22.05.2026) · v1.1 walking_asymmetry-Trip-Wire · **v2.0 Engine-Kontrakt** (deterministische `analyze_gym.py`, PR-Write-Back autonom+sichtbar nach baselines.md, Volumen-Bänder vereinheitlicht).
+<!-- cc-only:end -->
+<!-- cai-only:start
+→ `CHANGELOG.md` (Drive-Personal-Ordner). Kurzform: v1.0 Initial (22.05.2026) · v1.1 walking_asymmetry-Trip-Wire · **v2.0 Engine-Kontrakt** (deterministische `analyze_gym.py`, PR-Write-Back autonom+sichtbar nach baselines.md, Volumen-Bänder vereinheitlicht).
+cai-only:end -->
 
 ---
 
+<!-- cc-only:start -->
 **Ende der Skill-Definition v2.0. Engine rechnet, Senpai übersetzt — bei jeder Gym-ZIP aus Drive oder Text-only Gym-Message.**
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Ende der Skill-Definition v2.0. Engine rechnet, Senpai übersetzt — bei jeder Gym-ZIP im Chat oder Text-only Gym-Message.**
+cai-only:end -->

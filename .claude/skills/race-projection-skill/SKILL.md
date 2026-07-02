@@ -6,19 +6,34 @@ description: "AI Coach Race-Projektions-Engine für den Athleten. PFLICHT laden 
 # Race-Projection-Skill v1.1 — Senpai Race-Engine (skriptiert)
 
 > Senpai lädt diese Datei bei Race-/Cutoff-/Zielzeit-Fragen oder dem `Race`-Command.
+<!-- cc-only:start -->
 > **Personal-Module (aus der privaten Drive personal-folder `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` pullen, NICHT mehr aus `modules/`):**
 > ```bash
 > python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match Race_Strategie.md --out ./data   # → ./data/Race_Strategie.md (Pacing, Strecke)
 > python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match 21km.gpx --out ./data            # → ./data/21km.gpx (HM-Geometrie)
 > ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Personal-Module (liegen im Skill-Bundle):** `assets/Race_Strategie.md` (Pacing, Strecke) + `assets/21km.gpx` (HM-Geometrie) — direkt aus `assets/` lesen, kein Pull nötig.
+cai-only:end -->
 > + Wetter via `weather-runprep-skill`.
+<!-- cc-only:start -->
 > **Body-Comp-Hebel:** jeder kg = +0,025 W/kg + −0,9 kcal/km. Live-Gewicht aus `./data/live.md` (erst pullen: `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data`).
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Body-Comp-Hebel:** jeder kg = +0,025 W/kg + −0,9 kcal/km. Live-Gewicht aus `live.md` (Projekt-Datei — steht im Kontext; für Skript-Inputs bei Bedarf nach `./data/live.md` schreiben).
+cai-only:end -->
 
 ---
 
 ## 1. Rennkalender (Live-Anker aus ./data/live.md prüfen)
 
+<!-- cc-only:start -->
 > Live-Anker erst pullen: `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data` → dann `./data/live.md` lesen.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> Live-Anker: `live.md` ist Projekt-Datei — Renn-Kalender/Countdown/Status direkt aus dem Kontext lesen (für Skript-Inputs bei Bedarf nach `./data/live.md` schreiben).
+cai-only:end -->
 
 | Datum | Event | Distanz | Status |
 |---|---|---|---|
@@ -35,8 +50,15 @@ description: "AI Coach Race-Projektions-Engine für den Athleten. PFLICHT laden 
 **⛔ Kein Kopfrechnen.** Jede projizierte Zeit/Pace kommt aus den Skripten (Entscheidung #11); der Report übersetzt nur in Persona-Text.
 
 **2a. Kurz-Distanz (≤10 km, Firmenlauf/Stadtlauf/Parkrun-Effort) — `race_readiness`:**
+<!-- cc-only:start -->
 ```bash
 python3 lib/pull_drive.py --sheet 1zhNbm7f2SOeJL0QWGhaDt113R61tmHvi0KZCT1Z0sxU --tab "Trainings" --out ./data/Trainings_v5.csv
+```
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Trainings-Daten bereitstellen:** `Trainings_v5.csv` als Chat-Upload anfordern (NIE die Roh-Tabelle per Drive-Connector in den Kontext ziehen), Upload-Pfad per `ls` verifizieren, dann `mkdir -p ./data` und die Datei nach `./data/Trainings_v5.csv` kopieren.
+cai-only:end -->
+```bash
 python3 .claude/skills/daily-check-skill/scripts/stats.py race_readiness \
   --trainings ./data/Trainings_v5.csv --as-of {heute} \
   --race-event "<Event>" --race-date <YYYY-MM-DD> --race-km <km>   # alles aus ./data/live.md
@@ -50,7 +72,12 @@ python3 .claude/skills/daily-check-skill/scripts/stats.py hm_projection \
   [--target-time H:MM:SS] [--cutoff-time H:MM:SS] [--sweep-pace MM:SS] \
   [--scenarios szenarien.json]   # Matrix: [{name,h1_pace,decoupling_pct,temp_c},…]
 ```
+<!-- cc-only:start -->
 → `H1a = H1 + HitzeTax(3,5 s/km/°C >18°C)` · `H2a = H1a×(1+Dec)` · `Projected = (H1a+H2a)×km/2`, plus **Cutoff-Puffer + Gehpausen-Budget** (`cutoff.walk_budget`: km/Minuten gegen die Sweep-Pace, deterministisch). **Szenarien-Inputs (H1-Paces, Decoupling, Temp) kommen aus `./data/live.md` + `Race_Strategie.md` (Drive) — NIE aus dem Repo.** Decoupling nur aus validen Quellen (§4).
+<!-- cc-only:end -->
+<!-- cai-only:start
+→ `H1a = H1 + HitzeTax(3,5 s/km/°C >18°C)` · `H2a = H1a×(1+Dec)` · `Projected = (H1a+H2a)×km/2`, plus **Cutoff-Puffer + Gehpausen-Budget** (`cutoff.walk_budget`: km/Minuten gegen die Sweep-Pace, deterministisch). **Szenarien-Inputs (H1-Paces, Decoupling, Temp) kommen aus `live.md` (Projekt-Datei) + `assets/Race_Strategie.md` (Skill-Bundle) — NIE raten oder hardcoden.** Decoupling nur aus validen Quellen (§4).
+cai-only:end -->
 
 **2c. Pacing-Card (Renntag-Artefakt):**
 ```bash

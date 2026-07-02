@@ -3,8 +3,11 @@
 DATA-FREE & DETERMINISTISCH: synthetisches Roh-JSON, feste Timestamps. Lockt die
 PR-2-Fixes: Slot-Start-Floor (20:30-Start braucht die 20:00-Stunde), korrektes
 Einheiten-Label wind_max_kmh, Warnungen, Asphalt-Regen-Dämpfung, Taupunkt-Band.
+Dazu die Offline-Flags: --from-json (Datei-Replay durch reduce(), kein Netz),
+--print-url (nur URL drucken) und build_url() als geteilte URL-Quelle.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -93,3 +96,67 @@ def test_reduce_never_dumps_raw_array():
     out = weather.reduce(raw, "20:00", "21:00")
     assert len(out["slot_window"]) == 2
     assert "weather" not in out
+
+
+# --- Offline-Flags: --from-json / --print-url / build_url (KEIN Netz) -------------
+
+
+def test_build_url_matches_fetch_construction():
+    # build_url = BASE + urlencode in Arg-Reihenfolge lat/lon/date/tz (wie fetch()).
+    url = weather.build_url(52.52, 13.41, "2026-07-01", "Europe/Berlin")
+    assert url == ("https://api.brightsky.dev/weather"
+                   "?lat=52.52&lon=13.41&date=2026-07-01&tz=Europe%2FBerlin")
+    assert url.startswith(weather.BASE + "?")
+
+
+def test_print_url_prints_url_and_exits_zero(capsys):
+    rc = weather.main(["--lat", "52.52", "--lon", "13.41", "--date", "2026-07-01",
+                       "--print-url"])
+    out = capsys.readouterr().out.strip()
+    assert rc == 0
+    assert out == weather.build_url(52.52, 13.41, "2026-07-01", weather.DEFAULT_TZ)
+
+
+def test_from_json_replays_file_through_reduce(tmp_path, capsys):
+    # Offline-Replay: synthetische Roh-Response aus Datei → identischer reduce()-Pfad
+    # wie der Fetch-Modus (Slot-Fenster + day_summary + Sonnenzeiten aus lat/lon/date).
+    raw = _raw([_hour(19, 24.0), _hour(20, 23.0, wind=18.0),
+                _hour(21, 22.0, wind=25.0), _hour(22, 21.0)])
+    fixture = tmp_path / "brightsky_raw.json"
+    fixture.write_text(json.dumps(raw), encoding="utf-8")
+
+    rc = weather.main(["--lat", "52.52", "--lon", "13.41", "--date", "2026-07-01",
+                       "--slot-start", "20:30", "--slot-end", "21:30",
+                       "--from-json", str(fixture)])
+    out = json.loads(capsys.readouterr().out)
+
+    assert rc == 0
+    # Slot-Fenster inkl. Start-Floor (20:30 → 20:00-Stunde).
+    assert [h["time"] for h in out["slot_window"]] == ["20:00", "21:00"]
+    assert out["slot"] == {"start": "20:30", "end": "21:30"}
+    # Tages-Aggregat aus der Fixture, kein Roh-Dump.
+    assert out["day_summary"]["min_c"] == 21.0
+    assert out["day_summary"]["max_c"] == 24.0
+    assert out["day_summary"]["wind_max_kmh"] == 25.0
+    assert out["warnings"] == []
+    assert "weather" not in out
+    # Sonnenzeiten kommen aus lat/lon/date — deshalb bleiben die Args Pflicht.
+    assert out["sun"] is not None
+    assert set(out["sun"]) == {"sunrise", "sunset"}
+
+
+def test_from_json_output_identical_to_direct_reduce(tmp_path, capsys):
+    # --from-json muss die IDENTISCHE Ausgabe liefern wie reduce() auf demselben Raw.
+    raw = _raw([_hour(9, 18.0), _hour(10, 19.5)])
+    fixture = tmp_path / "brightsky_raw.json"
+    fixture.write_text(json.dumps(raw), encoding="utf-8")
+
+    rc = weather.main(["--lat", "52.52", "--lon", "13.41", "--date", "2026-07-01",
+                       "--slot-start", "09:00", "--slot-end", "10:00",
+                       "--from-json", str(fixture)])
+    cli_out = json.loads(capsys.readouterr().out)
+    expected = weather.reduce(raw, "09:00", "10:00",
+                              lat=52.52, lon=13.41, date="2026-07-01",
+                              tz=weather.DEFAULT_TZ)
+    assert rc == 0
+    assert cli_out == expected

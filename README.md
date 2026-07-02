@@ -13,8 +13,8 @@ Grund für den Repo: Der Claude.ai-Chat erstickte an den großen Roh-Uploads
 
 - **Dieses Repo = reine Coaching-Engine.** CLAUDE.md (Persona/V3-Regeln/Ampel/Safety),
   `.claude/skills/` (Analyse-Logik), `lib/` + Skripte, und die **Methoden-Module**
-  (`modules/`: V3_Protocol, Daten_Parsing, CHANGELOG, Project_Index). **Keine
-  personenbezogenen/Health-Daten.** Teilbar.
+  (`modules/`: V3_Protocol, Daten_Parsing; CHANGELOG + Project_Index leben im
+  Drive-Personal-Ordner). **Keine personenbezogenen/Health-Daten.** Teilbar.
 - **Google Drive = alle Daten.** Zwei Bereiche:
   - **Truth (read-only):** HAE-JSON, `.fit`, `Trainings_v5`, `Gesundheitsdaten_v5` — vom
     iPhone aktuell gehalten, Senpai schreibt nie.

@@ -29,7 +29,7 @@
 - **Metabolische Gewichts-Schwelle:** {{GEWICHT_SCHWELLE_KG}} kg  <!-- Dummy: 80.0 kg -->
 - **Gewichts-Annäherungs-Band:** {{ANNAEHERUNG_KG}} kg  <!-- Dummy: 2.0 kg -->
 - **Ziel-KFA:** {{ZIEL_KFA_PCT}} %  <!-- Dummy: 12.0 % -->
-- **Viszeralfett-Ziel:** ≤ {{VISZERAL_ZIEL}}  <!-- Dummy: 4.8 -->
+<!-- Viszeralfett ist als KPI GESTRICHEN (CLAUDE.md §1, Entscheidung 2026-07-02) — kein Ziel, kein Feld. Bauchumfang (manuell) ist der ergänzende Proxy. -->
 
 ## Medical / Sensor-Notizen (Ignore-Regeln, CLAUDE.md §6)
 - **Kardialer Rhythmus-Marker:** {{AFIB_REGEL}}  <!-- Dummy: AFib-Burden NICHT als Trainings-Signal werten -->

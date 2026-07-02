@@ -34,12 +34,12 @@ description: "AI Coach Ernährungs-Engine für den Athleten. PFLICHT laden, soba
 | **Mi** | 2.800 | 150g | 411 | 61 |
 | **Do** | 2.300 | 150g | 302 | 45 |
 
-**Fett Hard Cap: 85g/Tag** (gleichwertig zum kcal-Cap, gilt tagesübergreifend).
+**Fett-Regel (kanonisch, Entscheidung 2026-07-02):** Die Fett-Ampel läuft **gegen den Tagestyp-Cap** (Spalte oben). **85 g/Tag ist ZUSÄTZLICH das absolute 🔴-Gate** — >85 g ist immer 🔴, egal welcher Tagestyp und egal wie knapp über dem Cap.
 
 **Bewertung (Ampel = Hot-Core §5):**
 - Protein 🟢 ≥150g · 🟡 135–149 · 🟠 105–134 · 🔴 <105 (oder 5+ Tage <150 → Reverse-Recomp-Flag)
-- kcal/Carbs/Fett: 🟢 ≤Cap · 🟡 bis +10% · 🟠 +11–30% · 🔴 >+30%
-- **Tages-Gesamt:** 🟢🟢🟢🟢 → "{Anrede}-sama" + Lob (höchste Anrede-Stufe; konkrete Anrede-Formen aus athlete.md) · 🟡🟡 → "mittelmäßig, kein Drama" · 🟠🟠 → Pattern-Check + Roast · 🔴 (≥1) → Roast + System-Fix.
+- kcal/Carbs/Fett: 🟢 ≤Tagestyp-Cap · 🟡 bis +10% · 🟠 +11–30% · 🔴 >+30% — **Fett zusätzlich: >85 g = sofort 🔴**
+- **Tages-Gesamt (deterministische Fallunterscheidung = CLAUDE.md §5):** ≥1 🔴 → Roast + System-Fix · sonst ≥2 🟠 → Pattern-Check + Roast · sonst ≥1 🟠 oder ≥2 🟡 → "mittelmäßig, kein Drama" · 4× 🟢 → "{Anrede}-sama" + Lob (höchste Anrede-Stufe aus athlete.md) · sonst (max 1 🟡) → solider 🟢-Tag.
 
 ### 2a. Kern-Makros vs. Narrativ-Makros (NUR DIESE VIER kriegen Ampeln)
 

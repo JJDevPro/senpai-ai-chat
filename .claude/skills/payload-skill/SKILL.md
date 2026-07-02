@@ -1,11 +1,11 @@
 ---
 name: payload-skill
-description: "AI Coach Wochen-Payload-Generator für den Athleten. Laden bei dem Payload-Command oder am Sonntag-KW-Abschluss nach der SoT-Messung. Erzeugt ein verdichtetes, copy-paste-fertiges Wochen-Briefing (SoT-Snapshot, Trainings-Absolvierung, PRs, Makro-Compliance, HRV/VO2-Trend, Learnings, Persona-State, Next-KW-Fokus) als reinen Code-Fence-Block ohne Preamble und regeneriert daraus live.md (aus dem privaten Drive-Ordner) als autoritativen State-Seed für den nächsten KW-Chat. Erkennt außerdem einen Payload-Block am Chat-Anfang und integriert ihn priorisiert. NICHT für tägliche Checks (daily-check-skill) oder KW-Rekalibrierung (sync-skill)."
+description: "AI Coach Wochen-Payload-Generator für den Athleten. Laden bei dem Payload-Command oder am Sonntag-KW-Abschluss (SoT-Referenz = letzte Montag-Messung). Erzeugt ein verdichtetes, copy-paste-fertiges Wochen-Briefing (SoT-Snapshot, Trainings-Absolvierung, PRs, Makro-Compliance, HRV/VO2-Trend, Learnings, Persona-State, Next-KW-Fokus) als reinen Code-Fence-Block ohne Preamble und regeneriert daraus live.md (aus dem privaten Drive-Ordner) als autoritativen State-Seed für den nächsten KW-Chat. Erkennt außerdem einen Payload-Block am Chat-Anfang und integriert ihn priorisiert. NICHT für tägliche Checks (daily-check-skill) oder KW-Rekalibrierung (sync-skill)."
 ---
 
 # Payload-Skill v1.1 — KW-Abschluss-Export
 
-> Senpai lädt diese Datei NUR bei `Payload`-Command oder Sonntag-Abend nach SoT.
+> Senpai lädt diese Datei NUR bei `Payload`-Command oder am Sonntag-Abend (KW-Abschluss).
 > **Zweck:** Verdichtetes Wochen-Briefing als State-Seed für den nächsten KW-Chat. Regeneriert `live.md` (im privaten Drive-Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`) als volatile Senpai-State.
 
 ---
@@ -26,7 +26,7 @@ description: "AI Coach Wochen-Payload-Generator für den Athleten. Laden bei dem
 
 ## 1. Workflow
 
-1. **Sonntag (oder KW-Ende):** SoT-Messung (die Körperwaage als SoT, manuell gepostet).
+1. **Sonntag (oder KW-Ende):** KW-Abschluss. **Die SoT-Messung ist MONTAGS** (nüchtern nach dem Aufstehen, Richtwert ≤09:00 — CLAUDE.md §7); der Payload referenziert den **letzten Mo-SoT-Wert** (manuell gepostet bzw. aus `live.md`). KEINE Sonntag-Messung erwarten oder anfordern.
 2. **User:** sendet `Payload`.
 3. **Senpai:** generiert den Block unten — **copy-paste-fertig, NUR Code-Fence, kein Preamble/Postamble.**
 4. **Senpai:** schreibt denselben Block lokal nach `./data/live.md` (volatile Senpai-State = der Payload) und lädt ihn per Write-Back in den privaten Drive-Ordner hoch:
@@ -57,7 +57,7 @@ Erst nach einem **echten, fehlgeschlagenen Pull-Versuch** gilt: fehlender Wert =
 ```
 # 📦 PAYLOAD KW[Nr] — [Datumsbereich]
 
-## 🎯 SoT-Snapshot (Wochen-Messung, Körperwaage)
+## 🎯 SoT-Snapshot (Mo-SoT dieser KW, Körperwaage)
 - Gewicht: [X,X kg] (Δ [±X,X] vs Vor-KW)
 - KFA: [XX,X%] | Bauchumfang: [XXX cm] | LBM/Muskel: [X,X]
 - RHR: [XX] | VO2Max: [XX,X] [Ampel]
@@ -82,7 +82,7 @@ Erst nach einem **echten, fehlgeschlagenen Pull-Versuch** gilt: fehlender Wert =
 ## 💤 HRV- & VO2-Trend
 - HRV Wochen-Ø: [XX ms] [Ampel] | Trend: [↑→↓]
 - VO2Max: [XX,X → XX,X] [Ampel]
-- Schlaf Ø: [Xh Xmin] | Bedtime ≤00:30: [X/7]
+- Schlaf Ø: [Xh Xmin] | Bedtime-Score: [X,X/7] ([N]×🟢 ≤00:00 voll + [N]×🟡 ≤00:30 halb)
 
 ## 🎓 Offene Learnings für KW[Nr+1]
 - [1–3 konkrete Takeaways]

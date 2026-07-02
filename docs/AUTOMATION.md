@@ -118,15 +118,15 @@ und ersetzt den manuellen UI-Schritt aus §4 durch einen versionierten, reproduz
 | Job | Cron (Europe/Berlin) | Prompt |
 |---|---|---|
 | Morgen-Briefing | `0 10 * * *` (tgl. 10:00) | `/briefing` |
-| KW-Abschluss | `0 20 * * 0` (So 20:00) | `/payload` |
-| KW-Start-Sync | `0 7 * * 1` (Mo 07:00) | `/sync` (inkl. Memory-Konsolidierung) |
+| KW-Abschluss | `0 20 * * 0` (So 20:00) | `Payload` (Trigger-Wort → payload-skill; KEIN Slash-Command) |
+| KW-Start-Sync | `0 7 * * 1` (Mo 07:00) | `Sync` (Trigger-Wort → sync-skill, inkl. Memory-Konsolidierung) |
 
 - **HAE-Frische statt fixer-10:00-Rate:** `/briefing` macht jetzt einen **Frische-Vorcheck** (Datum-Alter,
   daily-check §3e) — bei stale Daten kurz warten/retrien statt blind auf eine „sichere" Uhrzeit zu
   vertrauen. Die 10:00 bleibt nur ein konservativer Default-Start.
 - **Snapshot + Backlog laufen mit (kein eigener Cron):** `/briefing` regeneriert via daily-check den
-  `trend_snapshot.md`-Woche+Monat-Rollup und schreibt/surft `backlog.md`; `/payload` versiegelt sonntags
-  die Woche im Snapshot + räumt den Backlog; `/sync` reviewt offene Items. Ist das Briefing gearmt, wird
+  `trend_snapshot.md`-Woche+Monat-Rollup und schreibt/surft `backlog.md`; der `Payload`-Job versiegelt sonntags
+  die Woche im Snapshot + räumt den Backlog; der `Sync`-Job reviewt offene Items. Ist das Briefing gearmt, wird
   der Trend-Snapshot + das Coaching-Backlog ohne expliziten Prompt gepflegt (CLAUDE.md §7/§11).
 - **Disarm/Status:** `/automation disarm` löscht die Jobs; `/automation status` listet sie (`CronList`).
 - Die **manuelle UI-Routine (§1–§4) bleibt** als Alternative gültig.

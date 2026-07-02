@@ -24,8 +24,8 @@ oder nur das Briefing gewünscht ist:
 | Job | Cron | Prompt |
 |---|---|---|
 | Morgen-Briefing | `0 10 * * *` | `/briefing` |
-| KW-Abschluss | `0 20 * * 0` (So) | `/payload` |
-| KW-Start-Sync | `0 7 * * 1` (Mo) | `/sync` |
+| KW-Abschluss | `0 20 * * 0` (So) | `Payload` (Trigger-Wort → payload-skill) |
+| KW-Start-Sync | `0 7 * * 1` (Mo) | `Sync` (Trigger-Wort → sync-skill) |
 
 > **Kein neuer Cron für Snapshot/Backlog:** Die obigen Routinen tragen die Pflege **automatisch mit** —
 > `/briefing` (via daily-check) regeneriert den `trend_snapshot.md`-Rollup + schreibt/surft `backlog.md`,

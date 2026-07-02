@@ -6,10 +6,10 @@
 > Wird bei Session-Start via `pull_drive.py` gezogen und per `--upload`
 > zurückgeschrieben (CLAUDE.md §0 Write-Back). Autoritativer State-Seed.
 
-## SoT-Snapshot (manuell, Mo fasted vor 09:00)
+## SoT-Snapshot (manuell, Mo nüchtern nach dem Aufstehen — Richtwert ≤09:00)
 - **Gewicht (SoT):** {{GEWICHT_KG}} kg  <!-- Dummy: 80.0 kg -->
 - **KFA:** {{KFA_PCT}} %  <!-- Dummy: 18.0 % -->
-- **Viszeralfett:** {{VISZERAL}}  <!-- Dummy: 6.0 -->
+- **Bauchumfang (optional, manuell):** {{BAUCHUMFANG_CM}} cm  <!-- Dummy: 90 cm -->
 - **Stand:** {{SOT_DATUM}}  <!-- Dummy: 2026-01-01 -->
 
 ## Trend-Metriken

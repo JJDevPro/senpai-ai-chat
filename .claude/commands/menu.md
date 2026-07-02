@@ -25,7 +25,7 @@ liest `./data/live.md` (vom Bootstrap gezogen) für den Race-Countdown — fehlt
 
 ## Schritt 2 — In Senpais Stimme präsentieren
 
-- Das HUD 1:1 als Gerüst nehmen, dann **kurz** einordnen (CLAUDE.md §2, Modus aus §16):
+- Das HUD 1:1 als Gerüst nehmen, dann **kurz** einordnen (CLAUDE.md §2; Modus aus daily-check SKILL.md §16):
   *was jetzt dran ist* (die „Jetzt"-Zeile), *was morgen kommt*, *welcher Skill-Trigger* zum
   aktuellen Slot passt. 2–4 Emojis/Absatz, Metaphern-Familien rotieren.
 - **Zeitbasiert schärfen** (CLAUDE.md §3, echte Uhr): Morgen-Fenster → Roast-Energie + `/briefing`;

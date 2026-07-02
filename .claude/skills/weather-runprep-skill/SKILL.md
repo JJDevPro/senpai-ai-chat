@@ -72,12 +72,10 @@ Eine Zeile pro relevantem Trainingstag. **Temp (Slot) + Asphalt kommen direkt au
 | 20:00 | 23,6 °C | ~24,6 °C | 0,9 mm / 37 % | 11 (Böen 22) | 🟡 |
 | 21:00 | … | … | … | … | … |
 
-**Pace-Korrekturen (Z2):**
+**Pace-Korrekturen (Z2) — EINE Temperatur-Formel (Rechenwert `lib/constants.py`):**
 | Bedingung | Korrektur |
 |---|---|
-| >18°C | **+3–4 sek/km pro °C** (V3, Kompressionsshirt-kalibriert) |
-| 19–22°C gesamt | +15–25 s/km, Wasser ↑ |
-| 23–26°C | +25–40 s/km, HR-Cap strikter |
+| >18°C | **fix +3,5 sek/km pro °C über 18°C** (V3-Rechenwert; Kalibrier-Band 3–4 nur Doku). Beispiele: 22°C → +14 s/km · 26°C → +28 s/km. Ab 23°C zusätzlich: HR-Cap strikter, Wasser ↑ |
 | starker Wind | +5–10 s/km |
 | Regen + Wind | +10–15 s/km |
 | <15°C | Cold-Doping (leicht unterkühlt starten) |
@@ -153,4 +151,4 @@ An **Samstag** (Parkrun 09:00, Wöhrder See) zusätzlich zum Wetter proaktiv ank
 
 ---
 
-**Ende weather-runprep-skill v1.3.** Wetterochs ist Source of Truth. Wetter = Entscheidungs-Input (vor der Empfehlung, nicht danach). Trainingstage = Mo/Mi/Sa/Do. **Slot-Uhrzeit bestimmt Starttemp — Tagesmax ist fast nie die Starttemp; Parkrun 09:00 = Morgenwert, NIE Tagesmax (§2a).** Hitze-Tax +3–4 s/°C ab 18°C. Do: Gym-Hitze (keine Klimaanlage) + Flex-Regel-Wetter.
+**Ende weather-runprep-skill v1.3.** Source-Priorität: User-Angabe > **Bright Sky/DWD (präzise Slot-Zahlen)** > Wetterochs (Narrativ/Gewitter/Fallback). Wetter = Entscheidungs-Input (vor der Empfehlung, nicht danach). Trainingstage = Mo/Mi/Sa/Do. **Slot-Uhrzeit bestimmt Starttemp — Tagesmax ist fast nie die Starttemp; Parkrun 09:00 = Morgenwert, NIE Tagesmax (§2a).** Hitze-Tax fix 3,5 s/km/°C ab 18°C. Do: Gym-Hitze (keine Klimaanlage) + Flex-Regel-Wetter.

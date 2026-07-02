@@ -18,7 +18,7 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 > python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match backlog.md --out ./data
 > ```
 > Danach `./data/live.md` (aktueller Live-State, Overrides, Persona-Modus),
-> `./data/athlete.md` (Stammdaten, Race-Kalender) und — für den **Multi-Wochen-/Monats-Trend** —
+> `./data/athlete.md` (NUR Stammdaten — der Renn-Kalender lebt in `live.md`, §2) und — für den **Multi-Wochen-/Monats-Trend** —
 > `./data/trend_snapshot.md` lesen (schneller Read statt Sheet-Replay, CLAUDE.md §7; bei Lücke/Deep-Dive → Roh-Sheets).
 > Außerdem `./data/backlog.md` (offene Coaching-/Ideen-Vorhaben) für den Review-Punkt der Checklist.
 > Falls für eine Frage doch frische Werte nötig sind, werden sie on-demand via

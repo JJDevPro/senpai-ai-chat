@@ -133,7 +133,7 @@ Step 12: Berechnungen über gemergtes Schlaf-Fenster + Recovery-Ampel-Komposit (
 Step 13: ANOMALIE-CHECK (§3d) → ggf. CSV (heute, bei Mitternachts-Fenster auch gestern).
 Step 14: Persona-Modus aus HRV+Bedtime (§16).
 Step 15: Output in fester Dashboard-Reihenfolge (§4), IMMER voll.
-Step 16: 📓 ARCHIV (T7, NACH dem Output, best-effort, NON-BLOCKING): das fertige Verdict ins rollende Journal —
+Step 16: 📓 ARCHIV (T7, NACH dem Output — PFLICHT-Post-Schritt, Auslassen = Skill-Bruch; non-blocking NUR bei fehlender Journal-Datei): das fertige Verdict ins rollende Journal —
          `python3 lib/archive.py --report - --kind daily --date {heute}` (Verdict-Text via stdin). Fehlt `senpai-journal.md` → Pre-Seed-Hinweis melden, NICHT blockieren.
 ```
 

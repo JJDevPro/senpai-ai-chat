@@ -6,14 +6,24 @@ description: "AI Coach Wochen-Payload-Generator für den Athleten. Laden bei dem
 # Payload-Skill v2.0 — KW-Abschluss-Export (skriptiertes Rollup + PATCH)
 
 > Senpai lädt diese Datei NUR bei `Payload`-Command oder am Sonntag-Abend (KW-Abschluss).
+<!-- cc-only:start -->
 > **Zweck:** Verdichtetes Wochen-Briefing als State-Seed für den nächsten KW-Chat. **PATCHT** `live.md` (Schema v2, privater Drive-Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`) — nie Voll-Ersatz.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Zweck:** Verdichtetes Wochen-Briefing als State-Seed für den nächsten KW-Chat. **PATCHT** `live.md` (Schema v2, Drive-synchronisierte Projekt-Datei; Write-Back per Google-Drive-Connector in den Ordner „Senpai-AI-Chat") — nie Voll-Ersatz.
+cai-only:end -->
 > **v2.0:** Wochen-Aggregation skriptiert (`weekly_rollup.py` — 4 Makro-Ampeln × 7 Tage, Bedtime zweistufig, HRV-/Schlaf-Ø, Δ vs Vor-KW); live.md-Update = PATCH-Semantik.
 
 ---
 
 ## 0. ⛔ AKZEPTANZKRITERIUM (Definition of Done — KEIN nice-to-have)
 
+<!-- cc-only:start -->
 > **Herkunft (wichtig):** Der Payload ist ein **Relikt aus claude.ai**. Dort war er ein reiner **Context-Dump** — die Wochendaten lagen (manuell hochgeladen) im Kontext, also genügte „gib aus, was geladen ist". **In Claude Code gilt das NICHT MEHR:** der Kontext enthält die Wochendaten NICHT automatisch. Ein „dump-what's-loaded"-Payload hätte hier zwangsläufig **Lücken**.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Herkunft (wichtig):** Der Payload war ursprünglich ein reiner **Context-Dump** — „gib aus, was geladen ist". **Das gilt NICHT MEHR:** auch hier liegen die WOCHEN-Daten (HAE-Tages-JSONs, Trainings-Detail) NICHT automatisch im Kontext — nur die State-Projekt-Dateien. Ein „dump-what's-loaded"-Payload hätte zwangsläufig **Lücken**.
+cai-only:end -->
 
 **Ein Payload mit Lücken aus NICHT-geholten Daten ist ein NO GO — er darf NICHT ausgegeben werden.** Vor der Ausgabe gilt verbindlich:
 
@@ -21,15 +31,25 @@ description: "AI Coach Wochen-Payload-Generator für den Athleten. Laden bei dem
 2. Ein `[?]`, das nur entstand, weil der Wert „nicht im Kontext lag" / nicht gezogen wurde, ist **unzulässig** → erst ziehen (§1, CLAUDE.md §0 Hol-Pflicht).
 3. Bevor der Block emittiert wird: **Gap-Check** über alle Felder. Findet sich ein nicht-quellenbelegtes `[?]` oder ein still weggelassenes Feld → **STOPP, nachziehen, dann erst ausgeben.** Verschweigen = Halluzination.
 
+<!-- cc-only:start -->
 > Kurz: In Claude Code ist der Payload ein **aktiver Daten-Sammler**, kein Context-Echo. Vollständigkeit (oder belegte, begründete Abwesenheit) ist Pflicht, nicht Kür.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> Kurz: Der Payload ist ein **aktiver Daten-Sammler**, kein Context-Echo — fehlende Wochen-Daten werden ANGEFORDERT (Chat-Upload) statt geraten. Vollständigkeit (oder belegte, begründete Abwesenheit) ist Pflicht, nicht Kür.
+cai-only:end -->
 
 ---
 
 ## 1. Workflow
 
+<!-- cai-only:start
+> **CAI-Twin-Notiz:** Der Sonntags-Payload läuft bevorzugt im Repo-Zwilling (Claude Code on the web); diese claude.ai-Variante ist der mobile Fallback — identischer Output-Kontrakt (§2-Block, PATCH-Semantik, Gap-Check §0).
+cai-only:end -->
+
 1. **Sonntag (oder KW-Ende):** KW-Abschluss. **Die SoT-Messung ist MONTAGS** (nüchtern nach dem Aufstehen, Richtwert ≤09:00 — CLAUDE.md §7); der Payload referenziert den **letzten Mo-SoT-Wert** (manuell gepostet bzw. aus `live.md`). KEINE Sonntag-Messung erwarten oder anfordern.
 2. **User:** sendet `Payload`.
 3. **Senpai:** generiert den Block unten — **copy-paste-fertig, NUR Code-Fence, kein Preamble/Postamble.**
+<!-- cc-only:start -->
 4. **Senpai:** **PATCHT `./data/live.md` (Schema v2)** mit den Payload-Werten und lädt es per Write-Back hoch:
    - Erst ziehen (`--match live.md`), dann NUR die betroffenen Zeilen/Sektionen aktualisieren: `Stand: KW…`, `## SoT-Snapshot`, `## Trend-Metriken`, `## PRs` (Gym-Zeile = Spiegel von baselines.md), `## Streaks`, `## Race-Countdown` (nur wenn sich Termine geändert haben), `## Persona-State`.
    - **⛔ KEIN Voll-Ersatz:** Sektionen ohne neue Daten bleiben byte-gleich stehen (die Kontrakt-Sektionen werden von `bootstrap`/`make_ics`/`session_menu` geparst — ein Voll-Ersatz durch den Payload-Block hat sie früher zerstört). Der Payload-BLOCK ist der Chat-Output; `live.md` ist das strukturierte State-File — zwei Formate, ein Inhalt.
@@ -37,8 +57,16 @@ description: "AI Coach Wochen-Payload-Generator für den Athleten. Laden bei dem
    python3 lib/pull_drive.py --upload ./data/live.md --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --name live.md
    ```
    **Hinweis:** `live.md` ist im Drive-Ordner **pre-seeded** (Service-Account kann nur updaten, nicht anlegen). **Drive bleibt die einzige Wahrheit — kein Sheet-Append, nichts ins Git-Repo.**
+<!-- cc-only:end -->
+<!-- cai-only:start
+4. **Senpai:** **PATCHT `./data/live.md` (Schema v2)** mit den Payload-Werten und schreibt es zurück:
+   - `live.md` ist Drive-synchronisierte Projekt-Datei (Inhalt im Kontext) → Inhalt 1:1 nach `./data/live.md` schreiben, dann NUR die betroffenen Zeilen/Sektionen aktualisieren: `Stand: KW…`, `## SoT-Snapshot`, `## Trend-Metriken`, `## PRs` (Gym-Zeile = Spiegel von baselines.md), `## Streaks`, `## Race-Countdown` (nur wenn sich Termine geändert haben), `## Persona-State`.
+   - **⛔ KEIN Voll-Ersatz:** Sektionen ohne neue Daten bleiben byte-gleich stehen (die Kontrakt-Sektionen werden von anderen Routinen geparst — ein Voll-Ersatz durch den Payload-Block hat sie früher zerstört). Der Payload-BLOCK ist der Chat-Output; `live.md` ist das strukturierte State-File — zwei Formate, ein Inhalt.
+   - **Write-Back:** die BESTEHENDE `live.md` im Drive-Ordner „Senpai-AI-Chat" per Google-Drive-Connector aktualisieren — NIE ein Duplikat anlegen. Schlägt der Connector-Write fehl → kompletten neuen `live.md`-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive. **Drive bleibt die einzige Wahrheit.**
+cai-only:end -->
 5. **User:** kopiert Block als erste Message in den neuen KW-Chat → sendet danach `Sync`.
 
+<!-- cc-only:start -->
 **Datenquellen:** der Live-State aus dem privaten Drive-Ordner (`live.md` + die übrigen State-Files) + Chat-Verlauf der Woche + ggf. Vor-KW-Payload (für Trends). Pull der State-Files vor Gebrauch:
 ```bash
 python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data       # dann ./data/live.md lesen
@@ -49,6 +77,14 @@ python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match lea
 **Zusätzlich PFLICHT (CLAUDE.md §0 Hol-Pflicht): die Wochen-Metriken ZIEHEN, die der Block braucht** — nicht nur die State-Files. Vor dem Block holen:
 - **HAE-Tages-JSONs** der KW via `pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthAutoExport-{tag}" --out ./data` (alle 7 Tage + Vortag des Montags).
 - **Trainings_v5** + **Gesundheitsdaten_v5** (`--sheet …`) für Absolvierung/CTL-ATL-TSB + Body-Comp/KW-Trend.
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Datenquellen:** der Live-State (`live.md` + die übrigen State-Files) + Chat-Verlauf der Woche + ggf. Vor-KW-Payload (für Trends). Die State-Files (`live.md`, `athlete.md`, `baselines.md`, `learnings.md`) sind Drive-synchronisierte Projekt-Dateien — ihr Inhalt steht im Kontext; was das Rollup-Skript braucht, 1:1 nach `./data/<name>` schreiben.
+**Zusätzlich PFLICHT (Hol-Pflicht): die Wochen-Metriken BESCHAFFEN, die der Block braucht** — anfordern statt raten, nicht nur die State-Files. Vor dem Block:
+- **Anker:** `readiness-history.csv` (Projekt-Datei) 1:1 nach `./data/readiness-history.csv` schreiben — speist HRV-/RHR-/Readiness-Ø + Δ vs Vor-KW im Rollup.
+- **HAE-Tages-JSONs der KW** (alle 7 Tage + Vortag des Montags) als **Chat-Upload anfordern** — Roh-JSON/FIT/ZIP NIE per Drive-Connector in den Kontext ziehen (§0-Kernregel: nur Aggregate). Upload-Verzeichnis per `ls` lokalisieren (typisch `/mnt/user-data/uploads`, nie blind hardcoden), Dateien nach `./data/` kopieren.
+- **Makro-/Trainings-Detail bei Bedarf:** die Monats-/Range-CSV (Trainings-/Gesundheits-Export) bzw. fehlende Tages-JSONs ebenfalls als Chat-Upload anfordern — fehlende Daten werden ANGEFORDERT, nie geraten, nie verschwiegen.
+cai-only:end -->
 
 **⚙️ DANN das skriptierte KW-Rollup (die Zahlen des Blocks — KEIN Kopfrechnen):**
 ```bash
@@ -116,7 +152,12 @@ Erst nach einem **echten, fehlgeschlagenen Pull-Versuch** gilt: fehlender Wert =
 - Ampeln immer mit Symbol (🟢🟡🟠🔴), nicht nur Wort — **Makro-/Bedtime-/HRV-Zeilen 1:1 aus `weekly_rollup.py` (`template_lines`), nie im Kopf gezählt.**
 - Trend-Pfeile aus KW-Vergleich (Vor-KW-Payload falls vorhanden).
 - Persona-State ehrlich aus aktuellem Chat extrahieren — keine Fake-Diagnose. Anrede-Tier + Roast-Anrede aus `athlete.md`, nicht erfinden.
+<!-- cc-only:start -->
 - **Protokoll = V3 Heavy Hybrid Polarized** (NICHT mehr V2). Countdown-Anker = aktuelle Races aus den State-Files (privater Drive-Ordner, oben gepullt) — Renn-Strategie aus `Race_Strategie.md`, ebenfalls aus dem privaten Drive-Ordner ziehen: `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match Race_Strategie.md --out ./data` (dann `./data/Race_Strategie.md` lesen).
+<!-- cc-only:end -->
+<!-- cai-only:start
+- **Protokoll = V3 Heavy Hybrid Polarized** (NICHT mehr V2). Countdown-Anker = aktuelle Races aus den State-Files (Projekt-Dateien, §1) — Renn-Strategie bei Bedarf aus `Race_Strategie.md` per Google-Drive-Connector lesen (Ordner „Senpai-AI-Chat"; Markdown-Modul, kein Roh-Datenfile → Connector-Read erlaubt).
+cai-only:end -->
 
 ---
 
@@ -129,6 +170,7 @@ Payload-Block am Chat-Anfang erkannt (`# 📦 PAYLOAD KW...`):
 
 ---
 
+<!-- cc-only:start -->
 ## 5. Archiv (T7, NACH dem Block — PFLICHT-Post-Schritt)
 
 Nach der Payload-Ausgabe den Block ins rollende Journal archivieren — **Auslassen = Skill-Bruch** (das Journal ist die Langzeit-Retro-Quelle). Non-blocking NUR, wenn `senpai-journal.md` in Drive fehlt (Pre-Seed-Hinweis melden):
@@ -136,11 +178,18 @@ Nach der Payload-Ausgabe den Block ins rollende Journal archivieren — **Auslas
 python3 lib/archive.py --report - --kind payload --date {kw_sonntag}   # Payload-Block via stdin
 ```
 Fehlt `senpai-journal.md` → Pre-Seed-Hinweis melden, nicht blockieren. (`live.md`-Regeneration bleibt der separate Write-Back-Schritt.)
+<!-- cc-only:end -->
+<!-- cai-only:start
+## 5. Archiv (NACH dem Block — best-effort, optional)
+
+Nach der Payload-Ausgabe den Block best-effort ins rollende Journal archivieren: `senpai-journal.md` per Google-Drive-Connector lesen, den Payload-Block als neue Sektion (KW + Datum) anhängen und die BESTEHENDE Drive-Datei aktualisieren (kein Duplikat). Schlägt der Connector-Write fehl oder fehlt die Datei → Hinweis melden, NICHT blockieren. (`live.md`-Regeneration bleibt der separate Write-Back-Schritt, §1 Schritt 4.)
+cai-only:end -->
 
 ---
 
 ## 6. Trend-Snapshot versiegeln (PR2, NACH dem Block, best-effort)
 
+<!-- cc-only:start -->
 Am KW-Ende versiegelt der Payload die **abgeschlossene Woche** als Snapshot-Zeile + rollt den Monat — nutzt die schon
 gezogenen Daten (kein zweiter Pull). Der Snapshot ist ab dann der schnelle Multi-Wochen-Read für Daily/Sync (§7 CLAUDE.md):
 ```bash
@@ -148,15 +197,28 @@ python3 .claude/skills/daily-check-skill/scripts/trend_snapshot.py --as-of {kw_s
 ```
 Regeneriert `trend_snapshot.md` aus `readiness-history.csv` (die Tageszeilen der KW sind via daily-check/run-bundle schon
 geschrieben) und lädt ihn nach Drive. Fehlt `readiness-history.csv`/`trend_snapshot.md` → Pre-Seed-Hinweis melden, NICHT blockieren.
+<!-- cc-only:end -->
+<!-- cai-only:start
+Am KW-Ende versiegelt der Payload die **abgeschlossene Woche** als Snapshot-Zeile + rollt den Monat — nutzt die schon beschafften Daten (kein zweiter Fetch). Der Snapshot ist ab dann der schnelle Multi-Wochen-Read für Daily/Sync:
+```bash
+python3 scripts/trend_snapshot.py --local --history ./data/readiness-history.csv --out-file ./data/trend_snapshot.md
+```
+Danach `./data/trend_snapshot.md` per Google-Drive-Connector als Update der BESTEHENDEN `trend_snapshot.md` (Ordner „Senpai-AI-Chat") zurückschreiben — kein Duplikat; Fallback: Inhalt als Code-Fence ausgeben. Fehlt `readiness-history.csv`/`trend_snapshot.md` → Hinweis melden, NICHT blockieren.
+cai-only:end -->
 
 ---
 
 ## 7. Backlog pflegen (PR3, NACH dem Block, best-effort)
 
+<!-- cc-only:start -->
 Am KW-Ende `backlog.md` ziehen (`pull_drive.py --match backlog.md --out ./data`) und mit den KW-Learnings
 abgleichen: **offene Learnings dieser KW** als Items übernehmen (`## Aktiv`/`## Hypothesen`, dedup gegen Bestand),
 in der KW **abgeschlossene** Vorhaben nach `## Erledigt` mit Datum. Lokal regenerieren + `pull_drive.py --upload
 --name backlog.md`. Fehlt `backlog.md` → Pre-Seed-Hinweis melden, NICHT blockieren. (Mutable Drive-State wie `coaching_cues.md`.)
+<!-- cc-only:end -->
+<!-- cai-only:start
+Am KW-Ende `backlog.md` (Drive-synchronisierte Projekt-Datei — Inhalt im Kontext, sonst per Google-Drive-Connector lesen) mit den KW-Learnings abgleichen: **offene Learnings dieser KW** als Items übernehmen (`## Aktiv`/`## Hypothesen`, dedup gegen Bestand), in der KW **abgeschlossene** Vorhaben nach `## Erledigt` mit Datum. Aktualisierte Fassung per Connector-Update der BESTEHENDEN `backlog.md` zurückschreiben (kein Duplikat; Fallback: Code-Fence). Fehlt `backlog.md` → Hinweis melden, NICHT blockieren. (Mutable Drive-State wie `coaching_cues.md`.)
+cai-only:end -->
 
 ---
 

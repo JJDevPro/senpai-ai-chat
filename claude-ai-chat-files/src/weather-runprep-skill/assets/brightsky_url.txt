@@ -1,0 +1,2 @@
+https://api.brightsky.dev/weather?lat=49.4533&lon=11.0998&date={date}&tz=Europe/Berlin
+# {date} durch den Zieltag YYYY-MM-DD ersetzen. Quelle: athlete.md (senpai-export-Block bzw. Koordinaten-Anker); Regeneration: export_claude_ai.py --refresh-personal

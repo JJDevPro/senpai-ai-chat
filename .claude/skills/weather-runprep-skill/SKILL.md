@@ -29,11 +29,24 @@ description: "AI Coach Wetter- und Pre-Lauf-Engine für den Athleten (Heimatstad
 
 ## 2. Wetter-Quellen (Dual-Source: Bright Sky/DWD präzise + Wetterochs Narrativ)
 
+<!-- cc-only:start -->
 **PRIMÄR — präzise Stundenwerte: Bright Sky / DWD via `lib/weather.py`** (deterministischer Pull wie `pull_drive.py`, KEIN WebFetch):
 ```bash
 python3 lib/weather.py --lat <LAT> --lon <LON> --date {heute} --slot-start HH:MM --slot-end HH:MM --tz Europe/Berlin
 ```
 - **lat/lon aus `athlete.md`** (Wohnort; Repo bleibt personal-data-frei — NIE hier hardcoden). tz-Default Europe/Berlin (Slot-Zeiten sind dann lokal).
+<!-- cc-only:end -->
+<!-- cai-only:start
+**PRIMÄR — präzise Stundenwerte: Bright Sky / DWD** (Chat fetcht, Skript rechnet — identische deterministische Slot-/Asphalt-Ausgabe):
+1. Bright-Sky-URL aus `assets/brightsky_url.txt` nehmen, darin `{date}` durch den Zieltag `YYYY-MM-DD` ersetzen.
+2. Die URL per **Chat-Web-Fetch** abrufen — das kann der Chat nativ. NICHT aus dem Sandbox-Skript fetchen.
+3. Die JSON-Antwort **UNGEKÜRZT** in `./data/brightsky.json` speichern (vorher `mkdir -p ./data`).
+4. Dann EXAKT:
+```bash
+python3 scripts/weather.py --from-json ./data/brightsky.json --lat <lat> --lon <lon> --date <YYYY-MM-DD> --slot-start HH:MM --slot-end HH:MM
+```
+- **lat/lon stehen in derselben `assets/brightsky_url.txt`** (NIE raten/hardcoden). tz-Default Europe/Berlin (Slot-Zeiten sind dann lokal).
+cai-only:end -->
 - Liefert kompakt: `slot_window` (eine Zeile je Stunde über das Lauf-Fenster: `temperature`, `precipitation`, `precipitation_probability`, `wind_speed`/`wind_gust_speed` [km/h], `dew_point`, `cloud_cover`, `condition` **+ `asphalt_surface_c_est` / `asphalt_excess_c_est`**), `day_summary` (min/max/mean, max_precip_prob, **day_sunshine_min, mean_cloud_cover, asphalt_residual_c_est**), `warnings`. **NIE das rohe 24-h-Array** (§0).
 - **Einheiten:** °C · mm · % · km/h. **`asphalt_*_est` = Heuristik aus solar/sunshine/cloud (KEIN Messwert)** — so labeln (sonniger Tag → mehr gespeicherte Hitze; Regen kühlt den Belag → ~Lufttemp).
 
@@ -42,7 +55,12 @@ python3 lib/weather.py --lat <LAT> --lon <LON> --date {heute} --slot-start HH:MM
 - **Delphi-JSON (ab morgen, 9 Tage):** `https://www.wetterochs.de/wetter/delphi/gen/WetterRegnitz.json`
 - Wetterochs-JSON ist nur **tages-granular** (Min/Max) → NICHT für exakte Slot-Zahlen. Nutzen: Prosa-Kontext, Gewitter/Glatteis-Warnung, Fallback wenn Bright Sky fehlt.
 
+<!-- cc-only:start -->
 > **Netz/Fallback:** `api.brightsky.dev` + `wetterochs.de` müssen in der Allowlist sein. Bright Sky fail (`error`/`warnings` im JSON) → auf Wetterochs (§2a-Heuristik) zurückfallen. Beide fail → `[kein Wetter]`, nach Apple-Weather-Screenshot fragen, wenn trainingsrelevant.
+<!-- cc-only:end -->
+<!-- cai-only:start
+> **Fallback:** Schlägt der Chat-Web-Fetch der Bright-Sky-URL fehl oder meldet das JSON `error`/`warnings` → auf Wetterochs (§2a-Heuristik) zurückfallen. Beide fail → `[kein Wetter]`, nach Apple-Weather-Screenshot fragen, wenn trainingsrelevant.
+cai-only:end -->
 
 ### 2a. ⏰ Slot-Uhrzeit → Starttemp (Fallback-Heuristik, wenn Bright Sky fehlt)
 **Wenn `lib/weather.py` (Bright Sky) läuft, ist die Slot-Starttemp DIREKT der `slot_window`-Stundenwert** — diese Heuristik dann NICHT nötig. Nur als **Fallback** (Bright Sky nicht erreichbar, nur Wetterochs Min/Max vorhanden): Die relevante Temp hängt an der **Slot-Uhrzeit**, NICHT am Tagesmax (der fällt nachmittags ~15–17 Uhr) — so ableiten:
@@ -132,8 +150,13 @@ Wetter ist **Kriterium 2** der Flex-Regel (`modules/V3_Protocol.md`, alle 4 müs
 9. Bei Hitze/Schwüle: Wasser-/Elektrolyt-Hinweis (→ `nutrition-skill` §6).
 
 ### 5a. 🎯 Mental Cues (eigener Block — VOR dem Lauf, getrennt vom Wetter)
+<!-- cc-only:start -->
 Die session-übergreifende Coaching-Schleife (run-bundle §12d schreibt sie): `coaching_cues.md` ziehen
 (`pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match coaching_cues.md --out ./data`),
+<!-- cc-only:end -->
+<!-- cai-only:start
+Die session-übergreifende Coaching-Schleife (run-bundle §12d schreibt sie): `coaching_cues.md` ist eine Drive-synchronisierte Projekt-Datei — Inhalt steht bereits im Kontext, kein Pull nötig. Direkt daraus
+cai-only:end -->
 die **OPEN-Cues des heutigen Slot-Typs** (Mo/Mi=Easy/Long, Sa=Parkrun — §1/V3) als eigenen Block zeigen:
 > 🎯 **Mental Cues — letzter [Typ]-Lauf:** [1–3 OPEN-Cues, je „Metrik war X 🟡, heute Ziel Y → Cue-Phrase"].
 > Primär-Dauer-Cue: **Vertical Ratio <11 %** („Vorlage aus den Knöcheln, kein Trampolin") aktiv coachen.

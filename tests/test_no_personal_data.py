@@ -18,7 +18,13 @@ from denylist import COORD_PAIR, denied_words
 REPO = Path(__file__).resolve().parents[1]
 
 # data/ ist gitignored, .git/ kein Quellcode. tests/ wird MIT gescannt (PR-7).
-EXCLUDE_PREFIXES = ("data/", ".git/")
+# claude-ai-chat-files/ = bewusste PII-ENKLAVE (Entscheidung 2026-07, v10.1.0):
+# der generierte claude.ai-Twin darf personalisierte Assets (Race-Strategie,
+# GPX, Bright-Sky-URL) enthalten — privater Repo, dokumentiert in
+# docs/CLAUDE_AI_EXPORT.md. tests/test_claude_ai_export.py pinnt dieses Set
+# exakt (die Ausnahme kann nicht stillschweigend wachsen) und hält den
+# Exporter-Quellcode selbst PII-frei.
+EXCLUDE_PREFIXES = ("data/", ".git/", "claude-ai-chat-files/")
 # Binär-/Asset-Endungen ohne durchsuchbaren Text.
 BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf",
                    ".gpx", ".fit", ".zip", ".woff", ".woff2"}

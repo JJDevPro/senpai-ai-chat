@@ -32,6 +32,7 @@ description: "AI Coach Daily Check für den Athleten — WHOOP-artiges Tages-Das
 
 ## 2. WORKFLOW (Pflicht-Reihenfolge)
 
+<!-- cc-only:start -->
 ```
 Step 0:  KEIN Tool-Setup nötig — alle Daten kommen lokal via `python3 lib/pull_drive.py` nach
          `./data` + die gebündelten Scripts unter `.claude/skills/daily-check-skill/scripts/`.
@@ -136,6 +137,125 @@ Step 15: Output in fester Dashboard-Reihenfolge (§4), IMMER voll.
 Step 16: 📓 ARCHIV (T7, NACH dem Output — PFLICHT-Post-Schritt, Auslassen = Skill-Bruch; non-blocking NUR bei fehlender Journal-Datei): das fertige Verdict ins rollende Journal —
          `python3 lib/archive.py --report - --kind daily --date {heute}` (Verdict-Text via stdin). Fehlt `senpai-journal.md` → Pre-Seed-Hinweis melden, NICHT blockieren.
 ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+```
+Step 0:  KEIN Tool-Setup nötig — Vorbereitung: `mkdir -p ./data`. State-/Snapshot-Dateien
+         (live.md, baselines.md, learnings.md, backlog.md, trend_snapshot.md,
+         readiness-history.csv) sind Drive-synchronisierte PROJEKT-DATEIEN — der Inhalt steht
+         im Kontext; was ein Skript braucht, 1:1 nach ./data/<name> schreiben
+         (readiness-history.csv IMMER nach ./data/readiness-history.csv). Roh-Tages-JSONs
+         kommen als CHAT-UPLOAD (Step 4), NIE per Drive-Connector in den Kontext
+         (§0-Kernregel). Zurückgeschrieben werden NUR State-Dateien via Connector-Update
+         derselben Drive-Datei (Steps 10.5–10.7, Step 16) — nie ein Duplikat anlegen.
+Step 1a: DATUM (Tag/Wochentag/KW) — deterministisch: User-Angabe → sonst **`python3 scripts/clock.py` (Sandbox-Uhr → Europe/Berlin)**, NIE das interne Modell-Datum raten. Dieses Datum ist das `--as-of {heute}` ALLER Folge-Steps.
+Step 1b: UHRZEIT (HH:MM): User-Angabe → **`python3 scripts/clock.py` (Sandbox-Uhr → Europe/Berlin)** → `[Zeit n/a]` nur falls Clock-Read scheitert. CLAUDE.md §3. **Kein API, kein Raten.**
+Step 2:  Wochentag → Trainingstag (Mo/Mi/Sa/Do)? → Wetterochs-Flag (PROAKTIV — auch wenn Rest empfohlen wird; Wetter ist Entscheidungs-Input).
+Step 3:  ISO-KW + Montag dieser KW.
+Step 3.5: INPUT-TYP: (a) EIN Multi-Day-Export hochgeladen (Range-Datei
+         `HealthAutoExport-YYYY-MM-DD-YYYY-MM-DD.json` in `./data`, Span >2 Tage) → MULTI-DAY-Pfad (§3f-bis),
+         Steps 4-6 entfallen, weiter bei Step 7. (b) Sonst Standard: zwei Tagesdateien (Steps 4-6, §3f).
+         **⛓️ SCOPE-INVARIANTE (nicht verhandelbar): Daily braucht IMMER mind. heute+gestern** — beide Tage gehen in slice_hae_day UND daily_signals (Step 8.5). Fragt der User explizit einen größeren Zeitraum (»diese KW«, »letzte 7 Tage«), wird der Range-Export / werden mehr Tagesdateien als Upload angefordert und alles in Relation gesetzt (§3f-bis). **NIE nur heute** — Single-Day = Vortag-Verlust (Daylight/Audio/Recovery-Link brechen, der 28.06-„3-min"-Glitch). Der manuelle HAE-Upload war schon immer der claude.ai-Modus — voller Scope ist Pflicht.
+Step 4:  ZWEI Tages-JSONs als CHAT-UPLOAD anfordern (HAE-Share vom iPhone; Muster YYYY-MM-DD, NIE YYYY-MM; §3b):
+         ├── Upload-Pfade im Sandbox-Dateisystem lokalisieren (typisch /mnt/user-data/uploads —
+         │   IMMER per ls verifizieren, nie blind hardcoden) und nach ./data kopieren.
+         └── Fehlt HEUTE oder GESTERN → aktiv nachfordern (der Mitternachts-Merge braucht BEIDE);
+             `[?]` nur nach echtem Versuch (Hol-Pflicht §0).   ← Gestern wird VOLL ausgewertet
+Step 5:  Beide lokalen JSON-Pfade + den Mitternachts-Merge + Ziel-Tag-Slicing in EINEM Aufruf:
+         `python3 scripts/slice_hae_day.py <heute_json> [<gestern_json>] --as-of {heute}` → JSON von stdout lesen (§3f).
+         [Multi-Day: §3f-bis — EIN Range-File als `<heute_json>`, kein zweites Argument.]
+Step 6:  slice_hae_day mergt die minuten-granularen Serien (HRV/HR/SpO2/Atmung) gestern+heute und slict auf die
+         Ziel-Nacht (§3f / §3f-bis bei Multi-Day). Kein manuelles base64/json — die JSON-Ausgabe lesen.
+Step 7:  sleep_analysis aus der slice_hae_day-JSON (sleepEnd == heute; §3f / §3f-bis bei Multi-Day).
+Step 8:  GESTERN-LOAD aus der slice_hae_day-JSON: active_energy (Tagessumme), step_count, physical_effort (Ø/Peak),
+         heart_rate (Tages-Ø wach / Peak / Uhrzeit), walking_hr.
+         **Plus `load_extra`** (nur wenn vorhanden, §7): `true_tdee_kcal` (Grundumsatz+Aktiv → Energie-Bilanz),
+         `exercise_min` + `flights_climbed` (Load-Proxys), `gait.asymmetry_pct`/`gait.double_support_pct`
+         (Gang-Trip-Wire — NUR surfacen wenn `flag=True` = erhöht → Verletzungs-/Ermüdungs-Kontext).
+         **Multi-Day: slice_hae_day filtert ZWINGEND auf den Vortag** (`day==gestern`), sonst Wochen-/Monats-Summe (§3f-bis).
+Step 8.5: TAG-SIGNALE: `python3 scripts/daily_signals.py <heute_json> <gestern_json> --as-of {heute}` (§3i) —
+         **BEIDE Tagesdateien übergeben** (heute + gestern) ODER den Multi-Day-Export — daily_signals mergt sie, damit der **Vortag (`daylight`/`audio` `yesterday`) nie verhungert**. `--as-of {heute}` pinnt today/yesterday (PFLICHT, sonst = letzter Tag im Export).
+         🛡️ **Vortag-Härtung:** Wird versehentlich NUR die Heute-Datei übergeben und fehlt der Kalender-Vortag, zieht daily_signals ihn via `--data-dir` (Default = Ordner der ersten Datei) selbst aus `./data` nach (`HealthAutoExport-<gestern>.json`) — nicht-fatal, wenn die Datei wirklich fehlt.
+         Liefert Tageslicht, Schlaf-Effizienz, Wrist-Temp+Baseline, Audio-Tag-Kontext, VO2max/cardio_recovery-Fallback, Wasser **+ `dietary`** (Makros gestern+heute: Protein/kcal/Fett/Carbs/Ballaststoffe/Zucker/Wasser → §7b Ernährung).
+Step 8.6: ⛔ SAFETY-GATE (deterministisch, NICHT verhandelbar — CLAUDE.md §6):
+         `python3 scripts/safety_gate.py <slice_json> [--injury] [--opt-out] [--prev-hrv N | --health-csv ./data/readiness-history.csv]`
+         `<slice_json>` = die slice_hae_day-Ausgabe (Datei oder '-' via Pipe). Liefert
+         `{gate,level,reasons,training_allowed,roast_allowed[,data_gaps]}`. Das Gate IMMER feuern und
+         RESPEKTIEREN: `training_allowed=false` (HRV🔴🔴 <40 + Schlaf <6h) = Training
+         STREICHEN, kein Verhandeln — übersteuert Plan-Matrix + Persona. `roast_allowed=false`
+         (Verletzung/Opt-out) = Persona aus. **Vortags-HRV-Zubringer (deterministisch, PFLICHT
+         für das 2-Tage-Deload-Muster):** `--health-csv ./data/readiness-history.csv` liest gestern-HRV
+         selbst aus der hrv_ms-Spalte der Projekt-CSV (Step 0); `--prev-hrv N` nur als manueller Override.
+         HRV<40 bei FEHLENDEM Schlafwert → `level=WARN` + `data_gaps:["heute_sleep.total_h"]` (kein stilles
+         Fail-open): Schlaf nachtragen oder konservativ handeln. AFib-Burden wird BEWUSST nicht
+         gegated (§6 Medical).
+Step 9:  TRAININGS-LOAD (INKREMENTELL — auf claude.ai gibt es KEIN Trainings_v5-Sheet-Replay):
+         letzte Zeile aus ./data/readiness-history.csv lesen (`readiness_history.last_row`); ist deren
+         `date` == gestern UND ctl/atl vorhanden → 🧮 `banister.compute_incremental(ctl, atl, date,
+         gestern_TRIMP, heute)` = EIN deterministischer EWMA-Schritt (gleiche 42/7-Konstanten wie die
+         Vollrechnung). TSB = heutige Readiness (CTL_gestern − ATL_gestern), Zeile via format_block(res).
+         `gestern_TRIMP` = Engine-TRIMP der gestrigen Session (Run-/Gym-Report bzw. live.md); Ruhetag → 0;
+         fehlt ein belastbarer Wert → TRIMP-Formel (§7) aus Gestern-Load (Dauer + Ø-HR) rechnen und als
+         „geschätzt" labeln. Anker reißt (letzte Zeile < gestern / ctl/atl leer) → compute_incremental
+         liefert None → CTL/ATL/TSB qualitativ + Hinweis, KEINE erfundenen Zahlen (Voll-Replay = Repo-Zwilling).
+Step 10: KW-TREND-QUELLE: kein Sheet auf claude.ai — Tageszeilen der laufenden KW aus
+         ./data/readiness-history.csv (Zeilen ≥ Montag) + `trend_snapshot.md` (Projekt-Datei) für
+         zurückliegende Wochen/Monate (§10).
+Step 10.1: 🟢 HRV-STATUS (Garmin-Klon): `python3 scripts/hrv_baseline.py --health-csv ./data/readiness-history.csv --as-of {heute}`
+         → `{median,band,status,latest_lag_days,stale}` (§6.5) — die hrv_ms-Spalte der Projekt-CSV ist die
+         Baseline-Historie (60-Tage-Fenster; <14 Tage → „bildet sich (n/14)"). LOW_FLOOR = safety_gate.HRV_RED
+         (geteilt). Bei `stale=true` (CSV-Lag) den Lag nennen — Baseline dann als „Stand −N d" labeln.
+Step 10.15: 🚨 SENTINEL (Trip-Wires, JEDER Daily Check — Pflicht-Zubringer für den EINEN Score):
+         `python3 scripts/sentinel.py --health-csv ./data/readiness-history.csv --daily <slice_json> [--weight-csv ./data/readiness-history.csv --weight-threshold-kg {aus athlete.md}]`
+         → `{alerts,warn_count,rhr_deviation,rhr_baseline_median,…}`.
+         Kalender-konsekutive HRV-/RHR-Muster (2+ Tage), Atemstörungs-Bänder, Gewichts-Trend. Der Output ist der
+         deterministische RHR-Baseline-Zubringer für Step 10.2 — NIE RHR-Abweichung im Kopf schätzen.
+Step 10.2: 🔋 READINESS (0–100, der EINE Score — §6.5): die SCHON berechneten Aggregate fusionieren (KEIN Re-Compute) —
+         `python3 scripts/readiness.py --hrv-baseline <hrv_json> --daily <slice_json> --banister <banister_json> --safety-gate <gate_json> --sentinel <sentinel_json>` → `{score,band,top_driver,top_limiter,safety_override}`.
+         `--sentinel` ist PFLICHT-Input (liefert `rhr_deviation` + Warn-Penalty); es gibt EINEN Readiness-Score im System — WHOOP-Card, Verdict und Heute-Plan zitieren DIESEN Wert, kein LLM-Komposit daneben.
+         ⛔ Safety-Gate bleibt AUTORITATIV: rotes Gate deckelt den Score auf ≤35 (`safety_override=true`) — übersteuert alles (§13/§16).
+Step 10.3: 🔋 BODY BATTERY: `python3 scripts/body_battery.py --slice <slice_json> --hrv <hrv_json> --banister <banister_json> --as-of {heute} --prev-bb <gestern_bb_end>` → `{bb_start,bb_end,drained,recharged,status}` (§6.5). Heuristik/Surrogat, klar so labeln.
+         **Verkettung (PFLICHT wenn verfügbar):** `<gestern_bb_end>` = `bb_end` aus der letzten Zeile der
+         ./data/readiness-history.csv (`readiness_history.last_row`, `date` == gestern) — Body Battery ist eine
+         Kette, kein Tages-Reset. Fehlt die Zeile/Lücke → ohne `--prev-bb` starten (Skript nutzt seinen Default) + im Output als „unverkettet" labeln.
+Step 10.4: 🏃 RUNNING TOLERANCE: Wochen-Lasten aus der week_km-Spalte von ./data/readiness-history.csv
+         ableiten (je ISO-Woche die letzte Zeile, älteste→neueste) →
+         `python3 scripts/running_tolerance.py --weekly <w1,w2,…> --as-of {heute}` → `{week_km,ceiling_km,acwr,ramp_flag,status}`
+         (Verletzungs-Decke bei hohem Körpergewicht, Schwelle → `athlete.md` → §13 Heute-Plan).
+         Zu wenig Wochen-Historie → Sektion ehrlich auslassen + Grund nennen (kein Trainings_v5 auf claude.ai).
+Step 10.5: 📈 HISTORY (T12, best-effort, NON-BLOCKING): Tageszeile LOKAL anhängen —
+         `python3 scripts/readiness_history.py --csv-path ./data/readiness-history.csv --as-of {heute} --readiness <readiness_json> --body-battery <bb_json> --banister <banister_json> --hrv-baseline <hrv_json> --daily <slice_json> --signals <signals_json> --tolerance <tolerance_json>`
+         (Local-Mode `--csv-path`, weitere Argumente identisch zum Repo-Zwilling; die erweiterte Zeile trägt
+         ctl/atl/hrv_ms/rhr/weight/kfa/vo2/week_km — speist den inkrementellen Banister (Step 9) + den Trend-Snapshot).
+         DANACH die aktualisierte ./data/readiness-history.csv via Google-Drive-Connector in die BESTEHENDE
+         Drive-Datei zurückschreiben (nie ein Duplikat; Fallback: kompletter Inhalt als Code-Fence, User ersetzt ihn).
+         Fehlt die Projekt-CSV → Hinweis MELDEN, NICHT blockieren (unkritisch für den Check).
+Step 10.6: 📅 TREND-SNAPSHOT (PR2, best-effort, NON-BLOCKING): NACH dem History-Write den Woche+Monat-Rollup
+         regenerieren + lesen — `python3 scripts/trend_snapshot.py --local --history ./data/readiness-history.csv --out-file ./data/trend_snapshot.md --as-of {heute}`,
+         dann trend_snapshot.md via Connector-Update in die bestehende Drive-Datei (Fallback: Code-Fence).
+         **Der Multi-Wochen-/Monats-KW-Trend (§10) liest DIESEN Snapshot** — kein Sheet-Replay.
+         HEUTE bleibt frisch gerechnet (Step 9/10.2). Fehlt Snapshot/CSV → Hinweis MELDEN, NICHT blockieren.
+Step 10.7: 📋 BACKLOG (PR3, best-effort, NON-BLOCKING): `backlog.md` ist Projekt-Datei (Inhalt im Kontext).
+         Feuert heute ein **längerfristiges** Signal (z. B. Protein-Floor-Fail mehrtägig, HRV-Korridor-Drift,
+         Re-Entry-Lücke) → unter `## Aktiv`/`## Hypothesen` ein Item ergänzen (Format = Template; **dedup**
+         gegen Bestand, kein Spam). Wirkt ein offenes Item erledigt → nach `## Erledigt` mit Datum. Datei
+         lokal regenerieren + via Google-Drive-Connector die BESTEHENDE Datei aktualisieren (Fallback:
+         Code-Fence). Fehlt `backlog.md` → Hinweis MELDEN, NICHT blockieren. (Abgrenzung: Form-Cues → `coaching_cues.md`.)
+Step 11: Wenn Trainingstag (Mo/Mi/Sa/Do, Wochentag aus scripts/clock.py): **`weather-runprep-skill` automatisch laden + ausführen**
+         (voller Workflow: präzise Bright Sky/DWD-Stundenwerte + Wetterochs RSS/Delphi-JSON fürs Narrativ —
+         Datenbeschaffung siehe §0-CAI des weather-Bundles: Bright Sky via Chat-Web-Fetch, das Script parst nur die gespeicherte JSON).
+         An **Lauftagen** (Mo/Mi/Sa; Do nur bei aktiver Flex-Regel) daraus zusätzlich das
+         **Pre-Lauf-Briefing** (§12.5: Schuh + Runna-Session + Pace@HR147) bauen — Subset aus dem weather-runprep-Output, keine Duplikation.
+Step 12: Berechnungen über gemergtes Schlaf-Fenster + Recovery-Ampel-Komposit (§6).
+Step 13: ANOMALIE-CHECK (§3d) → ggf. CSV (heute, bei Mitternachts-Fenster auch gestern).
+Step 14: Persona-Modus aus HRV+Bedtime (§16).
+Step 15: Output in fester Dashboard-Reihenfolge (§4), IMMER voll.
+Step 16: 📓 JOURNAL (NACH dem Output — OPTIONAL, best-effort, NON-BLOCKING): das fertige Verdict ins rollende
+         Journal — `senpai-journal.md` via Google-Drive-Connector lesen, Verdict-Sektion anhängen und DIESELBE
+         Datei aktualisieren (nie ein Duplikat). Connector-Write fehlgeschlagen → Sektion als Code-Fence
+         ausgeben (User hängt sie an). Fehlt die Datei → Hinweis melden, NICHT blockieren.
+```
+cai-only:end -->
 
 -----
 
@@ -143,17 +263,33 @@ Step 16: 📓 ARCHIV (T7, NACH dem Output — PFLICHT-Post-Schritt, Auslassen = 
 
 ### 3a. Vier-Ebenen-Architektur
 
+<!-- cc-only:start -->
 | Quelle | Granularität | Pull-Kommando | Best für |
 |---|---|---|---|
 | **Gesundheitsdaten_v5** (Sheet) | 1 Wert/Tag | `pull_drive.py --sheet … --out ./data/Gesundheitsdaten_v5.csv` | KW-Trend, Wochenvergleich |
 | **Trainings_v5** (Sheet) | 1 Zeile/Session | `pull_drive.py --sheet … --out ./data/Trainings_v5.csv` | **TRIMP, CTL/ATL/TSB, Session-Typ** |
 | **HealthAutoExport-YYYY-MM-DD.json** (~20-600 KB) | bis ~1440 Werte/Tag (minutengenau) | `pull_drive.py --folder … --match "HealthAutoExport-{tag}" --out ./data` → `slice_hae_day.py` | Schlaf, HRV/HR-Kurven, Tages-Load, Recovery |
 | **HealthMetrics-YYYY-MM-DD.csv** (~220 KB) | bis 1440/Tag (minutengenau) | `pull_drive.py --folder … --match "HealthMetrics-{tag}" --ext .csv --out ./data` | Forensik, Atemstörungs-/SpO2-Peaks |
+<!-- cc-only:end -->
+<!-- cai-only:start
+| Quelle | Granularität | Beschaffung (claude.ai) | Best für |
+|---|---|---|---|
+| **readiness-history.csv** (Projekt-Datei) | 1 Zeile/Tag | Inhalt nach `./data/readiness-history.csv` schreiben (Step 0) | KW-Trend, **CTL/ATL-Anker**, HRV/RHR-Baseline |
+| **trend_snapshot.md** (Projekt-Datei) | Woche+Monat-Rollup | steht im Kontext | Multi-Wochen-/Monats-Trend |
+| **HealthAutoExport-YYYY-MM-DD.json** (~20-600 KB) | bis ~1440 Werte/Tag (minutengenau) | Chat-Upload (HAE-Share vom iPhone) → nach `./data` kopieren → `slice_hae_day.py` | Schlaf, HRV/HR-Kurven, Tages-Load, Recovery |
+| **HealthMetrics-YYYY-MM-DD.csv** (~220 KB) | bis 1440/Tag (minutengenau) | Chat-Upload anfordern → nach `./data` kopieren | Forensik, Atemstörungs-/SpO2-Peaks |
+cai-only:end -->
 
 **⛔ NIEMALS `HealthAutoExport-YYYY-MM.json`** (Monats-Aggregat, tages-granular). Tagesdatei MUSS `YYYY-MM-DD` sein.
 
+<!-- cc-only:start -->
 **Pull-Zuordnung:** JSON/CSV-Tagesdateien → `pull_drive.py --folder … --match … --out ./data` (druckt NUR den lokalen Pfad). Sheets → `pull_drive.py --sheet … --out ./data/<name>.csv`. Aggregation/Slicing IMMER über die gebündelten Scripts, nie roh in den Kontext.
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Beschaffungs-Zuordnung:** Roh-Tagesdateien (JSON/CSV) → Chat-Upload → nach `./data` kopieren (NIE per Drive-Connector in den Kontext ziehen). State-/Trend-Dateien → Projekt-Dateien, bei Skript-Bedarf 1:1 nach `./data/<name>` schreiben. Aggregation/Slicing IMMER über die gebündelten Scripts, nie roh in den Kontext.
+cai-only:end -->
 
+<!-- cc-only:start -->
 ### 3b. Feste IDs & Pull-Strategie (zwei Tage, Datums-Match)
 
 ```
@@ -169,6 +305,14 @@ python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "He
 Der `--match`-Substring `HealthAutoExport-{YYYY-MM-DD}` greift NUR die volle Tagesdatei:
 `HealthAutoExport-2026-06-16.json` matcht ✅ · `HealthAutoExport-2026-06.json` matcht NICHT ❌ (kein Bindestrich-Tag).
 Existieren mehrere Kandidaten → `--list` zum Sichten (`name<TAB>id<TAB>modifiedTime`), sonst `--newest` für den jüngsten Treffer.
+<!-- cc-only:end -->
+<!-- cai-only:start
+### 3b. Upload-Strategie (zwei Tage, Datums-Match)
+
+Benötigt werden die genauen Tagesdateien (heute + gestern) als Chat-Upload, nur volle Tagesdaten `YYYY-MM-DD`:
+`HealthAutoExport-2026-06-16.json` ✅ · `HealthAutoExport-2026-06.json` ❌ (Monats-Aggregat, kein Bindestrich-Tag).
+Upload-Pfade per `ls` im Sandbox-Dateisystem lokalisieren (typisch `/mnt/user-data/uploads` — IMMER verifizieren, nie blind hardcoden) und nach `./data` kopieren. Existieren mehrere Kandidaten gleichen Tags → die neueste Datei nehmen, im Zweifel den User fragen.
+cai-only:end -->
 
 ### 3c. JSON-Struktur (Parsing-Referenz)
 ```
@@ -196,7 +340,12 @@ Datum: `"2026-06-16 06:23:00 +0200"` (minutengenau, Sekunden stets `:00`) → St
 | SpO2-Dip | Stundenwert < 90 % |
 | User fragt explizit | "Was war um HH:MM?" |
 
+<!-- cc-only:start -->
 CSV via `python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthMetrics-{heute}" --ext .csv --out ./data` → lokalen Pfad lesen. Relevante Minuten extrahieren, nicht dumpen.
+<!-- cc-only:end -->
+<!-- cai-only:start
+CSV (`HealthMetrics-{heute}.csv`) als Chat-Upload anfordern → nach `./data` kopieren → lokalen Pfad lesen. Relevante Minuten extrahieren, nicht dumpen.
+cai-only:end -->
 
 ### 3e. Datum-Alter-Check (Heute-Datei)
 Heute/Gestern 🟢 · 2 Tage 🟡 "Sync prüfen" · 3+ 🟠 · keine 🔴 "Watch/HAE prüfen".
@@ -216,11 +365,19 @@ Das Script mergt die minuten-granularen Serien (HRV/HR/SpO2/Atmung) aus beiden D
 
 Liegt EIN Export vor, der mehrere Tage umspannt (Wochen-/Monats-Range-Datei `HealthAutoExport-YYYY-MM-DD-YYYY-MM-DD.json`) statt zweier Tagesdateien → dieser Pfad. **Der Daily-Check bleibt ein HEUTE-Dashboard**; die Extra-Tage sind nur Datenquelle + Baseline, NICHT der Report-Inhalt.
 
+<!-- cc-only:start -->
 Range-Datei nach `./data` ziehen (Datums-Span im Namen) und als EINZIGES Argument an `slice_hae_day.py` geben — das Script slict mit `--as-of` selbst auf die Ziel-Nacht + den Vortag:
 ```bash
 python3 lib/pull_drive.py --folder 1dnXIB0bAblSXmVKudhTq3SZw_Hc6MM6F --match "HealthAutoExport-{range}" --out ./data
 python3 .claude/skills/daily-check-skill/scripts/slice_hae_day.py ./data/HealthAutoExport-{range}.json --as-of {heute}
 ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+Range-Datei als Chat-Upload anfordern (Datums-Span im Namen), nach `./data` kopieren und als EINZIGES Argument an `slice_hae_day.py` geben — das Script slict mit `--as-of` selbst auf die Ziel-Nacht + den Vortag:
+```bash
+python3 scripts/slice_hae_day.py ./data/HealthAutoExport-{range}.json --as-of {heute}
+```
+cai-only:end -->
 Aus der JSON-Ausgabe: `heute_sleep` = Record der LETZTEN Nacht (`sleepEnd == heute`, NIE alle N), `hrv_night`/`recovery.spo2` = Stunden-Serien auf das Schlaf-Fenster gesliced, `gestern.*` = Tages-Aggregate ZWINGEND auf den Vortag gefiltert, `recovery.rhr` = letzte Lesung `on_or_before=heute`.
 
 **HART (DER Multi-Day-Fallstrick):** Jede Tages-Summe (active_energy, Schritte, Distanz, Physical Effort) gehört auf den Zieltag (Vortag) gefiltert — das macht `slice_hae_day.py` über `--as-of`. Über das ganze File summiert = Wochen-/Monatswert = grob falsch. Stunden-Tabellen (HRV/HR/SpO2) NUR die Ziel-Nacht zeigen, nie N Tage Zeilen.
@@ -229,15 +386,25 @@ Aus der JSON-Ausgabe: `heute_sleep` = Record der LETZTEN Nacht (`sleepEnd == heu
 
 **Performance:** 23-MB-Monat ≈ 11k HR- + 2k HRV-Punkte. Die Scripts parsen einmal, slicen früh, geben nur Ziel-Nacht/Zieltag-Aggregate auf stdout — nie Rohdaten in den Output kippen.
 
+<!-- cc-only:start -->
 **KW-Trend (§10):** die **aktuelle ISO-KW** kommt frisch aus Gesundheitsdaten_v5 (Multi-Day-JSON ändert daran nichts).
 Der **Multi-Wochen-/Monats-Trend** (zurückliegende Wochen/Monate) kommt aus `trend_snapshot.md` (Step 10.6) statt aus
 einem erneuten Sheet-Replay — schneller Read, abgeschlossene Vergangenheit. Bei Lücke/Anomalie/Deep-Dive → Roh-Sheets (Escape-Hatch).
+<!-- cc-only:end -->
+<!-- cai-only:start
+**KW-Trend (§10):** die **aktuelle ISO-KW** kommt aus den Tageszeilen der `./data/readiness-history.csv` (+ heute frisch gerechnet; Multi-Day-JSON ändert daran nichts). Der **Multi-Wochen-/Monats-Trend** (zurückliegende Wochen/Monate) kommt aus `trend_snapshot.md` (Step 10.6). Ein Sheet-Replay existiert auf claude.ai nicht — Lücken ehrlich als Lücke benennen, nie auffüllen.
+cai-only:end -->
 
 ### 3g. 🧹 DEDUP — Trainings_v5 (PFLICHT vor JEDER CTL/ATL/TSB-Rechnung)
 
 `Trainings_v5` enthält durch einen mehrfach schreibenden Sync **doppelte Session-Zeilen** (real beobachtet: HM 489 ×4, Di-Lauf 78 ×2). **Über Duplikate gerechnet explodiert die ATL** (z.B. 122 statt 42) → CTL/TSB komplett verfälscht. Daher IMMER deduplizieren, **bevor** die Banister-Rechnung läuft.
 
+<!-- cai-only:start
+> **⛔ CAI-Twin-Notiz (§3g+§3h):** Auf claude.ai gibt es kein Trainings_v5-Sheet — der §3g-Dedup-Lauf + die §3h-`compute_from_sheet`-Vollrechnung bleiben dem Repo-Zwilling vorbehalten. CTL/ATL/TSB kommen hier aus dem `./data/readiness-history.csv`-Anker + `banister.compute_incremental()` (Step 9); reißt der Anker (Lücke >1 Tag / ctl/atl leer) → qualitativ + Hinweis, KEINE erfundenen Zahlen. Wird doch eine Trainings-CSV als Chat-Upload bereitgestellt, gelten Dedup-Pflicht + Warnungs-Regeln dieser Sektion unverändert.
+cai-only:end -->
+
 **Deterministischer Weg (gebündeltes Script, bevorzugt):**
+<!-- cc-only:start -->
 ```python
 import sys; sys.path.insert(0, ".claude/skills/daily-check-skill/scripts")
 from dedup_trainings import dedup, format_warning
@@ -246,6 +413,17 @@ clean_rows, report = dedup(raw_sheet_text)
 print(format_warning(report))                # Warnung 1:1 in den Output übernehmen
 # → NUR clean_rows in die CTL/ATL/TSB-Mathe geben
 ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+```python
+import sys; sys.path.insert(0, "scripts")
+from dedup_trainings import dedup, format_warning
+raw_sheet_text = open("./data/Trainings_v5.csv", encoding="utf-8", errors="replace").read()  # nur wenn eine Trainings-CSV als Chat-Upload nach ./data kopiert wurde
+clean_rows, report = dedup(raw_sheet_text)
+print(format_warning(report))                # Warnung 1:1 in den Output übernehmen
+# → NUR clean_rows in die CTL/ATL/TSB-Mathe geben
+```
+cai-only:end -->
 - **Dedup-Logik:** Session-Key aus vorhandenen Spalten (Datum + Typ + TRIMP + Distanz); behält die erste Vorkommnis. Fehlen Key-Spalten → Fallback = exakte Voll-Zeilen-Duplikate (merged NIE zwei echte verschiedene Sessions).
 - **Read-only:** Das Sheet wird NICHT verändert. Dedup passiert nur im Speicher für die Rechnung.
 - **Warnung PFLICHT:** Wenn `duplikate_entfernt > 0` → `format_warning(report)` in die Gestern-Retro (§5/🏋️-Block) übernehmen — mit dem Hinweis, die **Quelle** (Sheet + Sync) aufzuräumen. Bei 0 Duplikaten: stiller 🟢-Vermerk genügt.
@@ -254,6 +432,7 @@ print(format_warning(report))                # Warnung 1:1 in den Output überne
 ### 3h. 🧮 BANISTER CTL/ATL/TSB (DETERMINISTISCH — Pflicht)
 
 CTL/ATL/TSB **nie ad-hoc** rechnen (schwankte lauf-für-lauf: TSB +10,3 vs −0,5 bei identischen Daten). Gebündelter Helper, EIN Aufruf:
+<!-- cc-only:start -->
 ```python
 import sys; sys.path.insert(0, ".claude/skills/daily-check-skill/scripts")
 from banister import compute_from_sheet, format_block
@@ -261,6 +440,18 @@ raw_sheet_text = open("./data/Trainings_v5.csv", encoding="utf-8", errors="repla
 res = compute_from_sheet(raw_sheet_text, as_of="YYYY-MM-DD")  # as_of = HEUTE (Datum aus Kontext)
 print(format_block(res))   # CTL/ATL/TSB-Zeile, TSB = heutige Readiness
 ```
+<!-- cc-only:end -->
+<!-- cai-only:start
+```python
+import sys; sys.path.insert(0, "scripts")
+from banister import compute_incremental, format_block
+import readiness_history as rh
+anchor = rh.last_row(open("./data/readiness-history.csv", encoding="utf-8").read())  # Projekt-CSV (Step 0)
+res = compute_incremental(anchor["ctl"], anchor["atl"], anchor["date"], gestern_trimp, "YYYY-MM-DD")  # as_of = HEUTE
+print(format_block(res) if res else "CTL/ATL/TSB: Anker gerissen → qualitativ, keine erfundenen Zahlen.")
+```
+(`compute_from_sheet` = Repo-Pfad; auf claude.ai nur nutzbar, wenn eine Trainings-CSV als Chat-Upload vorliegt — siehe CAI-Twin-Notiz §3g. `gestern_trimp` → Step 9.)
+cai-only:end -->
 - **Dedup + Kalendertag-Zerofill + EWMA in EINEM Aufruf.** `compute_from_sheet` ruft intern `dedup` (§3g) → ersetzt den separaten Dedup-Schritt für den CTL/ATL/TSB-Pfad.
 - **Kalendertag-Zerofill = Kern-Fix:** Ruhetage = TRIMP 0 (sonst keine Decay-Tage → ATL überhöht, TSB instabil). NIE nur Session-Zeilen EWMA-en.
 - Feste Konstanten CTL 42 d / ATL 7 d, Seed 0. **TSB = CTL_gestern − ATL_gestern = heutige Readiness** — identisch zur Card (eine Zahl, §3f).
@@ -282,7 +473,12 @@ Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` +
 
 **😴 Schlaf-Effizienz:** Schlafzeit/Bett-Fenster (robust aus totalSleep+awake, da asleep/inBed oft 0). 🟢 ≥90 / 🟡 85–90 / 🟠 75–85 / 🔴 <75 %.
 
+<!-- cc-only:start -->
 **🛡️ Robustheit (VO2max/cardio_recovery/Wasser sind SPORADISCH):** Erscheinen nur bei Messung, nicht täglich. `latest_reading` gibt letzten Wert + Datum. Fehlt ganz → **Fallback-Wert aus `live.md`** (VO2-Baseline aus dem Athleten-Profil) nehmen — `live.md` aus dem privaten Drive-Ordner ziehen (`python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data` → `./data/live.md` lesen), Datum der Lesung nennen, und **Abwesenheit NIE als Wert/0/Verschlechterung** zeigen.
+<!-- cc-only:end -->
+<!-- cai-only:start
+**🛡️ Robustheit (VO2max/cardio_recovery/Wasser sind SPORADISCH):** Erscheinen nur bei Messung, nicht täglich. `latest_reading` gibt letzten Wert + Datum. Fehlt ganz → **Fallback-Wert aus `live.md`** (VO2-Baseline aus dem Athleten-Profil) nehmen — `live.md` ist Drive-synchronisierte Projekt-Datei (Inhalt im Kontext; für Skripte nach `./data/live.md` schreiben, Step 0), Datum der Lesung nennen, und **Abwesenheit NIE als Wert/0/Verschlechterung** zeigen.
+cai-only:end -->
 
 **🔊 Audio-Tag-Kontext — NUR NARRATIV, MÖGLICHES Muster, NIEMALS Urteil (HARTE REGEL):**
 `audio` gibt Ø + Peak + neutralen Lautstärke-Hinweis (ruhig/leicht erhöht/erhöht/laut). Übereinandergelegt mit Tageslicht + Schritten + später Wach-HR ergibt sich ein **MÖGLICHES** Tag-Muster — Betonung auf *möglich*.
@@ -321,7 +517,12 @@ Liefert (JSON auf stdout): `daylight` & `audio` je mit **`today` + `yesterday` +
 ```
 🕒 HH:MM | 🌤️ [°C - Wetter ODER "kein Wetter"] | 🔋 Recovery-Ampel | 🤖 Emotion | 🧠 Modell
 ```
+<!-- cc-only:start -->
 **Datum/Wochentag + Uhrzeit** = **`lib/clock.py` (echte VM-Uhr → Europe/Berlin)**; **User-Angabe gewinnt** immer. Der Header zeigt die **echte lokale Zeit** (`HH:MM`), nicht mehr `[Zeit n/a]` als Default. CLAUDE.md §3. **(Der claude.ai-TimeAPI-Workaround ist obsolet — die VM hat eine echte Uhr.)**
+<!-- cc-only:end -->
+<!-- cai-only:start
+**Datum/Wochentag + Uhrzeit** = **`python3 scripts/clock.py` (Sandbox-Uhr → Europe/Berlin)**; **User-Angabe gewinnt** immer. Der Header zeigt die **echte lokale Zeit** (`HH:MM`), nicht `[Zeit n/a]` als Default. CLAUDE.md §3. **(Der alte TimeAPI-Workaround ist obsolet — die Sandbox hat eine echte Uhr.)**
+cai-only:end -->
 > **B5-Zeit-Regel:** Die Header-Uhr kommt aus `lib/clock.py`. Eine Schlaf-Aufwachzeit ist eine **inhaltliche** Angabe („Wake HH:MM") und NIE die Header-Uhr — die zwei nicht verwechseln. User-Angabe übersteuert den Clock.
 
 -----
@@ -355,7 +556,12 @@ Top-Karte, drei Achsen auf einen Blick. Recovery = **deterministisch aus dem Rea
 
 -----
 
+<!-- cc-only:start -->
 ## 6.5 🔋 READINESS & ENERGIE (Garmin-Klon-Layer — aus Apple-Rohdaten in der VM)
+<!-- cc-only:end -->
+<!-- cai-only:start
+## 6.5 🔋 READINESS & ENERGIE (Garmin-Klon-Layer — aus Apple-Rohdaten in der Sandbox)
+cai-only:end -->
 
 Direkt nach der Tages-Übersicht: der nachgebaute Firstbeat-Layer (Steps 10.1–10.4). EINE kompakte Karte, Aggregate aus den schon gezogenen Daten — nichts neu messen.
 
@@ -501,7 +707,12 @@ Aus `sleep` (§3f) — Totals gelten für die ganze Nacht, egal in welcher Tages
 **💓 KW-HRV-Heatmap (rollende 7 Nächte, Stunde × Tag — best-effort, NON-BLOCKING):**
 `python3 .claude/skills/daily-check-skill/scripts/hrv_heatmap.py --as-of {heute} --data-dir ./data` → Markdown-Tabelle (Ampel-Emoji je Zelle, leere Nacht = „—", „N/7 Nächte"-Label).
 - **PROGRESSIV:** nutzt NUR die schon in `./data` gecachten HAE-Tagesdateien — **keine 7-fach-Pulls.** Früh in der Woche/bei Lücken → partiell mit „N/7"-Label (ehrlich, nie erfinden).
+<!-- cc-only:start -->
 - **Voll-Backfill nur auf Zuruf** („HRV-Heatmap voll"): vorher die fehlenden Tage via `pull_drive.py --match "HealthAutoExport-<tag>"` ziehen, dann das Script erneut.
+<!-- cc-only:end -->
+<!-- cai-only:start
+- **Nur rechnen, wenn mehrere Tages-JSONs in `./data` liegen** (mehrere Chat-Uploads bzw. Tagesdateien einer Multi-Tages-Range; das Script liest NUR `HealthAutoExport-YYYY-MM-DD.json`-Tagesdateien). Nur heute+gestern da → partiell mit „2/7"-Label ODER sauber auslassen und den Grund nennen (Hol-Pflicht-Stil, nie erfinden). **Voll-Backfill nur auf Zuruf** („HRV-Heatmap voll"): die fehlenden Tage als Chat-Upload nachfordern, dann das Script erneut.
+cai-only:end -->
 - **PNG nur auf expliziten Wunsch** (`--chart out.png`): Ampel-Hex (#2ecc71/#f1c40f/#e74c3c + grau #95a5a6), deutsche Achsen/Titel **+ 1 Satz sarkastische Einordnung** (CLAUDE.md §10, „nie stumme Diagramme"). Default bleibt Markdown; fehlt matplotlib → Script fällt automatisch auf Markdown zurück.
 - Sub-Block unter dem nächtlichen Feinverlauf, klar als „KW-Übersicht" gelabelt (≠ die Heute-Nacht-Tabelle).
 
@@ -511,7 +722,12 @@ Aus `sleep` (§3f) — Totals gelten für die ganze Nacht, egal in welcher Tages
 ```python
 montag = api_date - timedelta(days=api_date.isoweekday()-1)
 ```
+<!-- cc-only:start -->
 Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
+<!-- cc-only:end -->
+<!-- cai-only:start
+Quelle: Tageszeilen aus `./data/readiness-history.csv` (nur Zeilen ≥ Montag; hrv_ms/rhr/tsb je Tag) + `trend_snapshot.md` für zurückliegende Wochen. Schlaf-/Bedtime-Zeilen nur soweit Tages-JSONs vorliegen — fehlende Tage als „—" (ehrlich, Hol-Pflicht §0).
+cai-only:end -->
 ```
 📈 KW[NN]-Trend (seit Mo [Datum])
 - HRV-Schlaf-Ø: [Mo XX · Di XX · …] → Korridor, heute [im/über/unter]
@@ -612,7 +828,12 @@ Mo: "SoT nüchtern nach dem Aufstehen (Richtwert ≤09:00, kein hartes Gate), K�
 ## 17. EDGE CASES
 | Fall | Handling |
 |---|---|
+<!-- cc-only:start -->
 | `pull_drive.py` druckt nichts / Fehler | Auth (`GOOGLE_SERVICE_ACCOUNT_JSON`) + `--folder`/`--match` prüfen; `--list` zum Sichten der Kandidaten |
+<!-- cc-only:end -->
+<!-- cai-only:start
+| Upload fehlt / nicht gefunden | Sandbox-Verzeichnis per `ls` prüfen (typisch `/mnt/user-data/uploads`); Datei fehlt wirklich → als Chat-Upload anfordern, nie raten |
+cai-only:end -->
 | Datei schon in `./data` | nicht neu ziehen — lokalen Pfad direkt an die Scripts geben |
 | Datei nur YYYY-MM (Monats-Aggregat) | NIE verwenden — `--match "HealthAutoExport-{YYYY-MM-DD}"`, nur volle Tagesdaten |
 | Schlaf überspannt Mitternacht | Gestern-Datei mergen (§3f) |
@@ -621,7 +842,12 @@ Mo: "SoT nüchtern nach dem Aufstehen (Richtwert ≤09:00, kein hartes Gate), K�
 | **Trainings_v5 doppelte Zeilen (Sync-Müll)** | **§3g Dedup PFLICHT vor Banister (Script `dedup_trainings.py`); ohne Dedup explodiert ATL. Warnung in Output + Quelle-aufräumen-Hinweis.** |
 | **Trainings_v5 ohne CTL/ATL/TSB-Spalten** | **TRIMP nehmen/schätzen, CTL/ATL/TSB qualitativ, Hinweis "berechnet/geschätzt"** |
 | **Ruhetag (kein Training gestern)** | **Load-Block = Ruhe + CTL/ATL/TSB-Erholungs-Drift, kein TRIMP-Drama** |
+<!-- cc-only:start -->
 | Clock-Read scheitert (selten) | `[Zeit n/a]`, kein Drama; sonst kommt die Zeit aus `lib/clock.py` (echte VM-Uhr). Datum bleibt aus Kontext |
+<!-- cc-only:end -->
+<!-- cai-only:start
+| Clock-Read scheitert (selten) | `[Zeit n/a]`, kein Drama; sonst kommt die Zeit aus `scripts/clock.py` (Sandbox-Uhr). Datum bleibt aus Kontext |
+cai-only:end -->
 | Wetterochs fail | nur die andere Quelle / `[kein Wetter]` |
 | Körperwaage-Wert im JSON | NICHT mehr „erwartet abwesend": Withings kann ihn ins HAE-JSON syncen → `body_comp` lesen (§3c). Vorhanden → als **off-protocol / NICHT SoT** zeigen (Datum/Zeit/Source). Echte Mo-nüchtern-SoT bleibt manuell gepostet |
 | Arrhythmie-Marker hoch | IGNORIEREN (HRV-Frequenz-Trick, kein med. Signal — siehe Medical-Notes im Athleten-Profil) |
@@ -671,3 +897,20 @@ Mo: "SoT nüchtern nach dem Aufstehen (Richtwert ≤09:00, kein hartes Gate), K�
 -----
 
 **Ende v0.16. Senpai liefert bei jedem Daily-Check-Trigger das volle WHOOP-Dashboard mit Gestern-Retro, Ernährung, Pre-Lauf-Briefing und Urteil.**
+
+<!-- cai-only:start
+-----
+
+## Proaktives Briefing (Trigger: Briefing)
+
+Schreibt der User **„Briefing"** → Daily Check (§2–§16), aber mit umgekehrtem Einstieg: **LEAD mit den ACTIONABLE Signalen**, wenn welche feuern. Keine Logik-Duplikation — dieselben Steps, dieselben Engines. (Kein Cron auf claude.ai — das Briefing läuft on-demand, nicht als geplante Routine.)
+
+1. **State-Seed:** `athlete.md` + `live.md` (Projekt-Dateien) lesen → Identität, Anrede-Mapping, **metabolische Gewichts-Schwelle** `{WEIGHT_THRESHOLD_KG}` (für den Weight-Creep-Trip-Wire), VO2-Baseline, Medical-/Sensor-Ignore-Regeln. `backlog.md` = offene Vorhaben (Punkt 6).
+2. **HAE-Frische-Vorcheck:** Datum-Alter der Uploads prüfen (§3e). Heutige Daten noch nicht da → den frischen HAE-Export als Chat-Upload anfordern; sonst transparent mit Alters-Flag weiterlaufen („Daten von gestern — Sync lag noch").
+3. **Voller Daily-Check-Workflow (§2):** Slice → daily_signals → Safety-Gate → Sentinel → Garmin-Klon-Layer (HRV-Status · Readiness · Body Battery · Running Tolerance). Sentinel dabei voll füttern: `--daily <slice_json> --health-csv ./data/readiness-history.csv --weight-csv ./data/readiness-history.csv --weight-threshold-kg {WEIGHT_THRESHOLD_KG}`.
+4. **LEAD-Regel:** `sentinel.actionable == True` → der Report BEGINNT mit den Alerts, in Senpais Stimme (Modus §16), sortiert nach Schärfe (CRITICAL → WARN). Pro Alert: *was* feuert, *warum* (der `detail` nennt §-Bezug + Hebel), *ein* konkreter Schritt. Danach das **normale, volle** Dashboard — nichts kürzen („Länge ≠ Uhrzeit", CLAUDE.md §3). WATCH-Einträge sind KEIN Lead — höchstens Randnotiz im passenden Block. `actionable == False` → normaler Daily Check, stilles 🟢: die `checked`-Liste belegt in 1 Satz, dass die Trip-Wires liefen und ruhig blieben.
+5. **Gates bleiben AUTORITATIV:** `safety_gate.training_allowed=false` → der Heute-Plan gibt KEIN Training frei, sichtbar in Plan + Urteil — egal was Sentinel/Wochenrhythmus/Wetter sagen; `roast_allowed=false` → Persona aus. Sentinel ENTSCHEIDET nichts — `hrv_double_red` ist nur ein Pointer zurück aufs Gate.
+6. **Heute-Plan + Backlog-Ausklang:** Plan nach Wochentag (§13; Override Taper/Deload/Gate-Streichen schlägt den Default; an Mo/Mi/Sa/Do Wetter proaktiv, §12). Am Report-Ende die 1–3 schärfsten offenen `backlog.md`-Items als „📋 Offen"-Block — kein Lead, kein Drama; wirkt eins erledigt → nachfragen, dann per Connector-Update nach `## Erledigt`.
+
+Verdict am Ende wie Step 16 ins Journal (optional, best-effort, Connector; Fallback Code-Fence).
+cai-only:end -->

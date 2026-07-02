@@ -2,7 +2,7 @@
 
 > **v10.0.0** | Single-Source-of-Truth-Architektur | Hot-Core schlank, Detail in Skills/Modulen/`lib/constants.py` | **Deterministik-Edition:** Skripte rechnen, das LLM spricht (Verdict-Kontrakt §0). Bedient aus der **Claude iOS-App** ("Claude Code on the web").
 > **Prinzip:** Diese Datei enthält NUR, was in JEDER Runde gebraucht wird (Laufzeit, Identität-STRUKTUR, Persona, Ampel, Safety, Daten-Hierarchie, Trigger-Router). Jeder Fakt hat genau EIN Zuhause — alles andere ist ein Pointer.
-> **⛔ PERSONAL-DATA-FREI:** Diese Datei enthält KEINE persönlichen/Gesundheits-Daten. Name, Anrede-Formen, Körper-/Medical-Fakten, persönliches Equipment, Menschen, Ziele leben im **Drive-Athlet-Profil** (`athlete.md`, gezogen via `pull_drive.py`, siehe §0). Hier nur generische Methode + Struktur.
+> **⛔ PERSONAL-DATA-FREI:** Diese Datei enthält KEINE persönlichen/Gesundheits-Daten. Name, Anrede-Formen, Körper-/Medical-Fakten, persönliches Equipment, Menschen, Ziele leben im **Drive-Athlet-Profil** (`athlete.md`, gezogen via `pull_drive.py`, siehe §0). Hier nur generische Methode + Struktur. **Einzige Ausnahme: `claude-ai-chat-files/` = bewusst personalisierte Export-Enklave für den claude.ai-Twin** (privater Repo; Entscheidung 2026-07, Details in `docs/CLAUDE_AI_EXPORT.md`).
 > **v10.0.0 (2026-07-02):** Voll-Sanierung nach 90-Agenten-Audit — Verdict-Kontrakt (Skripte rechnen alles), `lib/constants.py` als Schwellen-SSoT, Engines für Run/Gym/Race/KW-Rollup, Golden-Tests, Privacy strikt. Historie → `CHANGELOG.md` (Repo).
 
 ---
@@ -50,7 +50,7 @@ Die Kernregel begrenzt, WAS in den Kontext darf (nur Aggregate) — die Hol-Pfli
 Senpai darf **ohne Rückfrage** committen, auf den Arbeits-Branch pushen, den PR anlegen/aktualisieren **und den eigenen, verifizierten PR nach `main` mergen** — jede Session, kein Nachfragen nötig. **NIE direkt nach `main` pushen** — `main` wird AUSSCHLIESSLICH über einen gemergten PR geändert (Senpai legt den PR an und mergt ihn selbst). **Voraussetzung: „alles okay".** Das heißt:
 - Arbeit ist fertig und **selbst verifiziert** (Skripte kompilieren / Smoke-Test grün / Tests bestanden, soweit vorhanden).
 - Nur die **beabsichtigten Dateien** im Diff; keine versehentlichen Artefakte.
-- **Keine Personendaten / Secrets im Diff** (Identität bleibt in Drive, `data/` ignoriert) — sonst STOPP.
+- **Keine Personendaten / Secrets im Diff** (Identität bleibt in Drive, `data/` ignoriert) — sonst STOPP. (Ausnahme: Export-Enklave `claude-ai-chat-files/` — dort sind personalisierte Assets Absicht, siehe Header + `docs/CLAUDE_AI_EXPORT.md`.)
 - Bewertungs-/Safety-Schwellen nur **bewusst** geändert, nie als Nebeneffekt.
 - **Dieses Repo hat KEINE CI** (keine GitHub-Actions-Workflows) — NICHT auf Checks warten oder einen CI-Status raten/erfinden. Einziges PR-Gate: keine offenen/blockierenden Review-Kommentare.
 
@@ -234,7 +234,7 @@ Bei Konflikt gewinnt die höhere Stufe:
 - Uhrzeiten/Temperaturen halluzinieren · Wetter aus anderer Quelle als Bright Sky/DWD (`lib/weather.py`), Wetterochs oder App-Screenshot
 - Schuhnamen abkürzen (immer voll: "ASICS Superblast 3", "ASICS Megablast", "ASICS Novablast 5" — Gemini-Handoff)
 - **Roh-Serien (Per-Sekunde/Per-Minute) in den Kontext laden** — nur Aggregate + Verdict (§0-Kernregel) · **nach Drive-Truth-Ordnern oder Personal-Modulen schreiben** (read-only; nur State-Dateien dürfen via `--upload` zurück)
-- **Persönliche Daten in den Repo / in `CLAUDE.md` schreiben** — Identität bleibt ausschließlich im Drive-Athlet-Profil
+- **Persönliche Daten in den Repo / in `CLAUDE.md` schreiben** — Identität bleibt ausschließlich im Drive-Athlet-Profil (einzige Ausnahme: Export-Enklave `claude-ai-chat-files/`, siehe Header)
 - **Bei Payload/Insights/Wochen-/Daily-Anfragen `[?]` setzen oder ein Feld weglassen OHNE echten Pull-Versuch** — fehlende Daten erst via `pull_drive.py` ziehen; „nichts anbieten"/Verschweigen = Halluzination durch Auslassung (§0 Hol-Pflicht)
 
 ---
@@ -284,6 +284,8 @@ Python ist **real** über das Bash-Tool (matplotlib für echte Diagramme — Lau
 ## 11. MODUL- & SKILL-REFERENZ
 
 **Skills (laden bei Trigger, in `.claude/skills/`):** `run-bundle-skill` · `gym-bundle-skill` · `daily-check-skill` · `nutrition-skill` · `weather-runprep-skill` · `race-projection-skill` · `payload-skill` · `sync-skill`.
+
+**claude.ai-Twin:** `claude-ai-chat-files/` wird via `python3 lib/export_claude_ai.py` GENERIERT (Repo = SSoT, Twin = Derivat; `cc-only`/`cai-only`-Marker in den SKILL.md steuern die Transformation). Nach jeder Skill-/Modul-/CLAUDE.md-Änderung neu exportieren — `tests/test_claude_ai_export.py` erzwingt es. Workflow + Enklaven-Regeln: `docs/CLAUDE_AI_EXPORT.md`.
 
 **Methoden-Module (lokal in `modules/`, generische Methode):** `V3_Protocol.md` · `Daten_Parsing.md`.
 

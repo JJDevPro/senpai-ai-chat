@@ -3,6 +3,34 @@
 > Repo-lokales Changelog (Trigger `Changelog`, CLAUDE.md §9). Nur Methode/Architektur —
 > KEINE Personendaten. Das alte Drive-CHANGELOG ist Alt-Bestand (Putz-Liste PR-6).
 
+## v10.1.0 — claude.ai-Twin: generierter Voll-Export (2026-07-02)
+
+Das claude.ai-Projekt (Original bis v9.0.3, Skills-Snapshot 24./25.06.) wird ab
+jetzt als **generierter Zwilling** gepflegt: Repo = SSoT, `claude-ai-chat-files/` =
+Derivat. Kernstücke:
+
+- **Exporter:** `lib/export_claude_ai.py` + Regel-Registry `lib/export_rules.py` +
+  Templates `lib/export_templates/` — deterministisch (Doppellauf byte-identisch),
+  `--check` als Drift-Gate, `--refresh-personal` für Personal-Assets,
+  Bundle-Import-Smoke-Test. Output: 8 Skill-Zips (`dist/`), diffbare Quellen
+  (`src/`), generierte Projekt-Anweisungen (v10-Port), Projekt-Datei-Checkliste,
+  Smoke-Tests S1–S13, MANIFEST mit Re-Upload-Report.
+- **Marker-Vertrag:** `cc-only`/`cai-only`-HTML-Marker in allen 8 SKILL.md — die
+  claude.ai-Ersatzprosa lebt in der Quelldatei; unmarkierter Drive-Zugriff bricht
+  den Export (FORBIDDEN-Gate).
+- **Local-Mode-Chirurgie (nützt beiden Welten):** `readiness_history.py --csv-path`,
+  `trend_snapshot.py --local`, `consolidate.py --local`, `weather.py --from-json`/
+  `--print-url` — Drive-Glue jetzt konditional, offline testbar.
+- **claude.ai-Laufzeit-Mapping:** State via Drive-synchronisierte Projekt-Dateien
+  (auto-aktuell), Roh-Daten via Chat-Upload → Sandbox, Write-Back via
+  Drive-Connector-Update (Fallback Code-Fence), Bright Sky via Chat-Fetch +
+  `--from-json`, Zeit via Sandbox-Uhr. Briefing → daily-check-Sektion, Menu →
+  sync-skill; `/automation` bleibt VM-only.
+- **PII-Enklave:** `claude-ai-chat-files/` bewusst personalisiert (nur ganze
+  Asset-Dateien; Prosa bleibt runtime-first) — Scanner-Ausnahme exakt gepinnt,
+  Exporter-Quellen weiter PII-gescannt. Doku: `docs/CLAUDE_AI_EXPORT.md`.
+- Alte Root-`.skill`-Snapshots (24./25.06.) entfernt — Historie bleibt in git.
+
 ## v10 — SSoT-Sanierung für Opus 4.8 + Reproduzierbarkeits-Garantie (2026-07-02)
 
 Ausgangspunkt: Voll-Audit (90 Agenten, adversarial verifiziert — 73 CONFIRMED

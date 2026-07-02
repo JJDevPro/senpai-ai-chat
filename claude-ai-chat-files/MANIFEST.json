@@ -1,0 +1,96 @@
+{
+  "artifacts": {
+    "daily-check-skill": {
+      "content_hash": "90abab2554516e347daa699cc875bfaaabe7b4d3ed9d33b889942b62357aa35b",
+      "personal_hash": null,
+      "reupload_hint": "RE-UPLOAD dist/daily-check-skill.skill (claude.ai → Settings → Skills)",
+      "source_commit": "8be503b",
+      "version": "v0.16",
+      "zip": "dist/daily-check-skill.skill",
+      "zip_sha256": "920c751e1f5bcdcaef681a51716e752a58e5feb31cd5043db066f609e3022832"
+    },
+    "gym-bundle-skill": {
+      "content_hash": "e3f948d00bea32edc15670a6d7704bfe76924aa62cd1dfce45c9c2171829ded3",
+      "personal_hash": null,
+      "reupload_hint": "RE-UPLOAD dist/gym-bundle-skill.skill (claude.ai → Settings → Skills)",
+      "source_commit": "9e2a30f",
+      "version": "v2.0",
+      "zip": "dist/gym-bundle-skill.skill",
+      "zip_sha256": "e3d128f0f84270c016620d9ffddcc3e5515ebdfe14aceb7cc55a2869d275d152"
+    },
+    "nutrition-skill": {
+      "content_hash": "b4f032c0765a72122881f6335fc9c1b952eb34e723f6ec83ffde101794965114",
+      "personal_hash": null,
+      "reupload_hint": "RE-UPLOAD dist/nutrition-skill.skill (claude.ai → Settings → Skills)",
+      "source_commit": "04adac7",
+      "version": "v1.1",
+      "zip": "dist/nutrition-skill.skill",
+      "zip_sha256": "f40e0a7ff2923cc75984429112d067499eb26a7982e6a858684a6d2f5878a2b9"
+    },
+    "payload-skill": {
+      "content_hash": "ff119fcf8aa2d89f9be93b19167e7f18cf76f79ecf5aea5c21933d30f74bb017",
+      "personal_hash": null,
+      "reupload_hint": "RE-UPLOAD dist/payload-skill.skill (claude.ai → Settings → Skills)",
+      "source_commit": "57edbd6",
+      "version": "v2.0",
+      "zip": "dist/payload-skill.skill",
+      "zip_sha256": "1ac73ee271433bceefffd424716b8acd46beeaf96c8068cfef6a38a25d86f0a6"
+    },
+    "race-projection-skill": {
+      "content_hash": "027ba6a8ca5970e8c31f5da5164986acd0437ae014ee68d4e46e3f35115e2dfe",
+      "personal_hash": "2320ef8773a8fa04e92a9a2a92e99793b15a87cc694f6af84b6f346f1171b477",
+      "reupload_hint": "RE-UPLOAD dist/race-projection-skill.skill (claude.ai → Settings → Skills)",
+      "source_commit": "55c08a6",
+      "version": "v1.1",
+      "zip": "dist/race-projection-skill.skill",
+      "zip_sha256": "b157de09293e4610af38baef026d893bf5edbbef60e3b8eca3d30cb60362156a"
+    },
+    "run-bundle-skill": {
+      "content_hash": "4aa8387f1c458e74610fbcfdd29bedb23ae9e3c3e612ea1d947fc557387f031e",
+      "personal_hash": null,
+      "reupload_hint": "RE-UPLOAD dist/run-bundle-skill.skill (claude.ai → Settings → Skills)",
+      "source_commit": "8be503b",
+      "version": "v3.14",
+      "zip": "dist/run-bundle-skill.skill",
+      "zip_sha256": "43f31c8b23f80233e8c02bfe66fc74a3399296d87ec69fb83b44c96d30b62a98"
+    },
+    "sync-skill": {
+      "content_hash": "8721af5d10181e5789567da8d1043e2a760aac5d41129a44c87cdf89c09c1654",
+      "personal_hash": null,
+      "reupload_hint": "RE-UPLOAD dist/sync-skill.skill (claude.ai → Settings → Skills)",
+      "source_commit": "57edbd6",
+      "version": "v1.1",
+      "zip": "dist/sync-skill.skill",
+      "zip_sha256": "f72567668eb1cd7e5dc8539303de3f5b37793f418e417708110fb6cc2f9decf6"
+    },
+    "weather-runprep-skill": {
+      "content_hash": "07c24e1aa4cc6368cbe7c7058095308d44ea7fa4973ab3314efa7d032ecbe3ec",
+      "personal_hash": "87456a34d773cc4ac76c38e09051a749c0f789676672feb97beeed69363bb0fc",
+      "reupload_hint": "RE-UPLOAD dist/weather-runprep-skill.skill (claude.ai → Settings → Skills)",
+      "source_commit": "8be503b",
+      "version": "v1.3",
+      "zip": "dist/weather-runprep-skill.skill",
+      "zip_sha256": "b6d21db1fffa699f2875c98283336682c1c1fe27e4a30ff0b56343e54ced99f2"
+    }
+  },
+  "docs": {
+    "README.md": {
+      "action_hint": "Referenz/Checkliste",
+      "content_hash": "94cf701c1374fff8ab784e6bc33aa3cd7449847fc823b6a49ff5ed2bc2cea691"
+    },
+    "project-files.md": {
+      "action_hint": "Referenz/Checkliste",
+      "content_hash": "0546392c22cb289d0c1938fd89157d1309368af7093c3c016c74def9beaf3f6a"
+    },
+    "project-instructions.md": {
+      "action_hint": "PASTE in claude.ai",
+      "content_hash": "f15ede40a2551c09331393ef9d0857fe070c7dc4269808cb099c6b7feb947303"
+    },
+    "smoke-tests.md": {
+      "action_hint": "Referenz/Checkliste",
+      "content_hash": "ee9db8917b852730484136c39ba4a0419ae98b75c0c3058c55cc5dc543ae8d84"
+    }
+  },
+  "schema": 1,
+  "twin_version": "v10.1.0-CAI"
+}

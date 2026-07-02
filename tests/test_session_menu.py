@@ -74,17 +74,17 @@ def test_hud_full_lists_skill_index():
 
 
 def test_race_line_from_live_full_only():
-    live = "## Race-Countdown\n- 🏃 **B2Run 6 km** — 21.07.2026 → erstes V3-Rennen.\n"
+    live = "## Race-Countdown\n- 🏃 **Firmenlauf 6 km** — 21.07.2026 → erstes V3-Rennen.\n"
     h_full = sm.build_hud(_b("2026-06-29", 9), "", live, full=True)
-    assert "Race:" in h_full and "B2Run" in h_full
+    assert "Race:" in h_full and "Firmenlauf" in h_full
     # kompakt liest live nicht -> keine Race-Zeile
     assert "Race:" not in sm.build_hud(_b("2026-06-29", 9), "", live, full=False)
 
 
 def test_hud_is_data_free():
+    from denylist import denied_words
     h = sm.build_hud(_b("2026-06-29", 9), "", "", full=True)
-    for tok in ("Javier", "Garcell", "Nürnberg", "Janna"):
-        assert tok not in h
+    assert not denied_words(h), "HUD traegt Identitaets-Tokens (Denylist-Hash-Match)"
 
 
 def test_main_smoke_exit0(capsys):

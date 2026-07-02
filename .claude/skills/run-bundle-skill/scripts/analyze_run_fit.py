@@ -973,6 +973,7 @@ def sport_guard(session):
 
 # ── Main ────────────────────────────────────────────────────────────────────
 def analyze(fit_path, as_of):
+    """Parse-Schicht: FIT laden, dann an assemble() (pure Report-Assembly)."""
     try:
         from fitparse import FitFile
     except ImportError:
@@ -983,7 +984,14 @@ def analyze(fit_path, as_of):
         fit.parse()
     except Exception as e:
         _fail(f"FIT konnte nicht geparst werden: {e}", fit_path=fit_path)
+    return assemble(fit, as_of, fit_path=fit_path)
 
+
+def assemble(fit, as_of, fit_path=None):
+    """Komplette Report-Assembly aus einem (echten oder gefakten) fit-Objekt —
+    PURE bzgl. Dateisystem (Golden-Test-Schnittstelle, PR-7): jedes Objekt mit
+    get_messages("session"/"record"/"lap"/"workout") kann den vollen
+    Aggregat-Report treiben."""
     session = {}
     for msg in fit.get_messages("session"):
         session = _msg_dict(msg)

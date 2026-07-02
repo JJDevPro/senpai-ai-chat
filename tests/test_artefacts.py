@@ -15,7 +15,7 @@ import pacing_card
 
 # ───────────────────────── make_ics ─────────────────────────
 SYN_RHYTHM = "Mo=Run+Core@20:00;Di=Rest;Mi=Long Run@18:00;Do=Gym@21:30;Sa=Parkrun@09:00"
-SYN_RACES = "B2Run Nürnberg 6km|2026-07-21@09:00;Sportscheck 10km|2026-10-04"
+SYN_RACES = "Firmenlauf 6km|2026-07-21@09:00;Stadtlauf 10km|2026-10-04"
 
 
 def test_make_ics_override_parses_training_days():
@@ -55,16 +55,16 @@ def test_make_ics_parses_markdown_seed():
     rhythm_md = (
         "## Wochen-Rhythmus\n\n"
         "| Tag | Plan |\n|-----|-----|\n"
-        "| **Mo** | Runna + Core 20:00 (Janna Zumba) |\n"
+        "| **Mo** | Runna + Core 20:00 (Partnerin Zumba) |\n"
         "| **Di** | Rest |\n"
         "| **Mi** | Long Run (flex, HR ≤ Z2) |\n"
         "| **Do** | Full Body Gym ≤ 21:30 |\n"
-        "| **Sa** | Parkrun 09:00 mit Papa |\n"
+        "| **Sa** | Parkrun 09:00 mit Trainingspartner |\n"
         "| **So** | Rest |\n"
     )
     races_md = (
         "## Race-Countdown\n\n"
-        "- 🏃 **B2Run Nürnberg (6 km) — 21.07.2026** → erstes V3-Rennen.\n"
+        "- 🏃 **Firmenlauf (6 km) — 21.07.2026** → erstes V3-Rennen.\n"
         "- 2. Rennen: Sportscheck RUN 10 km (Oktober 2026, Datum TBC).\n"
     )
     events = make_ics.parse_rhythm_md(rhythm_md)
@@ -82,7 +82,7 @@ def test_make_ics_parses_markdown_seed():
 # ───────────────────────── pacing_card ─────────────────────────
 def test_pacing_card_splits_sum_to_target_even_and_neg():
     target = "39:00"          # 6 km @ 6:30/km
-    card = pacing_card.build_card("B2Run", 6.0, target_time=target)
+    card = pacing_card.build_card("Firmenlauf", 6.0, target_time=target)
     total = pacing_card.parse_mmss(target)
     assert card["target_sec"] == total
     assert len(card["even"]) == 6
@@ -102,14 +102,14 @@ def test_pacing_card_splits_sum_to_target_even_and_neg():
 def test_pacing_card_reuses_readiness_band():
     # A synthetic stats.py race_readiness JSON (band shape verbatim).
     rr = {
-        "race": {"event": "B2Run", "km": 6.0},
+        "race": {"event": "Firmenlauf", "km": 6.0},
         "projection": {
             "best": {"pace_min_per_km": 5.4, "finish": "32:24", "finish_minutes": 32.4},
             "real": {"pace_min_per_km": 5.7, "finish": "34:12", "finish_minutes": 34.2},
             "conservative": {"pace_min_per_km": 6.1, "finish": "36:36", "finish_minutes": 36.6},
         },
     }
-    card = pacing_card.build_card("B2Run", 6.0, readiness=rr)
+    card = pacing_card.build_card("Firmenlauf", 6.0, readiness=rr)
     # 'real' band drives the target: 34.2 min = 2052 s.
     assert card["target_sec"] == round(34.2 * 60)
     assert sum(s["split_sec"] for s in card["neg"]) == card["target_sec"]

@@ -141,11 +141,11 @@ die **OPEN-Cues des heutigen Slot-Typs** (Mo/Mi=Easy/Long, Sa=Parkrun — §1/V3
 Heute auf diese Cues achten; der nächste Run-Report (§12d Cue-Check) prüft, ob sie umgesetzt wurden.
 Fehlt `coaching_cues.md` (noch nicht pre-seeded) → kein Block, kein Drama. KEIN Cue offen → 1 Zeile „🟢 keine offenen Cues".
 
-### 5b. 🅿️ Sa-Parkrun-Anker (Wöhrder See) + Papa-Layer + Schuh-km (Strava §18)
+### 5b. 🅿️ Sa-Parkrun-Anker (Heim-Strecke aus athlete.md) + Partner-Layer + Schuh-km (Strava §18)
 
-An **Samstag** (Parkrun 09:00, Wöhrder See) zusätzlich zum Wetter proaktiv ankern:
+An **Samstag** (Parkrun 09:00, Heim-Strecke — Ort/GPS-Anker in `athlete.md`) zusätzlich zum Wetter proaktiv ankern:
 - **Schuh-km (`gear.md` / Strava `get_gear`):** kurzer Rotations-Check — passt der Schuh zum Slot, Verschleiß ok? (run-bundle §18).
-- **Papa-Layer (`athlete.md`):** Papa + Crew sind FAST immer dabei (Ritual) → als Motivation framen. **Papa-Faktor (KM1-Drossel +18 s/km) NUR ansagen, wenn ihr zusammen lauft** (Papas Plan Easy + Athleten-Tempo); sonst NICHT annehmen — **Präsenz ≠ zusammen gelaufen** (Strava bestätigt Co-Runner nicht).
+- **Partner-Layer (`athlete.md`):** Parkrun-Partner + Crew sind FAST immer dabei (Ritual; Personen in `athlete.md`) → als Motivation framen. **Partner-Faktor (KM1-Drossel — Wert in `athlete.md`) NUR ansagen, wenn ihr zusammen lauft** (Partner-Plan Easy + Athleten-Tempo); sonst NICHT annehmen — **Präsenz ≠ zusammen gelaufen** (Strava bestätigt Co-Runner nicht).
 - **Parkrun-Counter (`live.md`):** der nächste Lauf ist #[N+1] — als kleinen Anker nennen.
 - **Temp = Morgenwert 09:00** (Tagesmin + Rampe, NIE Tagesmax — §2a).
 

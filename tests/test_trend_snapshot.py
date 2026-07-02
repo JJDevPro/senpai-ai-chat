@@ -35,9 +35,9 @@ SAMPLE = [
     {"date": "2026-05-07", "weight": 115.8, "kfa": 27.9, "hrv_ms": 56, "rhr": 53,
      "vo2": 35.6, "ctl": 41.0, "atl": 39.5, "tsb": 1.5, "week_km": 30},
     {"date": "2026-06-22", "weight": 115.1, "kfa": 27.2, "hrv_ms": 54, "rhr": 53,
-     "vo2": 35.8, "ctl": 45.0, "atl": 42.0, "tsb": 3.0, "week_km": 38},
+     "vo2": 36.2, "ctl": 45.0, "atl": 42.0, "tsb": 3.0, "week_km": 38},
     {"date": "2026-06-25", "weight": 116.0, "kfa": 27.0, "hrv_ms": 54, "rhr": 53,
-     "vo2": 35.8, "ctl": 45.5, "atl": 43.0, "tsb": 2.5, "week_km": 38},
+     "vo2": 36.2, "ctl": 45.5, "atl": 43.0, "tsb": 2.5, "week_km": 38},
 ]
 
 
@@ -137,35 +137,31 @@ def test_kennzahlen_parser_hrv_rhr_vo2():
 
 # --------------------------------------------------------------------------- #
 # Backfill-CTL ≙ banister-Vollrechnung (Snapshot ≠ Ersatz, aber genau)
+# PR-7: läuft auf dem SYNTHETISCHEN Fixture statt echter data/-CSV — kein Skip,
+# keine echten Gesundheitsdaten im Test-Pfad.
 # --------------------------------------------------------------------------- #
-def test_backfill_series_matches_banister_full_recompute():
+def test_backfill_series_matches_banister_full_recompute(trainings_csv_text):
     """Eine zurückgerechnete Tageszeile muss CTL/ATL/TSB einer frischen
     compute_from_sheet-Vollrechnung desselben Stichtags treffen (±0,15)."""
-    trainings = (REPO_ROOT / "data" / "Trainings_v5.csv")
-    if not trainings.is_file():
-        import pytest
-        pytest.skip("data/Trainings_v5.csv nicht vorhanden (nur lokal/CI mit Daten)")
-    tr = trainings.read_text(encoding="utf-8", errors="replace")
-    as_of = "2026-06-23"
-    series = ts._daily_banister_series(tr)
+    as_of = "2026-06-25"
+    series = ts._daily_banister_series(trainings_csv_text)
     from datetime import date
     # banister-Vollrechnung: TSB = Form am Morgen von as_of = Reihe bis (as_of-1)
-    full = b.compute_from_sheet(tr, as_of=as_of)
-    prev = series[date(2026, 6, 22)]   # letzter Tag der Reihe vor as_of
+    full = b.compute_from_sheet(trainings_csv_text, as_of=as_of)
+    prev = series[date(2026, 6, 24)]   # letzter Tag der Reihe vor as_of
     assert abs(prev[0] - full["ctl"]) <= 0.15
     assert abs(prev[1] - full["atl"]) <= 0.15
     assert abs(prev[2] - full["tsb"]) <= 0.15
 
 
-def test_backfill_csv_appends_rows_with_canonical_header():
-    trainings = (REPO_ROOT / "data" / "Trainings_v5.csv")
-    if not trainings.is_file():
-        import pytest
-        pytest.skip("data/Trainings_v5.csv nicht vorhanden")
-    tr = trainings.read_text(encoding="utf-8", errors="replace")
-    out = ts.backfill_csv("", tr, "", "", as_of="2026-06-29")
+def test_backfill_csv_appends_rows_with_canonical_header(trainings_csv_text):
+    out = ts.backfill_csv("", trainings_csv_text, "", "", as_of="2026-06-29")
     lines = out.splitlines()
     assert lines[0] == ",".join(rh.HEADER)
-    assert len(lines) > 100            # Jahre an Tageszeilen
-    # jede Datenzeile hat die richtige Spaltenzahl
+    # Fixture-Sessions 20.–24.06 → 5 Tageszeilen (Zerofill wirkt in der
+    # CTL/ATL-Reihe, geschrieben werden nur Tage mit Daten)
+    assert len(lines) == 1 + 5
+    # Chronologie-Invariante (PR-3-Sort-Fix) + Spaltenzahl jeder Zeile
+    dates = [ln.split(",")[0] for ln in lines[1:]]
+    assert dates == sorted(dates)
     assert all(len(ln.split(",")) == len(rh.HEADER) for ln in lines if ln.strip())

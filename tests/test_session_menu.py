@@ -28,7 +28,9 @@ def test_day_plan_weekdays():
     assert sm.day_plan(0)["name"] == "Mo"
     assert sm.day_plan(2)["type"] == "Long Run"
     assert sm.day_plan(3)["slot"].startswith("Full Body")
-    assert sm.day_plan(6)["kw_action"].startswith("/payload")
+    # "Payload"/"Sync" sind Trigger-Wörter (Skills), KEINE Slash-Commands —
+    # das HUD darf keine nicht existierenden /commands bewerben.
+    assert sm.day_plan(6)["kw_action"].startswith("„Payload“")
     assert sm.day_plan(1)["slot"] is None  # Di Ruhetag
 
 
@@ -36,9 +38,11 @@ def test_hud_monday_morning_has_briefing_sot_sync():
     h = sm.build_hud(_b("2026-06-29", 7), "", "", full=False)
     assert "Mo" in h and "Heute: Lauf + Core" in h
     assert "/briefing" in h
-    assert "SoT-Wiegen" in h
-    assert "/sync" in h
-    assert "Automation: inaktiv" in h
+    assert "SoT-Wiegen nüchtern nach dem Aufstehen" in h  # weiches Fenster, kein 09:00-Gate
+    assert "„Sync“" in h
+    # HUD behauptet keinen Automation-Zustand mehr, sondern verweist auf die Quelle:
+    assert "/automation status" in h
+    assert "Automation: inaktiv" not in h
 
 
 def test_hud_saturday_preslot_weather():
@@ -50,7 +54,7 @@ def test_hud_saturday_preslot_weather():
 
 def test_hud_sunday_evening_payload_bedtime_and_tomorrow_monday():
     h = sm.build_hud(_b("2026-06-28", 23), "", "", full=False)
-    assert "/payload" in h
+    assert "„Payload“" in h
     assert "Bedtime" in h          # >= 22:00
     assert "Morgen:" in h and "Mo" in h  # forward-looking
 

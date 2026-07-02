@@ -35,6 +35,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+_LIB_DIR = Path(__file__).resolve().parent
+if str(_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(_LIB_DIR))
+
+import clock  # noqa: E402 — Berlin date/now instead of the VM's UTC clock (CLAUDE.md §3)
+
 # Personal Drive folder "Senpai-AI-Chat" (state only — never raw data).
 DEFAULT_FOLDER = "1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde"
 
@@ -174,6 +180,28 @@ def parse_rhythm_override(spec: str) -> list[dict]:
     return events
 
 
+def _parse_race_time(ln: str) -> tuple[int, int]:
+    """Start time of a race line — robust against goal times ("sub 40:00").
+
+    Priority: an explicitly marked start time ("@HH:MM" or "HH:MM Uhr"), else the
+    first plain HH:MM whose hour is a valid clock hour AND that is not preceded by
+    goal context (Ziel/sub/→/cutoff/PB) — "sub 40:00" previously produced hour=40
+    and crashed build_ics (audit-CONFIRMED). Falls back to 09:00.
+    """
+    m = re.search(r"@(\d{1,2}):(\d{2})", ln) or re.search(r"\b(\d{1,2}):(\d{2})\s*Uhr\b", ln)
+    if m and int(m.group(1)) <= 23 and int(m.group(2)) <= 59:
+        return int(m.group(1)), int(m.group(2))
+    for m in _TIME_RE.finditer(ln):
+        hh, mm = int(m.group(1)), int(m.group(2))
+        if hh > 23 or mm > 59:
+            continue
+        prefix = ln[max(0, m.start() - 14):m.start()].lower()
+        if any(t in prefix for t in ("ziel", "sub", "→", "cutoff", "pb")):
+            continue
+        return hh, mm
+    return 9, 0
+
+
 def parse_races_md(md: str) -> list[dict]:
     """Parse the ## Race-Countdown section → one-off dated race events.
 
@@ -191,8 +219,7 @@ def parse_races_md(md: str) -> list[dict]:
         mk = _KM_RE.search(ln)
         if mk:
             km = float(mk.group(1).replace(",", "."))
-        m = _TIME_RE.search(ln)
-        hh, mm = (int(m.group(1)), int(m.group(2))) if m else (9, 0)
+        hh, mm = _parse_race_time(ln)
         races.append({"date": d, "title": f"🏁 {title}", "km": km,
                       "hh": hh, "mm": mm, "dur_min": _RACE_DUR_MIN})
     return races
@@ -223,6 +250,8 @@ def parse_races_override(spec: str) -> list[dict]:
             continue
         m = _TIME_RE.search(datespec)
         hh, mm = (int(m.group(1)), int(m.group(2))) if m else (9, 0)
+        if hh > 23 or mm > 59:
+            hh, mm = 9, 0
         km = None
         mk = _KM_RE.search(title)
         if mk:
@@ -262,8 +291,11 @@ def _fold(line: str) -> str:
 def build_ics(events: list[dict], races: list[dict], weeks: int = 8,
               start: dt.date | None = None, now: dt.datetime | None = None) -> str:
     """Assemble the full VCALENDAR text. ``weeks`` bounds the weekly RRULE COUNT."""
-    start = start or dt.date.today()
-    now = now or dt.datetime.now()
+    # Berlin wall-clock (not the VM's UTC clock) — a late-evening run must not
+    # anchor the recurrence on tomorrow's UTC date (CLAUDE.md §3, lib/clock.py).
+    local = clock.local_now()
+    start = start or local.date()
+    now = now or local.replace(tzinfo=None)
     stamp = f"{now:%Y%m%dT%H%M%S}"
     lines = [
         "BEGIN:VCALENDAR", "VERSION:2.0",
@@ -330,10 +362,12 @@ def _resolve_inputs(args) -> tuple[list[dict], list[dict]]:
     paths: dict[str, Path] = {}
     if args.want_drive:
         paths = pull_state(args.folder, data_dir, args.sa_file)
-    # Local fallback (committed synthetic seed or a previous pull).
+    # Local fallback (a previous pull, or the committed synthetic seed kit
+    # at repo-root drive-seed/ — the old ./data/senpai-drive-seed/ path was dead).
+    repo_seed = Path(__file__).resolve().parents[1] / "drive-seed"
     for name in ("athlete.md", "live.md"):
         if name not in paths:
-            for cand in (data_dir / name, data_dir / "senpai-drive-seed" / name):
+            for cand in (data_dir / name, repo_seed / name):
                 if cand.is_file():
                     paths[name] = cand
                     break

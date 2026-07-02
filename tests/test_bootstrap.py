@@ -189,3 +189,28 @@ def test_main_smoke(monkeypatch, tmp_path, capsys):
     rc = bootstrap.main(["--folder", "FOLDER", "--out", str(tmp_path)])
     assert rc == 0
     assert "Senpai bootstrap OK" in capsys.readouterr().out
+
+
+def test_run_bootstrap_missing_seed_warns_instead_of_ok(monkeypatch, tmp_path, capsys):
+    # PR-2 (Audit-CONFIRMED): technisch erfolgreicher Pull OHNE Seed-Dateien darf
+    # kein "bootstrap OK" mit lauter n/a drucken — WARN + nicht fabrizieren.
+    fake = _FakeDrive({})  # Ordner leer: weder athlete.md noch live.md
+    _install_fake(monkeypatch, fake)
+
+    rc = bootstrap.run_bootstrap(folder="FOLDER", out_dir=str(tmp_path))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Senpai bootstrap WARN" in out
+    assert "seed fehlt" in out
+    assert "bootstrap OK" not in out
+
+
+def test_run_bootstrap_partial_seed_flags_missing_file(monkeypatch, tmp_path, capsys):
+    fake = _FakeDrive({"athlete.md": SYN_ATHLETE})  # live.md fehlt
+    _install_fake(monkeypatch, fake)
+
+    rc = bootstrap.run_bootstrap(folder="FOLDER", out_dir=str(tmp_path))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Senpai bootstrap OK" in out
+    assert "Seed unvollständig" in out and "live.md" in out

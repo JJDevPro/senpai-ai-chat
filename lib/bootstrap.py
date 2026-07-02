@@ -185,7 +185,17 @@ def run_bootstrap(folder, out_dir, sa_file=None) -> int:
     except Exception as e:
         print(_warn_banner(type(e).__name__))
         return 0
-    print(build_banner(athlete_text, live_text))
+    # Ehrlichkeit vor "OK": Ein Pull, der technisch klappt, aber KEINEN Seed
+    # findet, ist kein Erfolg — der alte Code druckte "bootstrap OK" mit lauter
+    # n/a-Feldern (Audit-CONFIRMED). Fehlende Dateien werden benannt.
+    if not athlete_text and not live_text:
+        print(_warn_banner("seed fehlt: athlete.md + live.md nicht im Drive-Ordner"))
+        return 0
+    banner = build_banner(athlete_text, live_text)
+    missing = [n for n, t in ((ATHLETE_NAME, athlete_text), (LIVE_NAME, live_text)) if not t]
+    if missing:
+        banner += f" · ⚠️ Seed unvollständig: {', '.join(missing)} fehlt im Drive-Ordner"
+    print(banner)
     return 0
 
 

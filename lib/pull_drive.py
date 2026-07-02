@@ -43,6 +43,17 @@ from pathlib import Path
 
 SCOPES_RO = ["https://www.googleapis.com/auth/drive.readonly"]
 SCOPES_RW = ["https://www.googleapis.com/auth/drive"]
+
+# Write-back guard (CLAUDE.md §0): --upload darf NUR registrierte State-Dateien
+# in den privaten Personal-Ordner schreiben. Truth-Ordner + Personal-Module sind
+# read-only — ein Upload dorthin ist IMMER ein Fehler, kein Feature. Neue
+# State-Dateien werden hier registriert (bewusste Änderung, kein Nebeneffekt).
+STATE_FOLDER_ID = "1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde"
+STATE_FILES = {
+    "live.md", "athlete.md", "baselines.md", "learnings.md",
+    "coaching_cues.md", "readiness-history.csv", "trend_snapshot.md",
+    "backlog.md", "gear.md", "senpai-journal.md",
+}
 # --sheet reads use the Sheets API (tab-by-name, structured) with a Drive-export
 # CSV fallback, so they need BOTH the spreadsheets-read and drive-read scopes.
 SCOPES_SHEET = [
@@ -234,6 +245,9 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Drive bridge: read truth (RO) + read/write personal state.")
     p.add_argument("--folder", help="Drive folder ID")
     p.add_argument("--match", help="substring the file name must contain")
+    p.add_argument("--exact", action="store_true",
+                   help="--match ist der EXAKTE Dateiname (kein contains) — "
+                        "z. B. 'Historie.md' ohne 'Archiv_Historie.md' mitzuziehen")
     p.add_argument("--ext", help="filter to this extension, e.g. .fit / .json")
     p.add_argument("--newest", action="store_true", help="download only the newest match")
     p.add_argument("--all", action="store_true", help="download all matches")
@@ -251,6 +265,21 @@ def main(argv=None):
         if not args.folder:
             _eprint("ERROR: --upload needs --folder (the personal state folder)")
             return 2
+        target_name = args.name or Path(args.upload).name
+        if args.folder != STATE_FOLDER_ID:
+            _eprint(
+                f"ERROR: --upload target folder {args.folder!r} is not the personal "
+                f"state folder ({STATE_FOLDER_ID}). Truth folders + personal modules "
+                f"are READ-ONLY (CLAUDE.md §0) — refusing to write."
+            )
+            return 3
+        if target_name not in STATE_FILES:
+            _eprint(
+                f"ERROR: {target_name!r} is not a registered state file. Write-back "
+                f"is limited to: {', '.join(sorted(STATE_FILES))}. If this is a NEW "
+                f"state file, register it deliberately in lib/pull_drive.py STATE_FILES."
+            )
+            return 3
         creds = _load_credentials(args.sa_file, SCOPES_RW)
         svc = _drive(creds)
         fid = _upload(svc, args.upload, args.folder, args.name)
@@ -267,6 +296,16 @@ def main(argv=None):
             tab, nrows = _read_sheet_via_api(_sheets(creds), args.sheet, args.tab, out)
             _eprint(f"INFO: read tab {tab!r} via Sheets API ({nrows} rows) -> {out}")
         except Exception as e:
+            if args.tab:
+                # Ein EXPLIZIT angeforderter Tab darf nie still durch den ersten
+                # Tab ersetzt werden (Audit-CONFIRMED: falsche Daten mit Exit 0).
+                _eprint(
+                    f"ERROR: Sheets API read for tab {args.tab!r} failed ({e!r}). "
+                    f"NOT falling back to Drive export(csv) — that would silently "
+                    f"deliver the FIRST tab under the expected filename. Fix the "
+                    f"tab name / access, or omit --tab to accept the first tab."
+                )
+                return 3
             _eprint(f"WARNING: Sheets API read failed ({e!r}); falling back to Drive export(csv) — first tab only")
             _export_sheet_csv(_drive(creds), args.sheet, out)
         print(str(out))
@@ -280,8 +319,13 @@ def main(argv=None):
         return 2
 
     matches = _list_matches(svc, args.folder, args.match, args.ext)
+    if args.exact and args.match:
+        matches = [f for f in matches if f["name"] == args.match]
     if not matches:
-        _eprint(f"ERROR: no files in folder {args.folder} matching match={args.match!r} ext={args.ext!r}")
+        _eprint(
+            f"ERROR: no files in folder {args.folder} matching match={args.match!r} "
+            f"ext={args.ext!r} exact={args.exact}"
+        )
         return 1
 
     if args.list:

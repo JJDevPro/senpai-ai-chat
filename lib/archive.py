@@ -29,13 +29,14 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date as _date
 from pathlib import Path
 
 # archive.py lives next to pull_drive.py in lib/ — make it importable either way.
 _LIB_DIR = Path(__file__).resolve().parent
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
+
+import clock  # noqa: E402 — Berlin date instead of the VM's UTC date (CLAUDE.md §3)
 
 # The default private state folder (Senpai-AI-Chat). Overridable via --folder.
 DEFAULT_FOLDER_ID = "1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde"
@@ -118,14 +119,26 @@ def run_archive(report_text, kind, day, journal_name, folder_id, out_dir, sa_fil
     fid = exact[0]["id"]
     out = Path(out_dir)
     local = out / journal_name
-    pd._download_media(svc, fid, local)
 
-    current = local.read_text(encoding="utf-8")
-    updated = append_section(current, kind, day, report_text)
-    local.write_text(updated, encoding="utf-8")
-
-    # Upload back: the file exists -> pull_drive._upload does Drive files.update.
-    return pd._upload(svc, str(local), folder_id, journal_name)
+    # Lost-update guard: with cron automation two writers can interleave
+    # (pull -> append -> upload). After uploading, re-download and verify our
+    # section header survived; if a concurrent writer clobbered it, re-pull the
+    # (now newer) journal and append again — one retry is enough for the
+    # realistic two-writer case, and the loop stays bounded + deterministic.
+    marker = f"## [{kind}] {day}"
+    for attempt in (1, 2):
+        pd._download_media(svc, fid, local)
+        current = local.read_text(encoding="utf-8")
+        updated = append_section(current, kind, day, report_text)
+        local.write_text(updated, encoding="utf-8")
+        # Upload back: the file exists -> pull_drive._upload does files.update.
+        fid = pd._upload(svc, str(local), folder_id, journal_name)
+        pd._download_media(svc, fid, local)
+        if marker in local.read_text(encoding="utf-8"):
+            return fid
+        _eprint(f"WARNING: journal append verify failed (attempt {attempt}) — retrying")
+    _eprint("ERROR: journal append lost twice (concurrent writer?) — giving up")
+    raise SystemExit(3)
 
 
 def main(argv=None):
@@ -139,7 +152,9 @@ def main(argv=None):
     p.add_argument("--sa-file", help="path to service-account JSON (else env)")
     args = p.parse_args(argv)
 
-    day = args.date or _date.today().isoformat()
+    # Berlin-Kalendertag (nicht UTC): ein 23:30-Report darf nicht als "morgen"
+    # (UTC-Datum) im Journal landen.
+    day = args.date or clock.local_now().date().isoformat()
     report_text = _read_report(args.report)
 
     fid = run_archive(

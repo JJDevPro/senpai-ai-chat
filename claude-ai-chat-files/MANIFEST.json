@@ -1,94 +1,94 @@
 {
   "artifacts": {
     "daily-check-skill": {
-      "content_hash": "90abab2554516e347daa699cc875bfaaabe7b4d3ed9d33b889942b62357aa35b",
+      "content_hash": "392c828162fffb0135ad6a8a74ed84cc89dee0d80afe0b05f737bb337bf13f8c",
       "personal_hash": null,
       "reupload_hint": "RE-UPLOAD dist/daily-check-skill.skill (claude.ai → Settings → Skills)",
-      "source_commit": "8be503b",
+      "source_commit": "ebb935d",
       "version": "v0.16",
       "zip": "dist/daily-check-skill.skill",
-      "zip_sha256": "920c751e1f5bcdcaef681a51716e752a58e5feb31cd5043db066f609e3022832"
+      "zip_sha256": "c0b5b0e1a23c1da21e0871e5a9f80ac05942cd2194a8c76f7a4e7b759be32e32"
     },
     "gym-bundle-skill": {
-      "content_hash": "e3f948d00bea32edc15670a6d7704bfe76924aa62cd1dfce45c9c2171829ded3",
+      "content_hash": "6ca53b392e2711582d7d7d31f4eb1c1eae815e2780e310fa90262741e1e02fa2",
       "personal_hash": null,
       "reupload_hint": "RE-UPLOAD dist/gym-bundle-skill.skill (claude.ai → Settings → Skills)",
-      "source_commit": "9e2a30f",
+      "source_commit": "ebb935d",
       "version": "v2.0",
       "zip": "dist/gym-bundle-skill.skill",
-      "zip_sha256": "e3d128f0f84270c016620d9ffddcc3e5515ebdfe14aceb7cc55a2869d275d152"
+      "zip_sha256": "9f489a26d795b87e70f5f1e41a128a8ff161f838be972c8b3be270ec4f100831"
     },
     "nutrition-skill": {
-      "content_hash": "b4f032c0765a72122881f6335fc9c1b952eb34e723f6ec83ffde101794965114",
+      "content_hash": "61125bed42e5619b5ae22547891be1f9cf5a9074ea86697048fbd03605cf14cb",
       "personal_hash": null,
       "reupload_hint": "RE-UPLOAD dist/nutrition-skill.skill (claude.ai → Settings → Skills)",
-      "source_commit": "04adac7",
+      "source_commit": "ebb935d",
       "version": "v1.1",
       "zip": "dist/nutrition-skill.skill",
-      "zip_sha256": "f40e0a7ff2923cc75984429112d067499eb26a7982e6a858684a6d2f5878a2b9"
+      "zip_sha256": "9dca6cf7be522869de016f7291071e4cc6416a7fb287b81d628340a01317d29c"
     },
     "payload-skill": {
-      "content_hash": "ff119fcf8aa2d89f9be93b19167e7f18cf76f79ecf5aea5c21933d30f74bb017",
+      "content_hash": "da87d0a0402864ba4cf17c9fd12d181b40ac66bb1a7bca863d4cb4998ee4ed24",
       "personal_hash": null,
       "reupload_hint": "RE-UPLOAD dist/payload-skill.skill (claude.ai → Settings → Skills)",
-      "source_commit": "57edbd6",
+      "source_commit": "ebb935d",
       "version": "v2.0",
       "zip": "dist/payload-skill.skill",
-      "zip_sha256": "1ac73ee271433bceefffd424716b8acd46beeaf96c8068cfef6a38a25d86f0a6"
+      "zip_sha256": "5de3df864cb2797371aff42cb1e4a2e27b2ef9e61c397ca599a2e6ece7fece8d"
     },
     "race-projection-skill": {
-      "content_hash": "027ba6a8ca5970e8c31f5da5164986acd0437ae014ee68d4e46e3f35115e2dfe",
+      "content_hash": "f97c6330fce610fa198cfd7a6849ca71c445872ca2b556912f9e61569181aa49",
       "personal_hash": "2320ef8773a8fa04e92a9a2a92e99793b15a87cc694f6af84b6f346f1171b477",
       "reupload_hint": "RE-UPLOAD dist/race-projection-skill.skill (claude.ai → Settings → Skills)",
-      "source_commit": "55c08a6",
+      "source_commit": "ebb935d",
       "version": "v1.1",
       "zip": "dist/race-projection-skill.skill",
-      "zip_sha256": "b157de09293e4610af38baef026d893bf5edbbef60e3b8eca3d30cb60362156a"
+      "zip_sha256": "fb91e42e8d7bab74eaf0bdadb7951af8222dedb5cc96ae5f32b6a2b1420b6a69"
     },
     "run-bundle-skill": {
-      "content_hash": "4aa8387f1c458e74610fbcfdd29bedb23ae9e3c3e612ea1d947fc557387f031e",
+      "content_hash": "efe0d07b4cacf1d75ccaf42d9bd86b5a8620e574387ad50a501340273f46d3cb",
       "personal_hash": null,
       "reupload_hint": "RE-UPLOAD dist/run-bundle-skill.skill (claude.ai → Settings → Skills)",
-      "source_commit": "8be503b",
+      "source_commit": "ebb935d",
       "version": "v3.14",
       "zip": "dist/run-bundle-skill.skill",
-      "zip_sha256": "43f31c8b23f80233e8c02bfe66fc74a3399296d87ec69fb83b44c96d30b62a98"
+      "zip_sha256": "555172247e9533cb9574f9211e32039300cbd318d67f13d65c4a9ccf5ee58674"
     },
     "sync-skill": {
-      "content_hash": "8721af5d10181e5789567da8d1043e2a760aac5d41129a44c87cdf89c09c1654",
+      "content_hash": "98259579812aa781011a377a620805e1af57ec57a5f4c524072ee0a0c708de02",
       "personal_hash": null,
       "reupload_hint": "RE-UPLOAD dist/sync-skill.skill (claude.ai → Settings → Skills)",
-      "source_commit": "57edbd6",
+      "source_commit": "ebb935d",
       "version": "v1.1",
       "zip": "dist/sync-skill.skill",
-      "zip_sha256": "f72567668eb1cd7e5dc8539303de3f5b37793f418e417708110fb6cc2f9decf6"
+      "zip_sha256": "85ac0a954622623d6ea014fe51f04d57f37754b698d0fba6955c486902b40a08"
     },
     "weather-runprep-skill": {
-      "content_hash": "07c24e1aa4cc6368cbe7c7058095308d44ea7fa4973ab3314efa7d032ecbe3ec",
+      "content_hash": "92338dcd75d0eb30f93fa077ac562808df5841f4ce50f70d6b72f780ce074184",
       "personal_hash": "87456a34d773cc4ac76c38e09051a749c0f789676672feb97beeed69363bb0fc",
       "reupload_hint": "RE-UPLOAD dist/weather-runprep-skill.skill (claude.ai → Settings → Skills)",
-      "source_commit": "8be503b",
+      "source_commit": "ebb935d",
       "version": "v1.3",
       "zip": "dist/weather-runprep-skill.skill",
-      "zip_sha256": "b6d21db1fffa699f2875c98283336682c1c1fe27e4a30ff0b56343e54ced99f2"
+      "zip_sha256": "3a7147adde3d91d15bde98f246403e9c4b5fd58448c1b4bf82425a1e11f76da7"
     }
   },
   "docs": {
     "README.md": {
       "action_hint": "Referenz/Checkliste",
-      "content_hash": "94cf701c1374fff8ab784e6bc33aa3cd7449847fc823b6a49ff5ed2bc2cea691"
+      "content_hash": "a22530357b56e7d3e39525c38a69a33c6725c8dc26c25b4a9c761f9286fc3b9d"
     },
     "project-files.md": {
       "action_hint": "Referenz/Checkliste",
-      "content_hash": "0546392c22cb289d0c1938fd89157d1309368af7093c3c016c74def9beaf3f6a"
+      "content_hash": "46f10f9e3cd723967eea582d580809e3ada622747aed9660658dab31cd9f7965"
     },
     "project-instructions.md": {
       "action_hint": "PASTE in claude.ai",
-      "content_hash": "f15ede40a2551c09331393ef9d0857fe070c7dc4269808cb099c6b7feb947303"
+      "content_hash": "9b4461ba66ed92de3c4cfc4696c6d434683ef9298273bc829a762dc87ce7167a"
     },
     "smoke-tests.md": {
       "action_hint": "Referenz/Checkliste",
-      "content_hash": "ee9db8917b852730484136c39ba4a0419ae98b75c0c3058c55cc5dc543ae8d84"
+      "content_hash": "6603cc7ca2f275b358273296cb7717d01762933b93bc370efcc00af669b7ebf0"
     }
   },
   "schema": 1,

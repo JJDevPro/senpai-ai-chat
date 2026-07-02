@@ -15,8 +15,10 @@ description: "Senpais Gym-Analyse. Trigger: gymanalyse, Gym-Report, analysier de
 | Was | Woher |
 |---|---|
 | Gym-ZIP (Apple-Watch/HealthFit) | Chat-Upload → Sandbox (typisch `/mnt/user-data/uploads`, per `ls` verifizieren) |
-| baselines.md (PR-SSoT) · athlete.md (Geräte-Map) · live.md | Projekt-Datei (Kontext) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
-| Kraft-Programm.md (Geräte/Biomechanik) | Projekt-Datei (Drive-synchronisiert) |
+| baselines.md (PR-SSoT) · live.md | per Drive-Connector frisch lesen (PR-Vergleich braucht aktuellen Stand) → nach `./data/` schreiben |
+| athlete.md (Geräte-Map) · Kraft-Programm.md | statische Kopien im Projekt-Wissen (Grundkontext) |
+
+**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — Connector-Stand schlägt jede statische Kopie.
 
 **Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
 
@@ -397,4 +399,4 @@ Selbst bei einer durchschnittlichen Session sollte Senpai einen Lauf-Bezug ziehe
 **Ende der Skill-Definition v2.0. Engine rechnet, Senpai übersetzt — bei jeder Gym-ZIP im Chat oder Text-only Gym-Message.**
 
 ---
-> Export-Stand: gym-bundle-skill v2.0 · senpai-ai-chat@9e2a30f · content e3f948d00bea · generiert von export_claude_ai.py — NICHT von Hand editieren.
+> Export-Stand: gym-bundle-skill v2.0 · senpai-ai-chat@ebb935d · content 6ca53b392e27 · generiert von export_claude_ai.py — NICHT von Hand editieren.

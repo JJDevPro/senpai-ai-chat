@@ -14,8 +14,10 @@ description: "Senpais Ernährungs-Engine. Trigger: makro, essen, protein, kcal, 
 
 | Was | Woher |
 |---|---|
-| live.md (Tagestyp, SoT-Gewicht, Streaks) | Projekt-Datei (Kontext) |
+| live.md (Tagestyp, SoT-Gewicht, Streaks) | per Drive-Connector frisch lesen (Zahlen-SSoT) |
 | Makro-Zahlen des Tages | User-Post im Chat bzw. Tages-JSON-Upload (daily-check-Slicer) |
+
+**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — Connector-Stand schlägt jede statische Kopie.
 
 **Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
 
@@ -149,4 +151,4 @@ Der Wasser-Wert steht als `dietary_water_ml` im JSON-Output auf stdout.
 > **v1.1:** §2a Kern-Makros (Protein/Carbs/Fett/kcal) = einzige Ampel-Makros; Natrium/Zucker/Ballaststoffe/Mikros NUR Narrativ-Kontext (kein Spam). Echtes `dietary_water` aus JSON statt „mental 4L".
 
 ---
-> Export-Stand: nutrition-skill v1.1 · senpai-ai-chat@04adac7 · content b4f032c0765a · generiert von export_claude_ai.py — NICHT von Hand editieren.
+> Export-Stand: nutrition-skill v1.1 · senpai-ai-chat@ebb935d · content 61125bed42e5 · generiert von export_claude_ai.py — NICHT von Hand editieren.

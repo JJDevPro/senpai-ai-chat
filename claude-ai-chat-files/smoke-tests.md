@@ -75,9 +75,9 @@ Reihenfolge einhalten: **S1–S6 gaten die Skill-Nutzung**, S7–S9 gaten die Wr
 **Verifiziert:** Strava-Connector-Tools sind unter claude.ai verfügbar/benannt wie erwartet.
 **Wenn FEHLGESCHLAGEN:** §18 wird per Marker auf „nur wenn Strava-Connector verbunden“ konditioniert — Report bleibt sonst vollständig.
 
-## S13 — State-Bus-Latenz (Drive-Sync der Projekt-Dateien)
-**Setup:** Der Repo-Zwilling ändert `live.md` in Drive (normaler Betrieb). Am Folgetag auf claude.ai:
-> Was steht aktuell in live.md unter „Trend-Metriken“? Nur zitieren.
-**Erwartet:** der NEUE Wert (Projekt-Datei hat sich selbst aktualisiert).
-**Verifiziert:** der geteilte State-Bus Repo ⇄ claude.ai funktioniert ohne manuelles Re-Upload.
-**Wenn FEHLGESCHLAGEN/VERALTET:** Latenz notieren; ggf. „live.md bei Zahlen-Zweifel per Connector frisch lesen“ in die Anweisungen.
+## S13 — State-Bus-Roundtrip (Connector, beide Richtungen)
+**Setup:** Der Repo-Zwilling ändert `live.md` in Drive (normaler Betrieb, z. B. nach einem Run-Report). Danach auf claude.ai:
+> Lies live.md per Drive-Connector frisch und zitiere NUR die Trend-Metriken-Sektion.
+**Erwartet:** der NEUE Wert (Connector liest immer den aktuellen Drive-Stand — kein Sync nötig).
+**Verifiziert:** der geteilte State-Bus Repo ⇄ claude.ai über den Connector; zusammen mit S8 (Write) ist der Kreis geschlossen.
+**Wenn FEHLGESCHLAGEN:** Fehlermeldung pasten — dann liegt ein Connector-Berechtigungsproblem vor (S7 erneut prüfen), kein Architektur-Problem.

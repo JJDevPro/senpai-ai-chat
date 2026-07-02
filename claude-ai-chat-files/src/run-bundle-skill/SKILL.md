@@ -15,9 +15,11 @@ description: "Senpais Lauf-Analyse (FIT-first, V3). Trigger: analysier den Lauf,
 | Was | Woher |
 |---|---|
 | FIT/ZIP des Laufs | Chat-Upload → Sandbox (typisch `/mnt/user-data/uploads`, per `ls` verifizieren) |
-| live.md · gear.md · coaching_cues.md · baselines.md | Projekt-Datei (Kontext) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
+| live.md · gear.md · coaching_cues.md · baselines.md | State-Read (Projekt-Wissen bzw. Drive-Connector frisch, siehe unten) → bei Skript-Bedarf Inhalt nach `./data/<name>` schreiben |
 | readiness-history.csv (CTL/ATL-Anker) | Projekt-Datei → nach `./data/readiness-history.csv` schreiben |
 | V3-Protokoll / Parsing-Referenz | im Bundle: `references/V3_Protocol.md`, `references/Daten_Parsing.md` |
+
+**State-Read:** Rohe `.md`-State-Dateien lassen sich in claude.ai NICHT als Drive-synchronisierte Projekt-Dateien anbinden (Sync kann nur Google-native Formate). Regel: statische Kopie im Projekt-Wissen = Grundkontext; bei Zahlen-Relevanz (`live.md`, `baselines.md`, `gear.md`, `readiness-history.csv`) die Datei per Drive-Connector aus „Senpai-AI-Chat“ FRISCH lesen — Connector-Stand schlägt jede statische Kopie.
 
 **Write-Back:** Google-Drive-Connector — die BESTEHENDE Datei im Drive-Ordner „Senpai-AI-Chat“ aktualisieren (nie ein Duplikat anlegen). Fallback bei fehlgeschlagenem Write: kompletten neuen Datei-Inhalt als Code-Fence ausgeben, der User ersetzt ihn in Drive.
 
@@ -1283,4 +1285,4 @@ Eigenes mutables State-File (wie `coaching_cues.md`). `Schuhe_Ausruestung.md` bl
 Senpai liest diese Datei bei Run-Analyse-Trigger. Chat-Upload ist Default — die FIT kommt als HealthFit-Share in den Chat und wird nach `./data` kopiert, `analyze_run_fit.py` reduziert sie; FIT bevorzugt, CSV-Fallback wenn keine FIT für gewünschtes Datum, lokales ZIP nur als Legacy. Walking-Diskriminator ist Kadenz (§4), Wand-Diagnose via Kardio-vs-Neuromuskulär (§7b).
 
 ---
-> Export-Stand: run-bundle-skill v3.14 · senpai-ai-chat@8be503b · content 4aa8387f1c45 · generiert von export_claude_ai.py — NICHT von Hand editieren.
+> Export-Stand: run-bundle-skill v3.14 · senpai-ai-chat@ebb935d · content efe0d07b4cac · generiert von export_claude_ai.py — NICHT von Hand editieren.

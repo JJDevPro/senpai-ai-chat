@@ -33,7 +33,7 @@ Merge-Gate: Skill geändert + nicht re-exportiert = Suite rot.
 
 | Repo (Claude Code VM) | claude.ai-Twin |
 |---|---|
-| `pull_drive.py` (Service-Account) | State: Drive-synchronisierte **Projekt-Dateien** (auto-aktuell); Roh-Daten: **Chat-Upload** → Sandbox; kleine Texte: Drive-Connector |
+| `pull_drive.py` (Service-Account) | **Hybrid-State-Bus** (v10.1.1): träge Dateien (athlete.md, Kraft-Programm, Schuhe, Schlaf-HRV) = statische Uploads im Projekt-Wissen; volatiler State (live.md & Co.) = **Drive-Connector-Read bei Chat-Start** (rohe `.md` lassen sich NICHT als synchronisierte Projekt-Dateien anbinden — Sync kann nur Google-native Formate); Roh-Daten: **Chat-Upload** → Sandbox |
 | State-Write-Back `--upload` | **Drive-Connector-Update** derselben Datei (Fallback: Code-Fence) |
 | `lib/weather.py` (HTTP) | Bright-Sky-URL (`assets/brightsky_url.txt`) per **Chat-Web-Fetch** → `scripts/weather.py --from-json` |
 | `lib/clock.py` (VM-Uhr) | Sandbox-Uhr (`scripts/clock.py` in daily-check/weather/sync-Bundles) |

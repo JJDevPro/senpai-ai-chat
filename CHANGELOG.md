@@ -3,6 +3,19 @@
 > Repo-lokales Changelog (Trigger `Changelog`, CLAUDE.md §9). Nur Methode/Architektur —
 > KEINE Personendaten. Das alte Drive-CHANGELOG ist Alt-Bestand (Putz-Liste PR-6).
 
+## v10.1.1 — Twin-Fix: Hybrid-State-Bus (2026-07-02)
+
+Live-Befund bei der Erst-Einrichtung: rohe `.md`-Drive-Dateien lassen sich NICHT
+als synchronisierte Projekt-Dateien anbinden („URL-Auflösung fehlgeschlagen" —
+der Projekt-Wissen-Sync kann nur Google-native Formate wie Docs/Sheets). Der
+State-Bus wird zweistufig: **statische Uploads** für träge Dateien (athlete.md,
+Kraft-Programm.md, Schuhe_Ausruestung.md, Schlaf_HRV_Baseline.md) + **Drive-
+Connector-Read bei Chat-Start** für volatilen State (live.md, baselines.md,
+learnings.md, gear.md, coaching_cues.md, backlog.md, trend_snapshot.md,
+readiness-history.csv) — Connector-Stand schlägt statische Kopie und Memory.
+Angepasst: Anweisungs-§0/§7/§9/§11, alle Skill-Preambles (`_PRE_STATEREAD`),
+project-files.md (v2), Smoke-Test S13, README, Export-Doku.
+
 ## v10.1.0 — claude.ai-Twin: generierter Voll-Export (2026-07-02)
 
 Das claude.ai-Projekt (Original bis v9.0.3, Skills-Snapshot 24./25.06.) wird ab

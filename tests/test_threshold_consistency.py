@@ -229,3 +229,24 @@ def test_v3_ampel_bands_in_run_skill_prose():
     assert "🟢 <260" in RUN_SKILL and "🔴 >300" in RUN_SKILL
     # Decoupling 🟢 <5% … 🔴 >10%
     assert "🟢 <5%" in RUN_SKILL and "🔴 >10%" in RUN_SKILL
+
+
+# ── Gym-Bänder: Registry <-> Engine <-> gym SKILL.md (PR-5) ─────────────────
+def test_gym_bands_registry_matches_engine():
+    import analyze_gym as ag
+    assert C.GYM_LEG_BAND_PCT == ag.LEG_BAND_PCT
+    assert C.GYM_UPPER_BAND_PCT == ag.UPPER_BAND_PCT
+    assert C.GYM_CORE_BAND_PCT == ag.CORE_BAND_PCT
+    assert C.GYM_END_GREEN == ag.GYM_END_GREEN
+    assert C.GYM_END_YELLOW == ag.GYM_END_YELLOW
+    assert C.GYM_END_ORANGE == ag.GYM_END_ORANGE
+    assert C.GYM_REENTRY_FACTORS == ag.REENTRY_FACTORS
+
+
+def test_gym_bands_in_gym_skill_prose():
+    from pathlib import Path
+    skill = (Path(__file__).resolve().parents[1] / ".claude" / "skills"
+             / "gym-bundle-skill" / "SKILL.md").read_text(encoding="utf-8")
+    assert "50–65" in skill and "25–35" in skill and "8–15" in skill
+    assert "60/30/10-Zeile war nur der Band-Mittelwert" in skill  # alte Inkonsistenz getilgt
+    assert "≤21:30" in skill and "22:30" in skill                  # Bedtime-Bänder

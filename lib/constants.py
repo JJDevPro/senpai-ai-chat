@@ -106,6 +106,20 @@ EFFICIENCY_GREEN = 90
 EFFICIENCY_YELLOW = 85
 EFFICIENCY_ORANGE = 75
 
+# ── Gym (gym-bundle §7/§11/§12; Engine analyze_gym.py) ───────────────────────
+# Volumen-Verteilung (Anteil Tonnage) — EIN Band-Satz (die alte 60/30/10-Zeile
+# war nur der Mittelwert dieser Bänder, Audit: Inkonsistenz §7 vs §9).
+GYM_LEG_BAND_PCT = (50, 65)
+GYM_UPPER_BAND_PCT = (25, 35)
+GYM_CORE_BAND_PCT = (8, 15)
+# Do-Gym-Ende (Bedtime-Kette): 🟢 ≤21:30 · 🟡 ≤22:00 · 🟠 ≤22:30 · 🔴 >22:30
+GYM_END_GREEN = "21:30"
+GYM_END_YELLOW = "22:00"
+GYM_END_ORANGE = "22:30"
+# Re-Entry nach >7 Tagen Pause: Session 1 = 80 % der PRs, dann 90 %, dann 100 %.
+GYM_REENTRY_GAP_DAYS = 7
+GYM_REENTRY_FACTORS = (0.8, 0.9, 1.0)
+
 # ── SoT-Protokoll (Entscheidung 2026-07-02) ──────────────────────────────────
 # Koerperwaage-SoT: MONTAG, nuechtern nach dem Aufstehen (Richtwert ≤09:00,
 # KEIN hartes Gate). Sonntag-Payload referenziert den letzten Mo-Wert.

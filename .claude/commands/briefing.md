@@ -12,10 +12,10 @@ sonst das normale Daily-Dashboard liefern. **Alle Aufrufe vom Repo-Root (CWD), `
 > **⛔ Keine Logik hier duplizieren.** Dieses Command ORCHESTRIERT die bestehende
 > `daily-check-skill` + die deterministischen Gates. Der Daily-Check-Workflow,
 > die Ampeln, die Output-Struktur und die Persona-Modi leben dort
-> (`.claude/skills/daily-check-skill/SKILL.md`) bzw. in CLAUDE.md §5/§6/§16 — lies/lade sie.
+> (`.claude/skills/daily-check-skill/SKILL.md`, Modus-Matrix §16) bzw. in CLAUDE.md §5/§6 — lies/lade sie.
 > Hier steht NUR die Reihenfolge + die „lead with the alert"-Regel.
 
-Bezugstag: **`$ARGUMENTS`** wenn gesetzt, sonst **heute** (Datum aus Claude-Kontext, NIE API).
+Bezugstag: **`$ARGUMENTS`** wenn gesetzt, sonst **heute** aus der echten Uhr: `python3 lib/clock.py` (Europe/Berlin, CLAUDE.md §3 — NIE raten, KEINE API).
 Im Folgenden `{heute}` = Bezugstag, `{gestern}` = {heute} − 1.
 
 ---
@@ -125,7 +125,7 @@ python3 .claude/skills/daily-check-skill/scripts/readiness_history.py --as-of {h
 ## Schritt 4 — Report zusammensetzen: LEAD mit den Alerts, wenn `actionable=True`
 
 - **`sentinel.actionable == True`** → **beginne den Report mit den Alerts**, in Senpais Stimme
-  (CLAUDE.md §2, Modus aus §16/SKILL.md §16), sortiert nach Schärfe (CRITICAL → WARN). Pro Alert:
+  (CLAUDE.md §2; Modus aus daily-check SKILL.md §16), sortiert nach Schärfe (CRITICAL → WARN). Pro Alert:
   *was* feuert, *warum* (der `detail` nennt schon §-Bezug + Hebel), *ein* konkreter Schritt.
   Danach folgt das **normale, volle** Daily-Dashboard (nichts kürzen — „Länge ≠ Uhrzeit", CLAUDE.md §3).
   WATCH-Einträge sind KEIN Lead — höchstens eine Randnotiz im passenden Block.

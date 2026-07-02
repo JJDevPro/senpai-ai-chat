@@ -127,8 +127,8 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 | Modell | Eignung |
 |---|---|
 | Haiku 4.5 | 🔴 DISQUALIFIZIERT (fabriziert Topografie) |
-| Sonnet 4.6 | 🏆 Daily Driver |
-| Opus 4.8+ | 🟢 Strategie + Skill-Iteration |
+| Opus 4.8 (+ ultracode) | 🏆 Standard / Daily Driver |
+| Fable 5 / stärker | 🟢 Meta-Arbeit, Skill-Iteration, Deep-Audits |
 
 Header:
 ```
@@ -834,7 +834,7 @@ Aus ./data/live.md (Counter-Stand + #100-Zieldatum). **#100** → Club-100-Shirt
 **Decoupling (NUR Steady-State Long Run ≥45 Min):** 🟢 <5% | 🟡 5-7% | 🟠 7-10% | 🔴 >10%
 - Bei Intervall/Tempo/Sprint: 🟡 mit Disclaimer „methodisch nicht aussagekräftig"
 
-**TRIMP:** 🟢 <100 | 🟡 100-140 | 🟠 140-180 | 🔴 >180
+**TRIMP:** 🟢 <100 | 🟡 100-150 | 🟠 150-180 | 🔴 >180 (kanonisch = daily-check §7, `lib/constants.py`)
 **TSB:** 🟢 >+5 | 🟡 -10 bis +5 | 🟠 -30 bis -10 | 🔴 <-30
 **HRR-1 (Cardio Recovery):** 🟢 ≥35 | 🟡 25-35 | 🟠 15-25 | 🔴 <15
 **IF:** Easy 0,65-0,80 | Tempo 0,85-0,95 | Threshold 0,95-1,05

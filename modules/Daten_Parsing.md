@@ -66,7 +66,7 @@ running_only = df[(df['cadence'] * 2 >= 140) & (df['speed'] >= 2.0)]
 - **Gehpause = Kadenz×2 <140 spm UND Speed <2,0 m/s** (beide Bedingungen gleichzeitig)
 - **NIE Gehanteil aus GCT-Absenz ableiten** (Sensor-Dropout bei harter Intensität → False-Positives)
 - **Walking-Pausen separat zählen und im Output ausweisen**
-- Form-Benchmarks (Kadenz ≥166 spm, GCT <300 ms, VO ~89 mm) gelten NUR für Running-Only-Daten
+- Form-Benchmarks (Kadenz ≥166 spm, GCT ≤280 ms, VO 85–92 mm — SSoT `modules/V3_Protocol.md`/`lib/constants.py`) gelten NUR für Running-Only-Daten
 - **Hoher Geh-Wert bei harter Session → plausibilisieren** (Kadenz-Verteilung + User-Erinnerung), nie ungeprüft melden
 
 ---
@@ -102,15 +102,15 @@ Feste Reihenfolge für Lauf-/Gym-Analyse-Reports:
 5. **Schlaf/HRV-Kontext** (Vortag-Nacht, aktueller Tag)
 6. **Roast** (Senpai-Modus-abhängig)
 7. **Coaching** (1-2 konkrete Empfehlungen)
-8. **HM-Projektion** (nur bei Long Runs — gegen 3:00:00 Cutoff)
+8. **Race-Projektion** (nur bei Long Runs — gegen Ziel/Cutoff des nächsten Events aus dem Renn-Kalender in `live.md`)
 
 ---
 
-## 5. Daten-Hierarchie (erinnernd)
+## 5. Daten-Hierarchie (erinnernd — Vollversion: CLAUDE.md §7)
 
 1. **User-Input im Chat** (inkl. Körperwaage-Gewicht manuell, SoT) = Vorrang
-2. **Chat-Uploads** (diese JSONs/CSVs) = Standard
-3. **userMemories** = persistenter Live-State
-4. **Projekt-Module** = statische Referenzen
+2. **Frisch gezogene Truth-Daten** (HAE-JSON/FIT/Sheets via `pull_drive.py`) = Standard
+3. **State-Dateien** (`live.md`, `baselines.md`, … aus dem Drive-Personal-Ordner) = persistenter Live-State
+4. **Methoden-/Personal-Module** = statische Referenzen
 
-**Körperwaage-Werte (Gewicht, SoT, manuell) sind NIE im HealthAutoExport-JSON.** Wenn Sonntag-SoT gebraucht wird → auf manuellen User-Post warten, NICHT aus JSON schätzen.
+**Körperwaage-SoT-Protokoll:** SoT = **Montag, nüchtern nach dem Aufstehen** (Richtwert ≤09:00, weiches Fenster — CLAUDE.md §7). Withings-Messungen KÖNNEN im HAE-JSON auftauchen (`body_comp`) — sie zählen nur als SoT, wenn sie dem Mo-nüchtern-Protokoll entsprechen; sonst `off_protocol` (Info, nie SoT). Manuell geposteter Chat-Wert gewinnt immer.

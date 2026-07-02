@@ -40,9 +40,9 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 
 ## 2. Rekalibrierungs-Checklist (knapp bestätigen)
 
-1. **KW + Datum** — aktuelle ISO-KW, Montag dieser KW (Wochentag aus dem aktuellen Session-Datum, KEINE TimeAPI).
-2. **Race-Countdown** — nächstes Race + Tage (aus `./data/athlete.md`, gezogen via `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match athlete.md --out ./data`; nächstes Event + Datum aus dem Renn-Kalender in `./data/live.md` / `./data/athlete.md`).
-3. **Live-State** — Gewicht, KFA, Viszeralfett, HRV-Ø, VO2 (aus `./data/live.md`, gezogen via `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data`, oder Payload; Payload gewinnt).
+1. **KW + Datum** — aktuelle ISO-KW, Montag dieser KW (Datum/Wochentag aus der echten Uhr `python3 lib/clock.py`, CLAUDE.md §3 — KEINE TimeAPI, nie raten).
+2. **Race-Countdown** — nächstes Race + Tage (**Renn-Kalender-SSoT = `./data/live.md`**; live.md via `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data` ziehen; `athlete.md` liefert nur Stammdaten, keinen Kalender).
+3. **Live-State** — Gewicht, KFA, HRV-Ø, VO2 (aus `./data/live.md`, gezogen via `python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match live.md --out ./data`, oder Payload; Payload gewinnt).
 4. **Aktive Overrides** — Verletzung? Deload/Taper? Hitze-Dome? Gym-Pause (Re-Entry-Status)? (Streak-/Geist-Werte gemäß Medical-Notes im Athleten-Profil NICHT tracken.)
 5. **Protokoll-Anker** — **V3 Heavy Hybrid Polarized** (NICHT V2). Die-Eine-Regel: HR steuert Z2, Pace ist Ergebnis.
 6. **Persona-State** — Modus (SCHARF/STOLZ) aus letztem Stand, Default-Anrede {Anrede} (reale Anrede-Stufen aus `./data/athlete.md`).
@@ -55,11 +55,11 @@ description: "Senpai Rekalibrierungs-Routine. Laden bei dem Sync-Command, zu KW-
 ## 3. V3-Anker (Drift-Schutz — kurz prüfen)
 
 - HR-Zonen: Z2 = 136–147 (Ziel Easy/Long).
-- Hitze: +3–4 s/°C ab 18°C.
+- Hitze: Rechenwert fix 3,5 s/km/°C ab 18°C (`lib/constants.py`).
 - Wochenrhythmus: Mo Run+Core/OK 20:00 · Mi Long · Do 💀 Gym ≤21:30 · Sa Parkrun 09:00 + Trainingspartner.
 - Gym-Minimum: 1 Full-Body/Woche. Do-Lauf nur bei 4/4 Flex-Kriterien.
 - Gear-Blacklist (siehe Ausrüstung im Profil / Drive). Schuhnamen voll ausschreiben.
-- Walking-Filter v3.5 (Kadenz <140 UND Speed <2,0). Geist-/Ausschluss-Signale gemäß Medical-Notes im Athleten-Profil ignorieren. Die Körperwaage (SoT, manuell) nie im JSON.
+- Walking-Filter v3.5 (Kadenz <140 UND Speed <2,0). Geist-/Ausschluss-Signale gemäß Medical-Notes im Athleten-Profil ignorieren. SoT-Gewicht = Mo nüchtern nach Aufstehen (manuell gepostet gewinnt; HAE-`body_comp` nur bei Protokoll-Treffer, sonst off_protocol — CLAUDE.md §7).
 
 > Bei erkanntem Drift (z. B. "V2", abgekürzte Schuhnamen, falsche KW): **explizit korrigieren** und auf V3/Live-State zurückziehen.
 
@@ -82,7 +82,7 @@ python3 lib/consolidate.py --target baselines  --as-of {heute}   # neue PRs/Base
 ```
 🔄 SYNC KW[NN] — [Datum]
 - Race: [Event] in [X] Tagen
-- Live: [Gewicht] | KFA [%] | VFat [X] | HRV [XX ms Ampel] | VO2 [XX,X]
+- Live: [Gewicht] | KFA [%] | HRV [XX ms Ampel] | VO2 [XX,X]
 - Overrides: [Verletzung/Taper/Hitze/Gym-Pause/—]
 - Protokoll: V3 ✅ | Persona: [Modus], Anrede [..]
 - Fokus KW: [Haupt-Session] | Risiko: [..]

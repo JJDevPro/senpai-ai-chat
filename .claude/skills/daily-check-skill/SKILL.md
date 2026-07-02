@@ -412,14 +412,14 @@ Direkt nach der Tages-Übersicht: der nachgebaute Firstbeat-Layer (Steps 10.1–
 🥗 ERNÄHRUNG — gestern [Wochentag DD.MM.]
 - 🥩 Protein: [XXX g] [Ampel vs. 150 g Floor]        ← KERN-Signal, IMMER zeigen
 - 🔥 kcal: [X.XXX] / [Cap] [Ampel]                    ← Cap = Tagestyp von gestern
-- 🧈 Fett: [XX g] / 85 g Hard-Cap [Ampel]
+- 🧈 Fett: [XX g] / Tagestyp-Cap [XX g] [Ampel] (>85 g = immer 🔴)
 - 🍞 Carbs: [XXX g] / [Cap] [Ampel]   ·   🥤 Wasser: [X,X L] / [Ziel] [Ampel]
 - [Gesamt-Ampel §5: 🟢🟢🟢🟢 → Lob · 🟡🟡 → „mittelmäßig, kein Drama" · 🟠🟠 → Pattern-Check · 🔴(≥1) → System-Fix]
 → Tiefe Analyse, Casein & Mittag-Entscheidung: /makro
 ```
 
-**Caps pro Tagestyp (gestern) — aus `nutrition-skill` §2:** Mo/Sa 2.700 · Di/Fr/So 2.000 · Mi 2.800 · Do 2.300 kcal. **Protein-Floor 150 g (jeder Tag).** Fett Hard-Cap **85 g**.
-**Protein-Ampel:** 🟢 ≥150 · 🟡 135–149 · 🟠 105–134 · 🔴 <105 g. **kcal/Carbs/Fett:** 🟢 ≤Cap · 🟡 +≤10 % · 🟠 +11–30 % · 🔴 >+30 %. **Wasser-Ziel:** Rest 3,5–4 L · Do 4 L · Mo/Sa 4,5 L · Mi 5 L (über 20 °C +0,5 L).
+**Caps pro Tagestyp (gestern) — aus `nutrition-skill` §2:** Mo/Sa 2.700 · Di/Fr/So 2.000 · Mi 2.800 · Do 2.300 kcal. **Protein-Floor 150 g (jeder Tag).** **Fett-Ampel gegen den Tagestyp-Cap (56/36/61/45 g); 85 g = zusätzliches absolutes 🔴-Gate.**
+**Protein-Ampel:** 🟢 ≥150 · 🟡 135–149 · 🟠 105–134 · 🔴 <105 g. **kcal/Carbs/Fett:** 🟢 ≤Tagestyp-Cap · 🟡 +≤10 % · 🟠 +11–30 % · 🔴 >+30 % (Fett zusätzlich: >85 g = sofort 🔴). **Wasser-Ziel:** Rest 3,5–4 L · Do 4 L · Mo/Sa 4,5 L · Mi 5 L (über 20 °C +0,5 L).
 > `dietary_energy` kommt aus HAE in **kJ** — `daily_signals` rechnet bereits auf **kcal** um (`/4,184`); `dietary.yesterday.kcal` ist schon kcal.
 
 **⛔ Daten-Disziplin (Hol-Pflicht §0):**
@@ -501,7 +501,7 @@ Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
 - HRV-Schlaf-Ø: [Mo XX · Di XX · …] → Korridor, heute [im/über/unter]
 - Ruhepuls: [Mo XX · …] → [↑↓→]
 - Schlaf: [Mo X,Xh · …] → Ø
-- Bedtime-Disziplin: [X von N ≤00:30]
+- Bedtime-Score: [X,X von N] ([N]×🟢 ≤00:00 voll + [N]×🟡 00:00–00:30 halb; >00:30 = 0)
 - Form (TSB): [Mo · Di · …] → [Trend]
 ```
 **Montag:** Baseline-Tag, "Trend ab Di". **Sonntag:** volle Woche → Payload-Brücke. Fehlt → "—".
@@ -544,7 +544,7 @@ Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
 
 - **Schuh:** Rotations-Regel + km aus `gear.md`/`Schuhe_Ausruestung.md` (weather-runprep §5 Punkt 6 / §5b). Schuhnamen IMMER voll ausschreiben (CLAUDE.md NEVER-Liste).
 - **Runna-Session:** Typ aus dem Wochenrhythmus (CLAUDE.md §4 / `athlete.md`): Mo Easy+Core · Mi Long Run/Race-Sim · Sa Parkrun. „Nicht schneller als X" = Decke, nicht Ziel (V3).
-- **Pace@HR147:** temperatur-normalisierte Erwartung aus weather-runprep §5 Punkt 8 (+3–4 s/km pro °C >18 °C); Baseline `live.md`/`baselines.md`. Bei Easy/Long steuert **HR ≤147**, Pace ist Ergebnis.
+- **Pace@HR147:** temperatur-normalisierte Erwartung aus weather-runprep §5 Punkt 8 (fix +3,5 s/km pro °C >18 °C, `lib/constants.py`); Baseline `live.md`/`baselines.md`. Bei Easy/Long steuert **HR ≤147**, Pace ist Ergebnis.
 - **Sa-Parkrun:** Papa/Crew-Präsenz als sozialer Anker (athlete.md) — **Papa-Faktor nur bei nachweislich Zusammen-gelaufen**, nie aus bloßer Präsenz annehmen.
 - Fehlt ein Baustein (gear.md nicht geseeded, keine Pace-Baseline) → die Zeile ehrlich als „[?] — Quelle/Grund nennen" zeigen (Hol-Pflicht §0), nicht raten.
 
@@ -567,7 +567,7 @@ Quelle Gesundheitsdaten_v5, nur Zeilen ≥ Montag.
 -----
 
 ## 14. ⚠️ REMINDERS
-Mo: "SoT vor 09:00, Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?" · Do: "Zerstörung, ≤21:30, Handy 23:00" · Fr: "Total Rest" · Sa: "Parkrun + Parkrun-Partner + DI" · Pre-Log 12:00 (Brain-Master-Optionen) · Bedtime ≤00:00 wenn Trend schlecht · ☀️ Morgenlicht 20-30 min (Circadian-Anker, senkt Bettzeit) wenn Tageslicht-Trend niedrig · Wasser-Vorsatz.
+Mo: "SoT nüchtern nach dem Aufstehen (Richtwert ≤09:00, kein hartes Gate), Körperwaage-Wert posten" · Mi: "Long Run 17:00 oder 20:00?" · Do: "Zerstörung, ≤21:30, Handy 23:00" · Fr: "Total Rest" · Sa: "Parkrun + Parkrun-Partner + DI" · Pre-Log 12:00 (Brain-Master-Optionen) · Bedtime ≤00:00 wenn Trend schlecht · ☀️ Morgenlicht 20-30 min (Circadian-Anker, senkt Bettzeit) wenn Tageslicht-Trend niedrig · Wasser-Vorsatz.
 
 -----
 

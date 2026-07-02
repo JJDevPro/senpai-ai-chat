@@ -1,7 +1,7 @@
 <!-- SSoT-BANNER (Instructions v9.0.0, ergänzt 24.06.2026) -->
-> 🧭 **Diese Datei ist die kanonische Quelle (SSoT) für:** Die-Eine-Regel, HR-Zonen, Runna-Session-Typen, Flexibilitätsregel (4 Kriterien) + Sicherheitsnetz, Gym-Minimum, Hitze-Korrektur (3–4 s/°C ab 18°C), Schuh-Rotationsmatrix (intensitätsbasiert), Pace@Z2-Definition, Z2-Laufform-Targets.
+> 🧭 **Diese Datei ist die kanonische Quelle (SSoT) für:** Die-Eine-Regel, HR-Zonen, Runna-Session-Typen, Flexibilitätsregel (4 Kriterien) + Sicherheitsnetz, Gym-Minimum, Hitze-Korrektur (Rechenwert 3,5 s/km/°C ab 18°C, `lib/constants.py`), Schuh-Rotationsmatrix (intensitätsbasiert), Pace@Z2-Definition, Z2-Laufform-Targets.
 >
-> ⚠️ **Live-State-Hinweis:** Die "Heute"- und "Baseline"-Spalten in den KPI-Tabellen unten sind ein **datierter Snapshot (Ende Mai 2026)**. Aktuelle Werte (Gewicht, KFA, Viszeralfett, VO2, HRV, PRs, absolvierte Races) = **userMemories / Live-State (live.md + baselines.md aus dem Athleten-Profil)**. Bei Konflikt gewinnt der Live-State. Die *Regeln, Zonen, Formeln und Targets* hier bleiben gültig.
+> ⚠️ **Live-State-Hinweis:** Die "Heute"- und "Baseline"-Spalten in den KPI-Tabellen unten sind ein **datierter Snapshot (Ende Mai 2026)**. Aktuelle Werte (Gewicht, KFA, VO2, HRV, PRs, absolvierte Races) = **Live-State (`live.md` + `baselines.md` aus dem Drive-Personal-Ordner)**. Bei Konflikt gewinnt der Live-State. Die *Regeln, Zonen, Formeln und Targets* hier bleiben gültig.
 
 ---
 
@@ -165,24 +165,25 @@ Letzte Full-Body: Do letzte Woche (7 Tage zurück) → Kriterium 4 ✅
 
 ## Hitze-Flexibilität und Wetter
 
-**Wetter-Quellen:**
-- Primär: lokaler Wetterdienst-Bericht (schriftlicher Bericht, Mail; Quelle aus Athleten-Profil)
-- Sekundär: Apple Weather App Screenshot oder explizite Temp-Angabe vom Athleten
+**Wetter-Quellen (Priorität wie CLAUDE.md §3):**
+1. **User-Angabe** (Apple-Weather-Screenshot / explizite Temp) — gewinnt immer.
+2. **Bright Sky / DWD via `lib/weather.py`** — PRIMÄRE präzise Stundenwerte (Slot-Starttemp + Verlauf während des Laufs).
+3. **Wetterochs** (RSS + Delphi-JSON) — Narrativ, Gewitter-/Glatteis-Kontext, Fallback (nur tages-granular).
 - Bei Unsicherheit Starttemperatur → Senpai fragt: *"Was sagt deine Wetter-App für [Uhrzeit]?"*
 
-**Wichtig: Tagesmax ≠ Starttemperatur.** Senpai schätzt Starttemp aus Tagesmax + Uhrzeit. Bei Unsicherheit wird nachgefragt.
+**Wichtig: Tagesmax ≠ Starttemperatur.** Die Slot-Starttemp kommt aus dem `lib/weather.py`-Stundenwert; nur im Fallback (kein Bright Sky) aus Tagesmax + Uhrzeit geschätzt (`weather-runprep-skill` §2a). Bei Unsicherheit wird nachgefragt.
 
 **Asphalt-Effekt:** Nach einem 28°C+ Tag gibt Asphalt abends Wärme ab. Bei Start 20:00 nach 30°C-Tag: effektiv +3–5°C zur Lufttemperatur für Belastungskalkulation.
 
-| Starttemp (geschätzt) | Wetterampel | Pace-Anpassung Z2 |
+| Starttemp (Slot-Wert) | Wetterampel | Pace-Anpassung Z2 |
 |---|---|---|
 | ≤18°C | 🟢 GO | Normal |
-| 19–22°C | 🟡 ADJUST | +15–25 sek/km, Wasser ↑ |
-| 23–26°C | 🟡 ADJUST | +25–40 sek/km, HR-Cap strikter |
+| 19–22°C | 🟡 ADJUST | Formel: +3,5 s/km je °C >18°C · Wasser ↑ |
+| 23–26°C | 🟡 ADJUST | Formel: +3,5 s/km je °C >18°C · HR-Cap strikter |
 | >26°C | 🔴 SHIFT | Startzeit verschieben oder kürzen |
 | Gewitter | 🔴 NO-GO | Streichen |
 
-**Heat-Tax Rekalibrierung:** Bisherige +4–5 sek/km/°C war auf das alte Kompressionsshirt kalibriert (siehe Ausrüstung im Profil / Drive). Provisorisch ab sofort: **+3–4 sek/km/°C** über 18°C. Wird aus den nächsten 4–6 Kompressionsshirt-Läufen empirisch neu berechnet. Senpai trackt das bei jedem Run-Upload.
+**Heat-Tax:** **Rechenwert fix +3,5 sek/km/°C über 18°C** (`lib/constants.py` — EIN Wert für ALLE Rechnungen: Pace@Z2-Normalisierung, Pre-Lauf-Erwartung, Race-Szenarien). Historischer Kontext: die alte +4–5-Kalibrierung galt dem alten Kompressionsshirt; das empirische Kalibrier-Band liegt bei 3–4 und wird aus Kompressionsshirt-Läufen weiter verfeinert — bis dahin rechnet **jede** Formel mit 3,5, nie mit einer frei gewählten Zahl aus dem Band. Senpai trackt die Kalibrierung bei jedem Run-Upload.
 
 ---
 
@@ -259,31 +260,31 @@ Schwerere Läufer haben höhere Bodenreaktionskräfte pro Schritt. Erhöhte Kade
 ### Lauf-Performance
 | KPI | Heute | Ziel 13W | Ziel 26W |
 |---|---|---|---|
-| **Pace@Z2** (temp-norm.) | (Live-State / userMemories) | ≤8:00/km | ≤7:30/km |
-| Z2-Anteil (HealthFit) | (Live-State / userMemories) | ≥50% | ≥70% |
-| Decoupling Long Run | (Live-State / userMemories) | ≤8% | ≤6% |
-| VO2Max | (Live-State / userMemories) | 39–40 | 40–42 |
-| Parkrun (Effort) | (Live-State / userMemories) | ~31:30 | ~30:30 |
-| **Kadenz Z2** | (Live-State / userMemories) | ≥166 spm | ≥170 spm |
-| **GCT Z2** | (Live-State / userMemories) | ≤280 ms | ≤268 ms |
-| **Stride Z2** | (Live-State / userMemories) | ≥710 mm | ≥730 mm |
-| VO Z2 | (Live-State / userMemories) | 85–92 mm | 85–90 mm |
+| **Pace@Z2** (temp-norm.) | (Live-State: live.md/baselines.md) | ≤8:00/km | ≤7:30/km |
+| Z2-Anteil (HealthFit) | (Live-State: live.md/baselines.md) | ≥50% | ≥70% |
+| Decoupling Long Run | (Live-State: live.md/baselines.md) | ≤8% | ≤6% |
+| VO2Max | (Live-State: live.md/baselines.md) | 39–40 | 40–42 |
+| Parkrun (Effort) | (Live-State: live.md/baselines.md) | ~31:30 | ~30:30 |
+| **Kadenz Z2** | (Live-State: live.md/baselines.md) | ≥166 spm | ≥170 spm |
+| **GCT Z2** | (Live-State: live.md/baselines.md) | ≤280 ms | ≤268 ms |
+| **Stride Z2** | (Live-State: live.md/baselines.md) | ≥710 mm | ≥730 mm |
+| VO Z2 | (Live-State: live.md/baselines.md) | 85–92 mm | 85–90 mm |
 
 ### Body Recomp
 | KPI | Heute (SoT, Live-State) | Ziel 13W | Ziel 26W |
 |---|---|---|---|
 | Gewicht | Körpergewicht-SoT (siehe live.md, Körperwaage manuell) | Ausgangsgewicht −~3,5 kg | Ausgangsgewicht −~7,5 kg |
-| KFA | (Live-State / userMemories) | ≤29% | ≤26% |
-| LBM | (Live-State / userMemories) | LBM-Ist +~2 kg | LBM-Ist +~4 kg |
+| KFA | (Live-State: live.md/baselines.md) | ≤29% | ≤26% |
+| LBM | (Live-State: live.md/baselines.md) | LBM-Ist +~2 kg | LBM-Ist +~4 kg |
 | Bauchumfang (Proxy) | (Live-State / userMemories, manuell) | ↓ Trend | ↓ Trend |
 
 ### Gesundheit & Recovery
 | KPI | Heute | Ziel |
 |---|---|---|
-| HRV Ø Nacht | (Live-State / userMemories) | ≥65 ms |
-| Tiefschlaf | (Live-State / userMemories) | ≥15% |
-| Bedtime ≤00:00 | (Live-State / userMemories) | ≥5/7 |
-| Protein-Floor ≥150g | (Live-State / userMemories) | ≥5/7 |
+| HRV Ø Nacht | (Live-State: live.md/baselines.md) | ≥65 ms |
+| Tiefschlaf | (Live-State: live.md/baselines.md) | ≥15% |
+| Bedtime-Score (≤00:00 = 🟢 voll · 00:00–00:30 = 🟡 halb · >00:30 = ❌) | (Live-State: live.md/baselines.md) | ≥5/7 |
+| Protein-Floor ≥150g | (Live-State: live.md/baselines.md) | ≥5/7 |
 
 ### Gym-Compliance (V3-Sicherheitsnetz)
 | KPI | Standard | Warnung | Eskalation |

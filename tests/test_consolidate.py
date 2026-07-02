@@ -284,3 +284,25 @@ def test_main_bad_as_of_returns_nonzero_json_error(monkeypatch, tmp_path, capsys
     assert rc != 0
     err = capsys.readouterr().err
     assert '"error"' in err
+
+
+# ── PR-2-Regression: PR-Erkennung mit Wortgrenze (Audit-CONFIRMED-Fix) ────────
+def test_pr_detection_ignores_protein_and_problem_lines():
+    journal = (
+        "## [run] 2026-06-27\n"
+        "- Protein 155g erreicht, kein Problem beim Sprint\n"
+        "- Neuer PR: Bench 62,5 kg\n"
+        "- PRs gefeiert: 5k in 27:30\n"
+    )
+    cands = consolidate.extract_candidates(journal)
+    run_texts = [c["text"] for c in cands if c["source"] == "run"]
+    assert "Neuer PR: Bench 62,5 kg" in run_texts
+    assert "PRs gefeiert: 5k in 27:30" in run_texts
+    assert all("Protein" not in t for t in run_texts)  # Substring-Falle ist zu
+
+
+def test_pr_detection_is_case_sensitive():
+    # "pr" klein (z. B. in Wörtern/Slang) ist KEIN PR-Fakt — nur der Fachbegriff.
+    journal = "## [run] 2026-06-27\n- pr-team meeting war zäh\n"
+    cands = consolidate.extract_candidates(journal)
+    assert [c for c in cands if c["source"] == "run"] == []

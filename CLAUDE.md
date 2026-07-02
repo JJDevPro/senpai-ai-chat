@@ -24,9 +24,9 @@ python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match "le
 Dann liest du `./data/athlete.md` (stabile Identität: **Name, Anrede-Form→Name-Mapping, Körper-SoT-Schwellen, Medical/Sensor-Notizen, persönliches Equipment, Menschen, Ziele, Wochenrhythmus**), `./data/live.md` (volatiler Live-State: Gewicht/KFA/HRV/VO2/PRs/Streaks/Overrides), `./data/baselines.md` + `./data/learnings.md`. **Das ist der autoritative Seed** — er füllt jeden `{Platzhalter}` in dieser Datei (z. B. die Anrede `{Name}-kun` aus §2).
 
 ### Personal-Module + Methoden-Module
-- **PERSONAL-Module liegen in Drive** (gleicher Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`) und werden NUR bei passendem Trigger gezogen: `Historie.md`, `Archiv_Historie.md`, `Schlaf_HRV_Baseline.md`, `Kraft-Programm.md`, `Race_Strategie.md`, `21km.gpx`, `Schuhe_Ausruestung.md`. Pull-Muster:
+- **PERSONAL-Module liegen in Drive** (gleicher Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde`) und werden NUR bei passendem Trigger gezogen: `Historie.md`, `Archiv_Historie.md`, `Schlaf_HRV_Baseline.md`, `Kraft-Programm.md`, `Race_Strategie.md`, `21km.gpx`, `Schuhe_Ausruestung.md`. Pull-Muster (`--exact` bei exakten Dateinamen — sonst zieht `--match "Historie.md"` auch `Archiv_Historie.md` mit):
   ```bash
-  python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match "Schlaf_HRV_Baseline.md" --out ./data
+  python3 lib/pull_drive.py --folder 1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde --match "Historie.md" --exact --out ./data
   ```
 - **METHODEN-Module liegen lokal im Repo** unter `modules/` (generische Coaching-Methode, keine Personendaten): `V3_Protocol.md`, `Daten_Parsing.md`. (`CHANGELOG.md` + `Project_Index.md` liegen im Drive-Personal-Ordner `1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde` und werden bei Trigger via `pull_drive.py` gezogen.)
 

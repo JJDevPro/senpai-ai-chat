@@ -25,6 +25,7 @@ import math
 import os
 import ssl
 import sys
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -168,12 +169,17 @@ def reduce(raw: dict, slot_start: str | None = None, slot_end: str | None = None
             entry["dew_point_band"] = db
         return entry
 
-    # Slot-Fenster: Stunden, deren HH:MM in [slot_start, slot_end] liegt (inkl. Rand).
+    # Slot-Fenster: Stunden in [floor(slot_start), slot_end]. Der Start wird auf
+    # die VOLLE Stunde gefloort — ein 20:30-Start braucht die 20:00-Stunde als
+    # Slot-Starttemp; der alte String-Vergleich verlor genau sie (Audit-CONFIRMED).
     window = []
     if slot_start and slot_end:
+        floor_start = slot_start
+        if len(slot_start) >= 4 and ":" in slot_start:
+            floor_start = slot_start.split(":", 1)[0].zfill(2) + ":00"
         for h in hours:
             t = _hhmm(h.get("timestamp", ""))
-            if t is not None and slot_start <= t <= slot_end:
+            if t is not None and floor_start <= t <= slot_end:
                 window.append(pack(h))
 
     day_summary = {
@@ -182,7 +188,9 @@ def reduce(raw: dict, slot_start: str | None = None, slot_end: str | None = None
         "mean_c": _num(sum(temps) / len(temps)) if temps else None,
         "total_precip_mm": _num(sum(precs)) if precs else None,
         "max_precip_prob": _num(max(probs)) if probs else None,
-        "wind_max_ms": _num(max(winds)) if winds else None,
+        # Bright Sky liefert Wind in km/h — der alte Key "wind_max_ms" hat die
+        # Einheit falsch etikettiert (Audit-CONFIRMED: Einheiten-Falle fürs LLM).
+        "wind_max_kmh": _num(max(winds)) if winds else None,
         "day_sunshine_min": day_sunshine_min,
         "mean_cloud_cover": mean_cloud,
         "asphalt_residual_c_est": residual_c,

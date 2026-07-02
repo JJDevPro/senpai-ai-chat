@@ -34,7 +34,7 @@ LIVE_NAME = "live.md"
 # slot_hour = ungefähre Slot-Startstunde für die Pre-Slot-Erkennung.
 DAYS = {
     0: {"name": "Mo", "type": "Lauf + Core", "slot": "Run (Runna) + Core 20:00",
-        "slot_hour": 20, "extra": "SoT-Wiegen nüchtern <09:00", "kw_action": "/sync (KW-Start)"},
+        "slot_hour": 20, "extra": "SoT-Wiegen nüchtern nach dem Aufstehen", "kw_action": "„Sync“ (KW-Start)"},
     1: {"name": "Di", "type": "Ruhetag", "slot": None,
         "slot_hour": None, "extra": None, "kw_action": None},
     2: {"name": "Mi", "type": "Long Run", "slot": "Long Run (HR≤Z2 / Race-Sim)",
@@ -46,7 +46,7 @@ DAYS = {
     5: {"name": "Sa", "type": "Parkrun + Gym", "slot": "Parkrun 09:00 + Gym Upper/Core",
         "slot_hour": 9, "extra": None, "kw_action": None},
     6: {"name": "So", "type": "Ruhetag", "slot": None,
-        "slot_hour": None, "extra": None, "kw_action": "/payload (KW-Abschluss)"},
+        "slot_hour": None, "extra": None, "kw_action": "„Payload“ (KW-Abschluss)"},
 }
 
 # Skill-/Command-Index (der „was kann Senpai"-Cheat-Sheet).
@@ -67,7 +67,11 @@ SKILL_INDEX = [
 # Kompakte „immer"-Zeile (Teilmenge).
 ALWAYS_COMPACT = '„daily check" · „makro/essen" · „analysier den Lauf" · „wetter" · /menu'
 
-AUTOMATION_HINT = "Automation: inaktiv — /automation arm nach der Testphase"
+# Ehrlich statt hardcodiert "inaktiv": das HUD kann den echten Cron-Zustand
+# nicht lesen (CronList ist ein Session-Tool, kein Python-API; die VM ist
+# ephemer, ein lokaler Marker überlebt keine Session). Also auf den Befehl
+# verweisen, der den ECHTEN Stand zeigt, statt einen Zustand zu behaupten.
+AUTOMATION_HINT = "Automation: Stand via /automation status (arm/disarm dort)"
 
 
 def day_plan(weekday_idx: int) -> dict:
@@ -87,7 +91,7 @@ def _now_actions(dt, day) -> list[str]:
         if is_training:
             acts.append('Wetter („wetter")')
         if day["name"] == "Mo":
-            acts.append("SoT-Wiegen nüchtern <09:00")
+            acts.append("SoT-Wiegen nüchtern nach dem Aufstehen")
     if 11 <= h < 14:
         acts.append('„makro/essen" (Mittag-Check)')
     # Pre-Slot: Trainingstag + Slot in den nächsten ~2h
@@ -99,11 +103,11 @@ def _now_actions(dt, day) -> list[str]:
             and h >= day["slot_hour"] and w in ("abend", "nacht")):
         acts.append('nach Training: „analysier den Lauf" / „Gym-Report"')
     if clock.is_bedtime_window(dt):
-        acts.append("🌙 Bedtime ≤00:30 — Handy weg")
+        acts.append("🌙 Bedtime ≤00:00 (bis 00:30 zählt halb) — Handy weg")
     if day["name"] == "So":
-        acts.append("📦 /payload (KW-Abschluss)")
+        acts.append("📦 „Payload“ (KW-Abschluss)")
     if day["name"] == "Mo" and w in ("morgen", "tag"):
-        acts.append("/sync (KW-Start)")
+        acts.append("„Sync“ (KW-Start)")
 
     if not acts:
         acts.append("/briefing für den Überblick")

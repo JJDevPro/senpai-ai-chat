@@ -45,13 +45,14 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from datetime import date as _date
 from pathlib import Path
 
 # consolidate.py lebt neben pull_drive.py in lib/ — so oder so importierbar machen.
 _LIB_DIR = Path(__file__).resolve().parent
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
+
+import clock  # noqa: E402 — Berlin-Datum statt UTC-Systemdatum (CLAUDE.md §3)
 
 # Der private State-Ordner (Senpai-AI-Chat). Per --folder überschreibbar.
 DEFAULT_FOLDER_ID = "1OiTTKvxCn0fribZjvOBSXgCjRtzjHNde"
@@ -154,12 +155,14 @@ def extract_candidates(journal_text: str) -> list[dict]:
                 first_text[key] = text
             section_hits.setdefault(key, set()).add(sec_idx)
 
-            low = text.lower()
             # Neue PRs aus run-Sektionen, neue Baselines aus weekly-Sektionen:
             # sofort dauerhaft (ein einziger Beleg genügt für einen Fakt).
-            if kind == "run" and "pr" in low:
+            # PR-Erkennung mit Wortgrenze + case-sensitiv ("PR"/"PRs" als
+            # Fachbegriff, großgeschrieben) — der alte Substring-Match "pr"
+            # promotete "Protein"/"Problem"/"Sprint"-Zeilen (Audit-CONFIRMED).
+            if kind == "run" and re.search(r"\bPRs?\b", text):
                 _emit("run", text)
-            elif kind == "weekly" and "baseline" in low:
+            elif kind == "weekly" and re.search(r"\bbaselines?\b", text, re.IGNORECASE):
                 _emit("weekly", text)
 
     # Wiederkehrende Muster (in >= RECURRENCE_MIN DISTINKTEN Sektionen).
@@ -316,7 +319,9 @@ def main(argv=None):
     p.add_argument("--sa-file", help="Pfad zur Service-Account-JSON (sonst env)")
     args = p.parse_args(argv)
 
-    day = args.as_of or _date.today().isoformat()
+    # Berlin-Kalendertag (nicht UTC): kurz nach Mitternacht lokal wäre das
+    # UTC-Datum noch "gestern" und der Patch bekäme den falschen Stempel.
+    day = args.as_of or clock.local_now().date().isoformat()
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", day):
         print('{"error": "bad --as-of; expected YYYY-MM-DD"}', file=sys.stderr)
         return 1

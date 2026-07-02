@@ -1,0 +1,59 @@
+# CHANGELOG — senpai-ai-chat (personal-data-frei)
+
+> Repo-lokales Changelog (Trigger `Changelog`, CLAUDE.md §9). Nur Methode/Architektur —
+> KEINE Personendaten. Das alte Drive-CHANGELOG ist Alt-Bestand (Putz-Liste PR-6).
+
+## v10 — SSoT-Sanierung für Opus 4.8 + Reproduzierbarkeits-Garantie (2026-07-02)
+
+Ausgangspunkt: Voll-Audit (90 Agenten, adversarial verifiziert — 73 CONFIRMED
+Findings) + 17 User-Entscheidungen. Leitprinzip: **Skripte entscheiden** — jede
+Zahl/Ampel/Gate kommt als maschinenlesbares JSON aus Python; das LLM liefert nur
+Persona/Ton. Acht PR-Etappen:
+
+- **PR-1 · Kanon (#24):** `lib/constants.py` als einzige Konstanten-Registry
+  (HR-Zonen, HRV/VO2/Atmung/TRIMP/TSB-Bänder, Hitze-Tax 3,5, Bedtime zweistufig
+  00:00/00:30, Fett = Tagestyp-Cap + 85-g-Gate, SoT-Wiegetag Mo);
+  `test_threshold_consistency.py` erzwingt Skript+Doku-Gleichstand.
+  Doku-Widersprüche getilgt (Pace@Z2 = Steady-Z2-Segment, Viszeralfett als KPI
+  gestrichen, VR <11 %, tote Referenzen).
+- **PR-2 · lib-Härtung (#25):** consolidate-PR-Regex, make_ics-Zielzeit-Crash,
+  pull_drive (`--exact`, Upload-Whitelist + Ordner-Guard, Tab-Fehler statt
+  stillem Fallback), weather Slot-Floor + Wind-Einheiten, Berlin-Datum überall,
+  bootstrap-WARN, archive Lost-Update-Guard. Tests für die lib-Kerne.
+- **PR-3 · daily-check-Determinismus (#26):** daily_signals Tag-Shift-Fix
+  (as_of pinnt Kalendertage, kein Zukunfts-Leck, Wasser-Tagessumme,
+  kJ/kcal-Autodetect); safety_gate WARN+data_gaps statt Fail-open + CSV-Vortags-
+  HRV; sentinel kalender-konsekutiv + rhr_deviation; EIN Readiness-Score
+  (Sentinel-Pflicht-Input); Body-Battery-Verkettung (--prev-bb); trend_snapshot
+  Backfill-Sort + Partial-Marker; stats MM:60-Fix + Event-Hardcode raus;
+  slice weiches SoT-Fenster (<12:00); banister.day_trimp.
+- **PR-4 · run-bundle + Race (#27):** banister-Kopien byte-identisch + Parity-
+  Tripwire; analyze_run_fit v3.14 (Kadenz-Absenz ≠ 0 spm, Start-Temp-Label,
+  Top-Speed-Spike-Schutz, §11-Ampeln + EF engine-seitig, fastest_km,
+  schema_version); analyze_run = echte CSV-Engine (geteilte Funktionen);
+  parse_workout Mismatch-Flag; Race-Pfad skriptiert (stats hm_projection mit
+  Cutoff-/Gehpausen-Budget, pacing_card saniert, race-projection v1.1);
+  run-SKILL-Diät (Changelog-Block raus, H1-Paces → Drive-State).
+- **PR-5 · gym-bundle-Engine (#28):** analyze_gym v2.0 als deterministische
+  CLI-Engine (Text-Parser, Segment-Mapping ohne Raten, PR-Detection +
+  baseline_updates, Tonnage-Bänder 50–65/25–35/8–15, Belastungs-Score,
+  Bedtime-Ampel, Re-Entry-80 %); PR-Write-Back autonom + sichtbar nach
+  baselines.md (SSoT), live.md nur Spiegel.
+- **PR-6 · State-Layer & Drive:** live.md Schema v2 (Kontrakt-Sektionen für
+  bootstrap/make_ics/session_menu, Race-Countdown = Renn-Kalender-SSoT);
+  Payload v2.0 mit PATCH-Semantik statt Voll-Ersatz + skriptiertem KW-Rollup
+  (`weekly_rollup.py`: 4 Makro-Ampeln × 7 Tage, Bedtime zweistufig, HRV-/
+  Schlaf-Ø, Δ vs Vor-KW); sync-skill Renn-Kalender-Fix; senpai-journal.md
+  registriert + Append-Pflicht; CHANGELOG ins Repo; Drive-Write-Backs +
+  Putz-Liste als Session-Aktionen.
+- **PR-7 · Privacy strikt + Golden-Tests:** (geplant) Personendaten-Sweep,
+  gehashte Denylist, Golden-/Snapshot-Tests als Kern der Garantie.
+- **PR-8 · CLAUDE.md v10:** (geplant) Hot-Core-Diät, Betriebsmodus Opus 4.8 +
+  ultracode, Verdict-Kontrakt dokumentiert.
+
+## v9.0.x — SSoT-Edition (Port aus claude.ai)
+
+Hot-Core schlank, Detail in Skills/Modulen; Identität/State in Drive
+(personal-data-freies Repo); Kernregel „nur Aggregate in den Kontext";
+echte VM-Uhr via `lib/clock.py`; Metaphern-Rebalancing (Anime · IT · Gaming).
+Details: Git-Historie.

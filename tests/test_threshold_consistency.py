@@ -250,3 +250,17 @@ def test_gym_bands_in_gym_skill_prose():
     assert "50–65" in skill and "25–35" in skill and "8–15" in skill
     assert "60/30/10-Zeile war nur der Band-Mittelwert" in skill  # alte Inkonsistenz getilgt
     assert "≤21:30" in skill and "22:30" in skill                  # Bedtime-Bänder
+
+
+# ── weekly_rollup: Registry <-> Script (PR-6) ───────────────────────────────
+def test_weekly_rollup_thresholds_match_registry():
+    import weekly_rollup as wr
+    assert C.PROTEIN_FLOOR_G == wr.PROTEIN_FLOOR_G
+    assert C.PROTEIN_YELLOW_MIN == wr.PROTEIN_YELLOW_MIN
+    assert C.PROTEIN_ORANGE_MIN == wr.PROTEIN_ORANGE_MIN
+    assert C.CAP_YELLOW_PCT == wr.CAP_YELLOW_PCT
+    assert C.CAP_ORANGE_PCT == wr.CAP_ORANGE_PCT
+    assert C.FAT_HARD_CAP_G == wr.FAT_HARD_CAP_G
+    assert C.DAY_CAPS == wr.DAY_CAPS
+    assert C.BEDTIME_HALF_CUTOFF_MIN == wr.BEDTIME_HALF_CUTOFF_MIN
+    assert C.BEDTIME_HALF_WEIGHT == wr.BEDTIME_HALF_WEIGHT

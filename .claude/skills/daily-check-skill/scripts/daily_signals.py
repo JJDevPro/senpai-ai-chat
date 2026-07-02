@@ -140,10 +140,16 @@ def daylight_minutes(metrics, as_of=None):
     if not d:
         return None
     keys = list(d.keys())
-    today_key = str(as_of)[:10] if as_of else keys[-1]
-    if today_key not in d:
+    if as_of:
+        # Tag-Shift-Fix (Audit-CONFIRMED): bei gesetztem as_of KEIN Fallback auf den
+        # letzten Datentag — fehlt der Tag (typischer Morgen-Check ohne Tageslicht-
+        # Punkte), ist today=None statt still gestern. yesterday = exakter Kalender-
+        # Vortag, nie "nächst-früherer" Tag.
+        today_key = str(as_of)[:10]
+        y_key = _yesterday(as_of)
+    else:
         today_key = keys[-1]
-    y_key = _prev_key(keys, today_key)
+        y_key = _prev_key(keys, today_key)
 
     def pack(k):
         if k is None or k not in d:
@@ -154,14 +160,17 @@ def daylight_minutes(metrics, as_of=None):
             "history": {k: round(v) for k, v in d.items()}}
 
 
-def sleep_efficiency(metrics):
+def sleep_efficiency(metrics, as_of=None):
     """Effizienz = Schlafzeit / Bett-Zeit. asleep/inBed sind in beiden Export-Typen oft 0,
-    daher robust aus totalSleep + awake (= Schlaffenster, deckt sich mit inBedEnd-inBedStart)."""
+    daher robust aus totalSleep + awake (= Schlaffenster, deckt sich mit inBedEnd-inBedStart).
+    Mit as_of: nur Records ≤ as_of (kein Zukunfts-Leck bei Range-Exporten)."""
     m = metrics.get("sleep_analysis")
     if not m or not m.get("data"):
         return None
     rec = None
     for r in reversed(m["data"]):
+        if as_of and _day(r.get("date", "")) > str(as_of)[:10]:
+            continue
         if _f(r.get("totalSleep")):
             rec = r
             break
@@ -183,11 +192,13 @@ def sleep_efficiency(metrics):
             "inbed_h": round(t_bed, 2), "awake_h": round(awake, 2), "ampel": amp}
 
 
-def wrist_temp(metrics):
+def wrist_temp(metrics, as_of=None):
     m = metrics.get("apple_sleeping_wrist_temperature")
     if not m or not m.get("data"):
         return None
     vals = [(_day(p.get("date", "")), _f(p.get("qty"))) for p in m["data"] if _f(p.get("qty")) is not None]
+    if as_of:
+        vals = [v for v in vals if v[0] <= str(as_of)[:10]]  # kein Zukunfts-Leck
     if not vals:
         return None
     latest_day, latest = vals[-1]
@@ -217,10 +228,13 @@ def audio_context(metrics, as_of=None):
     if not peak:
         return None
     keys = list(peak.keys())
-    today_key = str(as_of)[:10] if as_of else keys[-1]
-    if today_key not in peak:
+    if as_of:
+        # Tag-Shift-Fix: exakte Kalendertage bei gesetztem as_of (wie daylight).
+        today_key = str(as_of)[:10]
+        y_key = _yesterday(as_of)
+    else:
         today_key = keys[-1]
-    y_key = _prev_key(keys, today_key)
+        y_key = _prev_key(keys, today_key)
 
     def pack(k):
         if k is None or k not in peak:
@@ -232,25 +246,46 @@ def audio_context(metrics, as_of=None):
             "peak_history": {k: round(v, 1) for k, v in peak.items()}}
 
 
-def latest_reading(metrics, name):
-    """Letzte verfügbare Lesung einer sporadischen Metrik (z. B. vo2_max)."""
+def latest_reading(metrics, name, as_of=None):
+    """Letzte verfügbare Lesung einer sporadischen Metrik (z. B. vo2_max).
+    Mit as_of: letzte Lesung ≤ as_of (kein Zukunfts-Leck bei Range-Exporten)."""
     m = metrics.get(name)
     if not m or not m.get("data"):
         return None
     pts = [(_day(p.get("date", "")), _f(p.get("qty"))) for p in m["data"] if _f(p.get("qty")) is not None]
+    if as_of:
+        pts = [p for p in pts if p[0] <= str(as_of)[:10]]
     if not pts:
         return None
     day, val = pts[-1]
     return {"value": round(val, 2), "date": day}
 
 
-def dietary_water(metrics):
-    r = latest_reading(metrics, "dietary_water")
-    return r["value"] if r else None
+def dietary_water(metrics, as_of=None):
+    """Wasser als TAGESSUMME (ml) für as_of (bzw. letzten geloggten Tag) —
+    nicht mehr die letzte Einzel-Lesung (mehrere Logs/Tag summieren korrekt)."""
+    d = _daily(metrics, "dietary_water", "sum")
+    if not d:
+        return None
+    key = str(as_of)[:10] if as_of else sorted(d)[-1]
+    v = d.get(key)
+    return round(v, 1) if v is not None else None
 
 
-# Health Auto Export liefert dietary_energy in KILOJOULE — Umrechnung auf kcal.
+# Health Auto Export liefert dietary_energy typischerweise in KILOJOULE — die
+# Einheit wird aber aus dem units-Feld AUTODETEKTIERT (App-/Regions-Einstellung
+# kann kcal liefern; blinde kJ-Annahme wäre ein 4,184×-Fehler).
 _KJ_PER_KCAL = 4.184
+
+
+def _energy_factor(metrics):
+    """kJ→kcal-Faktor aus dem units-Feld von dietary_energy (Autodetect)."""
+    units = str((metrics.get("dietary_energy") or {}).get("units") or "").lower()
+    if "kcal" in units or units == "cal":
+        return 1.0
+    if "kj" in units or "kilojoule" in units:
+        return 1.0 / _KJ_PER_KCAL
+    return 1.0 / _KJ_PER_KCAL   # HAE-Default ist kJ (an echten Exporten verifiziert)
 
 # out_key → (HAE-Metrik-Name, Faktor). ⚠️ ECHTE HAE-Feldnamen (an KW26-Daten verifiziert):
 # protein/carbohydrates/total_fat/fiber/dietary_sugar (g), dietary_energy (kJ!), dietary_water (mL).
@@ -278,6 +313,8 @@ def dietary_macros(metrics, as_of=None):
     sums, daykeys = {}, set()
     for out_key, (hae_name, factor) in _DIETARY_FIELDS.items():
         d = _daily(metrics, hae_name, "sum")
+        if out_key == "kcal":
+            factor = _energy_factor(metrics)   # Einheiten-Autodetect statt blinder kJ-Annahme
         sums[out_key] = (d, factor)
         daykeys |= set(d.keys())
     if not daykeys:
@@ -325,12 +362,12 @@ def all_signals(json_obj, as_of=None, data_dir=None):
                     m = _load(objs)
     return {
         "daylight": daylight_minutes(m, as_of),
-        "sleep_efficiency": sleep_efficiency(m),
-        "wrist_temp": wrist_temp(m),
+        "sleep_efficiency": sleep_efficiency(m, as_of),
+        "wrist_temp": wrist_temp(m, as_of),
         "audio": audio_context(m, as_of),
-        "vo2_max": latest_reading(m, "vo2_max"),
-        "cardio_recovery": latest_reading(m, "cardio_recovery"),
-        "dietary_water_ml": dietary_water(m),
+        "vo2_max": latest_reading(m, "vo2_max", as_of),
+        "cardio_recovery": latest_reading(m, "cardio_recovery", as_of),
+        "dietary_water_ml": dietary_water(m, as_of),
         "dietary": dietary_macros(m, as_of),
     }
 

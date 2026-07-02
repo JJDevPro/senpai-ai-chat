@@ -196,6 +196,21 @@ def compute_from_sheet(raw_sheet_text, as_of=None):
     return res
 
 
+def day_trimp(raw_sheet_text, day):
+    """DER deterministische Zubringer für den inkrementellen Pfad (SKILL Step 9):
+    Tages-TRIMP für `day` aus dem Roh-Sheet — IMMER über dedup → extract (dieselbe
+    Kette wie die Vollrechnung; Audit-CONFIRMED: eine unspezifizierte gestern_TRIMP-
+    Quelle ohne Dedup-Pflicht macht compute_incremental nicht-reproduzierbar).
+    Ruhetag/kein Eintrag → 0.0 (Zerofill-Konvention der EWMA-Reihe)."""
+    from dedup_trainings import dedup
+    clean, dedup_report = dedup(raw_sheet_text)
+    daily, _ = extract_daily_trimp(clean, dedup_report.get("header"))
+    d = _parse_date(day) if isinstance(day, str) else day
+    if d is None:
+        return 0.0
+    return round(float(daily.get(d, 0.0)), 1)
+
+
 def tsb_ampel(tsb):
     if tsb > 5:
         return "🟢"      # frisch/Peak

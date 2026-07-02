@@ -144,6 +144,24 @@ def build_row(as_of, readiness=None, body_battery=None, banister=None, hrv_basel
     bb = body_battery or {}
     ba = banister or {}
     hrv = hrv_baseline or {}
+
+    def _fresh_bc(name):
+        """body_comp-Wert NUR persistieren, wenn er FRISCH (date == as_of) und
+        protokoll-konform (not off_protocol) ist — Audit-CONFIRMED: vorher landete
+        ein tagealter/off-protocol Withings-Wert unter dem heutigen Datum und
+        verfälschte SoT-Buckets im Trend-Snapshot dauerhaft."""
+        rec = _dig(daily, "body_comp", name)
+        if not isinstance(rec, dict):
+            return None
+        if rec.get("date") != as_of or rec.get("off_protocol"):
+            return None
+        return rec.get("value")
+
+    vo2_rec = _dig(signals, "vo2_max")
+    vo2 = None
+    if isinstance(vo2_rec, dict) and vo2_rec.get("date") == as_of:
+        vo2 = vo2_rec.get("value")   # sporadische Metrik: nur den ECHTEN as_of-Wert stempeln
+
     return {
         "date": as_of,
         "readiness_score": r.get("score"),
@@ -157,9 +175,9 @@ def build_row(as_of, readiness=None, body_battery=None, banister=None, hrv_basel
         "atl": ba.get("atl"),
         "hrv_ms": _num(_dig(daily, "hrv_night", "avg")),
         "rhr": _num(_dig(daily, "recovery", "rhr")),
-        "weight": _num(_dig(daily, "body_comp", "weight_body_mass", "value")),
-        "kfa": _num(_dig(daily, "body_comp", "body_fat_percentage", "value")),
-        "vo2": _num(_dig(signals, "vo2_max", "value")),
+        "weight": _fresh_bc("weight_body_mass"),
+        "kfa": _fresh_bc("body_fat_percentage"),
+        "vo2": vo2,
         "week_km": (tolerance or {}).get("week_km"),
     }
 

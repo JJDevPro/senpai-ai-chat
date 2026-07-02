@@ -107,20 +107,33 @@ def test_build_row_bad_date_raises():
 def test_build_row_unwraps_dict_valued_slice_fields():
     """Echte slice-Felder liefern teils `{value,date}`-Dicts statt Skalaren
     (recovery.rhr); build_row muss den Skalar entpacken, nicht den Dict-String
-    in die CSV-Zelle schreiben (sonst liest der Trend-Snapshot die Zelle als leer)."""
+    in die CSV-Zelle schreiben (sonst liest der Trend-Snapshot die Zelle als leer).
+    body_comp braucht seit dem Frische-Guard date==as_of + on-protocol."""
     daily = {
-        "recovery": {"rhr": {"value": 61.0, "date": "2026-06-28"}},
+        "recovery": {"rhr": {"value": 61.0, "date": "2026-06-29"}},
         "hrv_night": {"avg": 65},
         "body_comp": {
-            "weight_body_mass": {"value": 115.69},
-            "body_fat_percentage": {"value": 33.74},
+            "weight_body_mass": {"value": 75.4, "date": "2026-06-29", "off_protocol": False},
+            "body_fat_percentage": {"value": 18.0, "date": "2026-06-29", "off_protocol": False},
         },
     }
     row = rh.build_row("2026-06-29", daily=daily)
     assert row["rhr"] == 61.0          # NICHT "{'value': 61.0, ...}"
     assert row["hrv_ms"] == 65
-    assert row["weight"] == 115.69
-    assert row["kfa"] == 33.74
+    assert row["weight"] == 75.4
+    assert row["kfa"] == 18.0
+
+
+def test_build_row_body_comp_freshness_guard():
+    """Frische-Guard (Audit-CONFIRMED): ein TAGEALTER oder off-protocol
+    body_comp-Wert darf NICHT unter dem heutigen Datum persistiert werden —
+    sonst verfälscht er SoT-Buckets im Trend-Snapshot dauerhaft."""
+    stale = {"body_comp": {
+        "weight_body_mass": {"value": 75.4, "date": "2026-06-27", "off_protocol": False}}}
+    off = {"body_comp": {
+        "weight_body_mass": {"value": 75.4, "date": "2026-06-29", "off_protocol": True}}}
+    assert rh.build_row("2026-06-29", daily=stale)["weight"] is None
+    assert rh.build_row("2026-06-29", daily=off)["weight"] is None
 
 
 def test_num_unwraps_value_dict_and_passes_scalars():

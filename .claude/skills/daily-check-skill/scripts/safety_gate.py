@@ -78,6 +78,8 @@ def evaluate_gate(daily, injury=False, opt_out=False, prev_hrv=None):
     hrv_avg = _get(daily, "hrv_night", "avg")
     sleep_h = _get(daily, "heute_sleep", "total_h")
 
+    data_gaps = []
+
     # --- Gate 1: HRV 🔴🔴 (CLAUDE.md §6 / §5) — höchste Priorität ---
     if hrv_avg is not None and sleep_h is not None and hrv_avg < HRV_CRITICAL and sleep_h < SLEEP_CRITICAL_H:
         level = "CRITICAL"
@@ -85,6 +87,18 @@ def evaluate_gate(daily, injury=False, opt_out=False, prev_hrv=None):
         reasons.append(
             f"HRV 🔴🔴: hrv_night.avg {hrv_avg} < {HRV_CRITICAL} ms UND Schlaf {sleep_h}h < {SLEEP_CRITICAL_H}h "
             f"→ Training STREICHEN, kein Verhandeln (§6)."
+        )
+    elif hrv_avg is not None and hrv_avg < HRV_CRITICAL and sleep_h is None:
+        # Audit-CONFIRMED-Fix: das 🔴🔴-Gate darf bei fehlendem Schlafwert NICHT
+        # still auf WATCH/WARN degradieren ("fail-open"). Die §6-Bedingung ist
+        # mangels Daten NICHT auswertbar — das wird laut benannt, WARN gesetzt
+        # und der fehlende Wert als data_gap ausgewiesen.
+        level = "WARN"
+        data_gaps.append("heute_sleep.total_h")
+        reasons.append(
+            f"HRV 🔴🔴-KANDIDAT: hrv_night.avg {hrv_avg} < {HRV_CRITICAL} ms, aber heute_sleep.total_h FEHLT "
+            f"— §6-Gate (<{HRV_CRITICAL} + Schlaf <{SLEEP_CRITICAL_H}h) nicht auswertbar. Schlafdaten "
+            f"nachziehen, bis dahin konservativ behandeln (kein hartes Training freigeben)."
         )
     else:
         # --- Gate 2: HRV 🔴 sustained (CLAUDE.md §5) ---
@@ -123,13 +137,34 @@ def evaluate_gate(daily, injury=False, opt_out=False, prev_hrv=None):
     if not reasons:
         reasons.append("Keine Sicherheits-Overrides ausgelöst — V3 läuft normal.")
 
-    return {
+    out = {
         "gate": "v3_safety",
         "level": level,
         "reasons": reasons,
         "training_allowed": training_allowed,
         "roast_allowed": roast_allowed,
     }
+    if data_gaps:
+        out["data_gaps"] = data_gaps
+    return out
+
+
+def _prev_hrv_from_csv(csv_path, as_of):
+    """Deterministischer Vortags-HRV-Zubringer: exakter Kalender-Vortag von as_of
+    aus der Tägliche-Kennzahlen-CSV (reduziert, 1 Zeile/Tag). None, wenn der Tag
+    fehlt — NIE ein 'nächst-früherer' Wert (das wäre ein stilles Muster-Fake)."""
+    import datetime as _dt
+    import os as _os
+    sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    import sentinel as _sen
+    try:
+        prev_day = (_dt.date.fromisoformat(str(as_of)[:10]) - _dt.timedelta(days=1)).isoformat()
+    except ValueError:
+        return None
+    for r in _sen.read_health_csv(csv_path):
+        if r.get("date") == prev_day and r.get("hrv") is not None:
+            return float(r["hrv"])
+    return None
 
 
 def main(argv=None):
@@ -139,12 +174,19 @@ def main(argv=None):
     ap.add_argument("--opt-out", action="store_true", help="Opt-out → Persona aus, neutraler Ton.")
     ap.add_argument("--prev-hrv", type=float, default=None,
                     help="hrv_night.avg des Vortags — bestätigt HRV🔴 als 2-Tage-Muster.")
+    ap.add_argument("--health-csv", default=None,
+                    help="Tägliche-Kennzahlen-CSV: Vortags-HRV wird deterministisch daraus "
+                         "gezogen (Kalender-Vortag von daily.as_of), falls --prev-hrv fehlt.")
     args = ap.parse_args(argv)
 
     raw = sys.stdin.read() if args.daily_json == "-" else open(args.daily_json, encoding="utf-8").read()
     daily = json.loads(raw)
 
-    gate = evaluate_gate(daily, injury=args.injury, opt_out=args.opt_out, prev_hrv=args.prev_hrv)
+    prev_hrv = args.prev_hrv
+    if prev_hrv is None and args.health_csv and daily.get("as_of"):
+        prev_hrv = _prev_hrv_from_csv(args.health_csv, daily["as_of"])
+
+    gate = evaluate_gate(daily, injury=args.injury, opt_out=args.opt_out, prev_hrv=prev_hrv)
     print(json.dumps(gate, ensure_ascii=False, separators=(",", ":")))
     return 0
 

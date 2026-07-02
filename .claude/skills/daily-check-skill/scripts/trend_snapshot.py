@@ -131,16 +131,27 @@ def _iso_week_label(d):
     return f"{iso[0]}-KW{iso[1]:02d}"
 
 
-def rollup_weekly(rows, n_weeks=8):
+def rollup_weekly(rows, n_weeks=8, as_of=None):
     buckets = _bucket(rows, _iso_week_label)
     labels = sorted(buckets)[-n_weeks:]
-    return [_agg_bucket(lbl, buckets[lbl]) for lbl in labels]
+    out = [_agg_bucket(lbl, buckets[lbl]) for lbl in labels]
+    cur = _iso_week_label(_d(as_of)) if _d(as_of) else None
+    for b in out:
+        # Partial-Marker: die LAUFENDE Woche ist kein abgeschlossener Bucket
+        # (CLAUDE.md §7: Snapshot = abgeschlossene Vergangenheit, nie "heute").
+        b["partial"] = bool(cur and b["label"] == cur)
+    return out
 
 
-def rollup_monthly(rows, n_months=12):
+def rollup_monthly(rows, n_months=12, as_of=None):
     buckets = _bucket(rows, lambda d: f"{d.year}-{d.month:02d}")
     labels = sorted(buckets)[-n_months:]
-    return [_agg_bucket(lbl, buckets[lbl]) for lbl in labels]
+    out = [_agg_bucket(lbl, buckets[lbl]) for lbl in labels]
+    d = _d(as_of)
+    cur = f"{d.year}-{d.month:02d}" if d else None
+    for b in out:
+        b["partial"] = bool(cur and b["label"] == cur)
+    return out
 
 
 def _cell(v):
@@ -148,13 +159,16 @@ def _cell(v):
 
 
 def _table(title, buckets, label_col):
+    # Label-Fix (Audit-CONFIRMED): die letzte Spalte trägt die Acute-Wochenlast
+    # aus running_tolerance (--trainings = Wochen-TRIMP), KEINE Kilometer.
     head = (f"| {label_col} | ⚖️ Gewicht | KFA % | 💓 HRV-Ø | ❤️ RHR | 🫁 VO2 | "
-            f"CTL (Fitness) | ATL (Fatigue) | TSB (Form) | 🏃 km |")
+            f"CTL (Fitness) | ATL (Fatigue) | TSB (Form) | 🔥 Acute-Last (Wo.) |")
     sep = "|" + "---|" * 10
     lines = [f"### {title}", head, sep]
     for b in buckets:
+        label = b["label"] + (f" ⏳{b['n_days']}d (laufend)" if b.get("partial") else "")
         lines.append(
-            f"| {b['label']} | {_cell(b['weight'])} | {_cell(b['kfa'])} | {_cell(b['hrv_ms'])} | "
+            f"| {label} | {_cell(b['weight'])} | {_cell(b['kfa'])} | {_cell(b['hrv_ms'])} | "
             f"{_cell(b['rhr'])} | {_cell(b['vo2'])} | {_cell(b['ctl'])} | {_cell(b['atl'])} | "
             f"{_cell(b['tsb'])} | {_cell(b['week_km'])} |")
     return "\n".join(lines)
@@ -167,8 +181,10 @@ def render_snapshot(weekly, monthly, as_of=None, prs=None):
         f"# Senpai · Trend-Snapshot{stamp}",
         "",
         "> Schneller Read statt Sheet-Replay (CLAUDE.md §7). Abgeschlossene Wochen/Monate; HEUTE wird "
-        "frisch gerechnet, nie hier gelesen. Bei Lücke/Deep-Dive → Roh-Sheets in Drive. "
-        "Abk.: CTL (Fitness) · ATL (Fatigue) · TSB (Form) · KFA (Körperfett-%).",
+        "frisch gerechnet, nie hier gelesen. ⏳-Zeilen = LAUFENDE Woche/Monat (unvollständig, n Tage) — "
+        "nie als abgeschlossenen Trend lesen. Bei Lücke/Deep-Dive → Roh-Sheets in Drive. "
+        "Abk.: CTL (Fitness) · ATL (Fatigue) · TSB (Form) · KFA (Körperfett-%) · "
+        "Acute-Last (Wo.) = Wochen-TRIMP aus running_tolerance (keine km).",
         "",
         _table("📅 Letzte Wochen", weekly, "ISO-Woche"),
         "",
@@ -181,7 +197,8 @@ def render_snapshot(weekly, monthly, as_of=None, prs=None):
 
 def build_from_csv_text(csv_text, as_of=None, weeks=8, months=12, prs=None):
     rows = rh.read_history(csv_text)
-    return render_snapshot(rollup_weekly(rows, weeks), rollup_monthly(rows, months),
+    return render_snapshot(rollup_weekly(rows, weeks, as_of=as_of),
+                           rollup_monthly(rows, months, as_of=as_of),
                            as_of=as_of, prs=prs)
 
 
@@ -269,7 +286,10 @@ def backfill_rows(trainings_text, kennzahlen_text="", gewicht_text="", as_of=Non
     series = _daily_banister_series(trainings_text)
     kz = _daily_from_kennzahlen(kennzahlen_text)
     gw = _daily_from_gewicht(gewicht_text)
-    end = _d(as_of) or (max(series) if series else None)
+    # Off-by-one-Fix: OHNE --as-of gehören ALLE Datentage in den Backfill — der
+    # alte Default (end = max(series) mit d >= end → break) warf den letzten
+    # vorhandenen Datentag still weg. Mit --as-of: nur abgeschlossene Tage < as_of.
+    end = _d(as_of)
     rows = []
     for d in sorted(series):
         if end and d >= end:
@@ -292,12 +312,34 @@ def backfill_rows(trainings_text, kennzahlen_text="", gewicht_text="", as_of=Non
     return rows
 
 
+def _sort_csv_chronologically(csv_text):
+    """Datenzeilen nach `date` sortieren (Header bleibt vorn). ISO-Daten →
+    lexikalische Sortierung = chronologisch. Stellt die dokumentierte Invariante
+    'Datei-Reihenfolge = chronologisch' her, auf der last_row/tail (inkrementeller
+    Banister-Anker) und die Bucket-Rollups beruhen."""
+    header, rows = rh._read_rows(csv_text)
+    if not header:
+        return csv_text
+    rows.sort(key=lambda r: str(r.get(header[0]) or ""))
+    out = io.StringIO()
+    w = csv.writer(out, lineterminator="\n")
+    w.writerow(header)
+    for r in rows:
+        w.writerow([("" if r.get(c) is None else str(r.get(c))) for c in header])
+    return out.getvalue()
+
+
 def backfill_csv(existing_text, trainings_text, kennzahlen_text="", gewicht_text="", as_of=None):
-    """Hängt alle Backfill-Zeilen idempotent an den bestehenden CSV-Text an."""
+    """Hängt alle Backfill-Zeilen idempotent an + sortiert chronologisch.
+
+    Audit-CONFIRMED-Fix: auf einer BEREITS befüllten CSV landeten die historischen
+    Zeilen früher ANS ENDE und brachen die Chronologie-Invariante (Bucket-SoT-Werte
+    dauerhaft falsch, inkrementeller Fast-Path dauerhaft tot). Deshalb wird nach dem
+    Anhängen einmal nach Datum sortiert — idempotent, deterministisch."""
     text = existing_text if (existing_text or "").strip() else ",".join(rh.HEADER) + "\n"
     for row in backfill_rows(trainings_text, kennzahlen_text, gewicht_text, as_of):
         text = rh.append_row(text, row)
-    return text
+    return _sort_csv_chronologically(text)
 
 
 # --------------------------------------------------------------------------- #

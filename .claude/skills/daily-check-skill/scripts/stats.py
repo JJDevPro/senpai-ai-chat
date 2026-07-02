@@ -16,7 +16,7 @@ ANALYSEN
 1. bedtime_hrv   — die #1-Stellschraube des Athleten. OLS Bettzeit → (Folge-)Tag-HFV.
                    slope (ms HFV pro Stunde später) + 95%-CI + R² + n.
                    Confound-Wächter: zweites Modell kontrolliert Schlafdauer.
-2. race_readiness— B2Run 6 km (21.07): aus CTL/TSB (Banister) + jüngster
+2. race_readiness— nächstes Renn-Event (Parameter aus live.md): aus CTL/TSB (Banister) + jüngster
                    Z2-Pace/HF → transparentes 6-km-Pace/Zielband (best/real/konservativ).
 3. anomaly       — Robuster z-Score (Median/MAD) über die letzten N Tage für
                    HFV & Ruhe-HF → statistische Ausreißer (ergänzt §5-Ampel, ersetzt sie nicht).
@@ -290,7 +290,7 @@ def cmd_bedtime_hrv(args):
 
 
 # ════════════════════════════════════════════════════════════════════════
-#  2) RACE READINESS  (B2Run 6 km, 21.07) — transparente Heuristik
+#  2) RACE READINESS  (Event/Datum/km via CLI aus live.md) — transparente Heuristik
 # ════════════════════════════════════════════════════════════════════════
 # Annahmen (explizit, überschreibbar). Faktor = Renn-Pace / Z2-Pace (kleiner = schneller).
 RACE_FACTORS = {"best": 0.82, "real": 0.87, "conservative": 0.93}
@@ -314,9 +314,12 @@ def project_race(z2_pace_min_km, race_km=6.0, tsb=None, factors=None):
     for name, f in factors.items():
         pace = z2_pace_min_km * (f + tsb_adj)
         total_min = pace * race_km
+        # Sekunden-Rundung MIT Übertrag: der alte f"{int(m)}:{round(frac*60):02d}"
+        # konnte "41:60" ausgeben (Audit-CONFIRMED) — erst auf Gesamtsekunden runden.
+        total_sec = int(round(total_min * 60))
         band[name] = {
             "pace_min_per_km": round(pace, 2),
-            "finish": f"{int(total_min)}:{int(round((total_min % 1) * 60)):02d}",
+            "finish": f"{total_sec // 60}:{total_sec % 60:02d}",
             "finish_minutes": round(total_min, 1),
             "assumed_race_factor": round(f + tsb_adj, 3),
         }
@@ -360,12 +363,20 @@ def _extract_easy_runs(rows, H, window_days):
         seen.add(key)
         # Z2-Dominanz: Anteil niedriger Zonen an der Bewegungszeit
         zlow = sum(hms_to_seconds(r[z]) or 0 for z in (z0, z1, z2) if z is not None and z < len(r))
-        easy = (zlow / sec) >= 0.55 if zlow else (hr is not None and hr <= 150)
+        # Fallback-Decke = Z2-Cap 147 (CLAUDE.md §4 / lib/constants.py) — der alte
+        # 150er-Fallback ließ Z3-Läufe in die Z2-Pace-Basis der Projektion einsickern.
+        easy = (zlow / sec) >= 0.55 if zlow else (hr is not None and hr <= 147)
         runs.append({"date": d, "pace": pace, "hr": hr, "easy": easy})
     return runs, last
 
 
 def cmd_race_readiness(args):
+    if not args.as_of:
+        return {"error": "--as-of ist PFLICHT (deterministische Pipeline, keine Wall-Clock — "
+                         "Bezugstag aus lib/clock.py übergeben)."}
+    if not args.race_km:
+        return {"error": "--race-km ist PFLICHT (Renn-Distanz aus dem Renn-Kalender in live.md "
+                         "übergeben — kein Hardcode im Repo)."}
     H, rows = load_csv(args.trainings)
     runs, last = _extract_easy_runs(rows, H, args.pace_window)
     if not runs:
@@ -398,8 +409,7 @@ def cmd_race_readiness(args):
         raw = open(args.trainings, encoding="utf-8", errors="replace").read()
         clean, rep = dedup(raw)
         daily_trimp, _ = extract_daily_trimp(clean, rep.get("header"))
-        as_of = args.as_of or dt.date.today().isoformat()
-        bres = run_banister(daily_trimp, as_of=as_of)
+        bres = run_banister(daily_trimp, as_of=args.as_of)
         if bres:
             tsb, ctl = bres["tsb"], bres["ctl"]
             banister_meta = {"ctl": ctl, "atl": bres["atl"], "tsb": tsb,
@@ -409,7 +419,9 @@ def cmd_race_readiness(args):
 
     band = project_race(z2_pace, race_km=args.race_km, tsb=tsb)
     return {
-        "race": {"event": "B2Run", "km": args.race_km, "date": args.race_date},
+        # Renn-Parameter kommen aus dem Renn-Kalender (live.md) via CLI — ein
+        # hardcodiertes Event wäre Personal-Data + Stale-Date-Risiko im Repo.
+        "race": {"event": args.race_event, "km": args.race_km, "date": args.race_date},
         "inputs": {
             "z2_pace_min_per_km": round(z2_pace, 2),
             "pace_basis": pace_basis,
@@ -433,7 +445,8 @@ def cmd_race_readiness(args):
             "bei <3 sauberen Z2-Läufen PROXY = langsamere Hälfte der jüngsten Läufe "
             f"(pace_basis='{pace_basis}' im Output prüfen).",
             "Renn-Faktor fix/labeled — kein individueller Riegel-/VO2-Fit.",
-            "Wetter/Topo/Tapering NICHT modelliert (B2Run = Abend, oft warm).",
+            "Wetter/Topo/Tapering NICHT modelliert — Hitze-Tax separat einpreisen "
+            "(fix 3,5 s/km/°C >18 °C, weather-runprep).",
         ],
     }
 
@@ -651,9 +664,14 @@ def main(argv=None):
 
     r = sub.add_parser("race_readiness", help="6-km-Projektion aus CTL/TSB + Z2-Pace")
     r.add_argument("--trainings", required=True)
-    r.add_argument("--as-of", default=None, dest="as_of")
-    r.add_argument("--race-date", default="2026-07-21", dest="race_date")
-    r.add_argument("--race-km", type=float, default=6.0, dest="race_km")
+    r.add_argument("--as-of", default=None, dest="as_of",
+                   help="PFLICHT: Bezugstag YYYY-MM-DD (deterministisch, keine Wall-Clock).")
+    r.add_argument("--race-event", default="Race", dest="race_event",
+                   help="Event-Name aus dem Renn-Kalender (live.md) — kein Hardcode im Repo.")
+    r.add_argument("--race-date", default=None, dest="race_date",
+                   help="Renn-Datum YYYY-MM-DD aus dem Renn-Kalender (live.md).")
+    r.add_argument("--race-km", type=float, default=None, dest="race_km",
+                   help="Renn-Distanz km aus dem Renn-Kalender (live.md).")
     r.add_argument("--pace-window", type=int, default=90, dest="pace_window")
     r.set_defaults(func=cmd_race_readiness)
 

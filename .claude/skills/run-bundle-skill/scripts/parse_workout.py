@@ -159,6 +159,11 @@ def parse_workout(path):
     structured = len(flat) > 0
 
     rows = []
+    # Lap↔Step-Mismatch: weichen Vorschrift-Steps und Ist-Laps in der Anzahl ab
+    # (übersprungene Steps, manueller Lap, abgebrochenes Workout), ist die
+    # 1:1-Index-Zuordnung ab der Abweichung POTENZIELL VERSCHOBEN — Warn-Flag
+    # statt stiller Fehlzuordnung (Audit-CONFIRMED).
+    mismatch = structured and (len(flat) != len(laps))
     if structured:
         n = min(len(flat), len(laps))
         rep = 0
@@ -179,6 +184,11 @@ def parse_workout(path):
         "name": name, "structured": structured,
         "prescription": flat, "laps": laps, "rows": rows,
         "lap_count": len(laps), "step_count": len(flat),
+        "lap_step_mismatch": mismatch,
+        "mismatch_note": (f"⚠️ {len(flat)} Vorschrift-Steps vs {len(laps)} Ist-Laps — "
+                          "Index-Zuordnung ab der Abweichung potenziell verschoben, "
+                          "Compliance-Tabelle mit Vorsicht lesen."
+                          if mismatch else None),
         "manual": (not structured) and any(l["trigger"] == "manual" for l in laps),
     }
 
@@ -188,9 +198,12 @@ def format_table(res):
         kind = "manuelle Laps (User-Splits)" if res["manual"] else "keine Lap-Struktur"
         return f"Kein strukturiertes Workout — {kind} ({res['lap_count']} Laps)."
     out = [f"🗓️ **{res['name'] or 'Workout'}** — Soll-Ist pro Lap "
-           f"({res['step_count']} Vorschrift-Segmente, {res['lap_count']} Ist-Laps; ✅-Text = Deko, FIT = Wahrheit)",
-           "", "| Lap | Phase | Soll | Ist | HR | Compliance |",
-           "|---|---|---|---|---|---|"]
+           f"({res['step_count']} Vorschrift-Segmente, {res['lap_count']} Ist-Laps; ✅-Text = Deko, FIT = Wahrheit)"]
+    if res.get("mismatch_note"):
+        out.append("")
+        out.append(res["mismatch_note"])
+    out += ["", "| Lap | Phase | Soll | Ist | HR | Compliance |",
+            "|---|---|---|---|---|---|"]
     for r in res["rows"]:
         out.append(f"| {r['lap']} | {r['phase']} | {r['soll']} | {r['ist']} | "
                    f"{r['hr'] if r['hr'] is not None else '—'} | {r['comp']} |")

@@ -3,51 +3,13 @@ name: run-bundle-skill
 description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integriert. PFLICHT laden bei jeder Lauf-Analyse: der runanalyse-Command, Phrasen wie analysier den Lauf/Lauf-Report/wie war mein Lauf, oder ein absolvierter Lauf in den letzten 24h. Parst FIT (fitparse, Kadenz x2, enhanced_speed) und HealthAutoExport-JSON, wendet Walking-Filter v3.5 an, liefert Splits, Lauf-Form (GCT/VO/Stride/VR), Decoupling, Pace@Z2, Schuh-Check und Senpai-Verdict. NICHT für Gym (gym-bundle-skill), Ernährung (nutrition-skill) oder reine Tages-Werte (daily-check-skill)."
 ---
 
-# Run-Bundle-Analyse-Skill v3.13 — pull_drive · V3-only · Kadenz-Walking-Filter · Strava-Enrichment
+# Run-Bundle-Analyse-Skill v3.14 — pull_drive · V3-only · Kadenz-Walking-Filter · Strava-Enrichment
 
 > **Primärquelle:** FIT-Datei + Trainings_v5 + Gesundheitsdaten_v5, on-demand via `python3 lib/pull_drive.py` nach `./data` gezogen (Drive bleibt read-only Single Source of Truth, nie geschrieben).
-> **Fallback:** CSV (Apple-Watch HealthFit-Export, gleicher Folder) → lokales ZIP in `./data` (Legacy, siehe §1c).
-> **V3 Protocol v0.5 ist der einzige Bewertungs-Modus.** Alle Läufe — egal welches Datum — werden nach V3 bewertet. Kein V2-Modus, keine Backward-Compatibility.
-
-> **v3.13-Änderungen (gegenüber v3.12):**
-> - **§18 NEU: Strava-MCP-Enrichment (MCP-native, §0-konform).** Nach der FIT-Analyse wird die Strava-Aktivität via `list_activities` ZUGEORDNET (kein Trigger — die .fit kommt weiter per HealthFit-Auto-Upload) und um Loot angereichert, das FIT/HAE strukturell NICHT haben: **Schuh-Kilometer + Rotations-Compliance** (`get_gear`), **strecken-normalisierter Segment-Trend** (`get_activity_performance.segment_efforts`), **Titel/Beschreibung** als subjektiver Kontext, **Parkrun-Counter** (aus Titel), **Race-Auto-Detect** (`activity_tags`), **Parkrun/Papa-Sozial-Layer** (Präsenz ≠ zusammen-gelaufen). Dünner FIT-loser Fallback (Tier 3) aus `laps`/`best_efforts`/`segment_efforts`. Neues State-File `gear.md` (§11). **⛔ §0-HART: `get_activity_streams` (Roh-Serie) NIE aufrufen** — nur Aggregat-Tools. Stream-Bridge bewusst out of scope (Backlog).
-> - **Engine-Härtung (analyze_run_fit.py) + Pre-V3-Regel:** (1) **Pace@Z2 bei Race/Parkrun unterdrückt** — Z4+Z5 >50 % → `pace_at_z2.race_effort=true`, „N/A — kein Z2-Lauf" statt einer Pseudo-Pace aus Warmup-Resten. (2) **GPS-End-Artefakt geklemmt** — partieller Schluss-KM (<300 m) bzw. Teil-Bucket (<50 %) → `grade_pct=None` statt absurder −33 %. (3) **`meta.pre_v3`/`meta.run_date`** — Läufe vor dem 27.05.2026 (post-Japan-V3-Start) werden als historische Referenz geflaggt, NICHT V3-bewertet (§0i). (4) **Marquee-Segment** = Voll-Strecken-Segment „Wöhrder See parkrun" (§18.2b).
-
-> **v3.12-Änderungen (gegenüber v3.11):**
-> - **§0h Topo-Feinsampling:** `topography` (analyze_run_fit.py) rechnet jetzt **100m-Primär** (statt 200m) + einen **50m-Fein-Layer (`fine_buckets`) NUR in/um die Steil-Zonen** (Notable |Grade|≥2%, je 1 Nachbar → Anstieg→Abstieg-Paar). Deckt den echten Peak-Grade auf, den die 200m-Mittelung wegglättete (validiert: km3,5-Hügel 50m = +4,9% vs 200m-Mittel 2,9%). Notable-Gate proportional (`dd ≥ bucket·0,75`) → partieller End-Bucket/GPS-Stop-Artefakt bleibt gefiltert. Kompakt: nur Steil-Zonen im Fein-Layer, nie der ganze Lauf in 50m-Zeilen (§0-Kernregel).
-
-> **v3.11-Änderungen (gegenüber v3.10):**
-> - **§2b NEU:** JSON-Running-Fallback (running_* aus HealthAutoExport, wenn kein FIT — gröber, FIT-First-Caveat) + Cross-Check + Einheiten-Falle (VO in cm, Stride in m). **🛡️ VO2max/Cardio-Recovery-Robustheit** (sporadisch → letzter Wert + ./data/live.md-Fallback, Abwesenheit ≠ Verschlechterung). **🦵 walking_asymmetry-Trip-Wire** (>3–5 % sustained = Dysbalance-Flag, v. a. nach Gym-Re-Entry).
-
-> **v3.10-Änderungen (gegenüber v3.9):**
-> - **§6c NEU: deterministischer Banister** (gebündeltes Script `scripts/banister.py`, byte-identisch zum daily-check). CTL/ATL/TSB via `compute_from_sheet` (Dedup + **Kalendertag-Zerofill** + feste 42/7-EWMA, Seed 0) → reproduzierbar lauf-für-lauf. Behebt TSB-Inter-Run-Varianz (+10,3 vs −0,5 bei gleichen Daten). TSB = heutige Readiness, identisch zum daily-check.
-
-> **v3.9-Änderungen (gegenüber v3.8):**
-> - **§8c Z2-Pace-SSoT:** EINE `pace_z2_run` (running-only) speist Hitze-Korrektur + Pace@Z2-Update + Verdict identisch; as-run-Pace (inkl. Gehpausen) wird gelabelt und NIE normalisiert. Behebt widersprüchliche managed-Paces im selben Report (9:13 vs 8:58).
-> - **PACE-FORMAT (§2, HART):** alle User-Paces als M:SS/km, NIE m/s; Max-Speed als Pace. m/s nur intern (Filter/CSV/Konvertierung).
-> - **Sprint-60s deterministisch:** Fenster = letzte 60 s bewegter Zeit (Stop/Cooldown-Tail raus) → kein Schwanken mehr.
-
-> **v3.8-Änderungen (gegenüber v3.7):**
-> - **§3b NEU: FIT-Lap- & Runna-Struktur-Auto-Detect** (gebündeltes Script `scripts/parse_workout.py`, gegen echtes K200er-FIT verifiziert). Rekonstruiert Runnas Vorschrift AUS DER FIT (auch ohne gepasteten Plan): `wkt_name`, Speed-Band→Pace-Band-Konvertierung, Repeat-Expansion (7 Steps→9 Segmente). Mappt Ist-Laps 1:1, rechnet **Soll-Ist-Compliance pro Rep** (HR pro Lap aus records), flaggt Reps außerhalb Target (z.B. Rep 2 1km 8:32 statt 7:10). Lap-Sorten via `lap_trigger`: manual=User-Splits, distance/time+workout_step=Runna-strukturiert.
-> - **✅-Regel:** Häkchen in Runnas gepastetem Plan-Text = Deko, NICHT Compliance/absolviert. Wahrheit = FIT-Ist; bei Konflikt FIT > Text.
-> - Output `🗓️ Runna-Kontext` auf Soll-Ist-pro-Rep-Tabelle umgestellt.
-
-> **v3.7-Änderungen (gegenüber v3.6):**
-> - **§6b NEU + SCHRITT 6: Trainings_v5-DEDUP als Pflichtschritt** vor CTL/ATL/TSB (gebündeltes Script `scripts/dedup_trainings.py`, identisch zum daily-check-skill). Dedupliziert Sync-Doppelzeilen (HM 489×4, Di 78×2) → sonst überhöhte ATL. Read-only, format-tolerant, mit Sheet-Hygiene-Warnung im `Fitness · Fatigue · Form`-Block + Quelle-aufräumen-Hinweis.
-
-> **v3.6-Änderungen (gegenüber v3.5) — 4 SSoT-/Genauigkeits-Fixes:**
-> - **§11 Zone-Label hart:** 148 bpm = Z3, nicht Z2. Keine Lone-Label-Ausnahmen in Lap-Tabelle/Zonen-Verteilung.
-> - **§11 Schnitt ≠ Decke:** Bei >30% Z3-Zeit in einer Z2-Session → „Schnitt-Compliance" framen statt pauschal „V3-Compliance 🟢"; Lap-Ø UND Z3-Zeitanteil ausweisen.
-> - **§Laufdynamik VR-Methode:** Headline-VR muss zur Rechnung passen; record-gewichtet kennzeichnen, sonst VO_Ø/Stride_Ø-konsistent.
-> - **§8c + §7 Pace@Z2-Referenz aus ./data/live.md** (SSoT) — nicht im Skill hardcoden, im Report keine Vergleichszahl erfinden; neue Baseline nur bei sauberem Z2 ≤22°C, Decoupling <8%.
-
-> **v3.5-Änderungen (gegenüber v3.3/v3.4):**
-> - §4 Walking-Filter ist jetzt **Kadenz-primär** (Kadenz <140 spm UND Speed <2,0 m/s). Speed-only (v3.3) und GCT-Absenz (v3.4) sind beide DEPRECATED — Begründung + Validierung in §4.
-> - §2 / §2c / §6 Walking-Diskriminator konsistent auf Kadenz umgestellt.
-> - §7b NEU: Kardio-vs-Neuromuskulär-Wand-Diagnose.
-> - §5 neue Pattern-Inserts (Wand, Run-Walk-Eskalation, neuromuskuläres Limit).
-> - §0c + §15b: GCT-Absenz als Walking-Signal explizit verboten.
-> - §14 HM-Schuh bestätigt (Modell siehe Ausrüstung im Profil), letzter HM abgeschlossen, nächste Races (aus Renn-Kalender, live.md).
+> **Fallback:** CSV (Apple-Watch HealthFit-Export, gleicher Folder — Engine `scripts/analyze_run.py`, gleicher Aggregat-Kontrakt) → lokales ZIP in `./data` (Legacy, siehe §1c).
+> **V3 Protocol v0.5 ist der einzige Bewertungs-Modus.** Alle Läufe — egal welches Datum — werden nach V3 bewertet. Kein V2-Modus, keine Backward-Compatibility. (Pre-V3-Läufe vor 27.05.2026 → §0i: historische Referenz, nicht V3-benotet.)
+> **v3.14:** Engine liefert §11-Ampeln + EF selbst (`v3_ampeln`, `{value, ampel}`), 7 Bestwerte inkl. `fastest_km`, GPS-Spike-geschützten Top-Speed, `temp_source`, Kadenz-Absenz-Fallback (≠ 0 spm), `schema_version`; CSV-Fallback = echte Engine; HM-Buffer-Math skriptiert (`stats.py hm_projection`, §7).
+> **Versions-Historie:** lebt im `CHANGELOG.md` (Drive-Personal-Ordner, via `pull_drive.py` bei Trigger `Changelog`) — nicht mehr hier im Hot-Pfad.
 
 ---
 
@@ -62,7 +24,7 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 ✅ 📋 Übersicht (PFLICHT — min. 15 Metrik-Zeilen)
 ✅ 🏞️ Topografie (PFLICHT — 100m-Primär + 50m-Fein an Steil-Zonen §0h)
 ✅ 📈 Lap-Verlauf (PFLICHT — Tabelle MIT Cadence-Spalte aus FIT records)
-✅ 💥 Bestwerte (PFLICHT — 7 mit X,XX-KM-Präzision)
+✅ 💥 Bestwerte (PFLICHT — die 7 Engine-Keys aus `best_values`: top_speed · max_hr · max_power · max_cadence · max_stride · min_gct · fastest_km, je mit X,XX-KM-Präzision)
 ✅ 🏃 Letzte 60s Sprint-Check (PFLICHT — eigene Tabelle)
 ✅ 🎯 User-Segment-Marker (skip wenn keine Segmente)
 ✅ 🔥 HR-Zonen-Verteilung (PFLICHT — ASCII-Bars in Code-Fences)
@@ -83,6 +45,8 @@ description: "AI Coach Laufanalyse für den Athleten — FIT-First, V3-integrier
 ```
 
 **Self-Check ist INTERN** — nie sichtbar im Output. **Skip > Forced-Sektion** (außer Pflicht). Die Kardio-vs-Neuromuskulär-Diagnose (§7b) ist nur Pflicht, wenn eine Wand/ein Pace-Einbruch/eine Run-Walk-Eskalation vorliegt — sonst skip.
+
+> **Volles Output-Template mit Sektions-Wortlaut: §12** (die Checklist hier ist die Reihenfolge, §12 der Formulierungs-Rahmen). **Ampeln/EF NICHT nachrechnen** — `v3_ampeln` aus der Engine übersetzen (§6).
 
 ---
 
@@ -365,7 +329,7 @@ SCHRITT 8: TREND-HISTORY (best-effort, NON-BLOCKING) — Tageszeile in readiness
 
 ### 2c. CSV-Schema (Apple Watch HealthFit-Export)
 
-Apple Watch via HealthFit-App exportiert CSVs mit folgendem Schema (Semicolon-Delimiter, Komma als Dezimaltrennzeichen). **CSV-Engine = `scripts/analyze_run.py` (importierbares Modul, nur CSV-Fallback)** — die folgende Parse-Konvention dokumentiert, was es intern tut:
+Apple Watch via HealthFit-App exportiert CSVs mit folgendem Schema (Semicolon-Delimiter, Komma als Dezimaltrennzeichen). **CSV-Engine = `scripts/analyze_run.py` — ECHTES Pendant zur FIT-Engine** (parst nur; alle Aggregate laufen über die GETEILTEN Funktionen von `analyze_run_fit.py` — Walking-Filter v3.5, km-Splits, HR-Zonen, run_form, Bestwerte, Decoupling, Pace@Z2, §11-Ampeln):
 
 ```
 Time;Timestamp;ISO8601;Heart Rate (bpm);Power (watt);Cadence (count/min);
@@ -374,18 +338,12 @@ Vertical accuracy (meter);Distance (meter);Speed (m/s);Stride length (mm);
 VO (mm);GCT (ms);Lap;Intensity;Since start (second)
 ```
 
-**CSV-Parse-Konvention (v3.5 Kadenz-Filter):**
-```python
-df = pd.read_csv(csv_path, sep=';', decimal=',', encoding='utf-8')
-df.columns = df.columns.str.strip()
-df['spm'] = df['Cadence (count/min)'].fillna(0) * 2  # single-foot → spm
-df['spd'] = df['Speed (m/s)'].fillna(0)
-# Walking = Kadenz <140 UND Speed <2.0 (NICHT Speed-only, NICHT GCT-Absenz)
-walk_mask = (df['spm'] < 140) & (df['spd'] < 2.0) & ~((df['spm']==0) & (df['spd']<0.5))
-df_run = df[~walk_mask].copy()
-df_walk = df[walk_mask].copy()
-df_run['pace_min_km'] = 1000 / (df_run['spd'] * 60)
+```bash
+python3 .claude/skills/run-bundle-skill/scripts/analyze_run.py <csv_path> --as-of YYYY-MM-DD
+# → gleiches Aggregat-JSON wie die FIT-Engine (schema_version, v3_ampeln, best_values …)
 ```
+
+**Parse-Konventionen (in der Engine verdrahtet, hier nur dokumentiert):** Kadenz = Single-Foot × 2; **Kadenz-ABSENZ ≠ 0 spm** (fehlende Zelle → Speed-only-Fallback, NIE als Gehen werten); Walking = Kadenz <140 UND Speed <2,0 (NICHT Speed-only bei vorhandener Kadenz, NICHT GCT-Absenz); Stillstand separat; `Lap`-Spalte → `splits_lap`.
 
 **CSV vs FIT — Daten-Verfügbarkeit:**
 
@@ -549,9 +507,10 @@ Was er intern macht und als kompaktes JSON (Aggregate-only) liefert:
 - **v3.5 Walking-Filter** (Kadenz <140 & Speed <2,0; Standstill separat) → `summary.walk_pct`, `df_run`-Aggregate (§4).
 - **`workout` / `workout_step`** → `meta.workout_name`; die Soll-Ist-pro-Rep-Struktur liefert `parse_workout.py` (§3b).
 - **`topography`**: 100m-Primär-Buckets + 50m-`fine_buckets` (nur Steil-Zonen) aus dem VOLLEN Datensatz (nicht walking-gefiltert), `enhanced_altitude` sonst `altitude`, Grade pro Bucket (§0h).
-- Zusätzlich: `hr_zones`, `run_form`, `best_values`, `sprint_last_60s`, `decoupling`, `pace_at_z2`.
+- Zusätzlich: `hr_zones`, `run_form`, `best_values` (**7 Bestwerte** inkl. `fastest_km`; `top_speed` GPS-Spike-geschützt), `sprint_last_60s`, `decoupling`, `pace_at_z2` (`temp_source` sagt Start- vs. Session-Avg-Temp), **`v3_ampeln`** (§11-Urteile `{value, ampel}` für Kadenz/GCT/VR/EF/Decoupling/Easy-HR — ENGINE-seitig, der Report übersetzt nur) und `schema_version`.
+- **Kadenz-Absenz-Transparenz:** Samples ohne Kadenz-Feld werden NICHT als 0 spm (= Gehen) fehlklassifiziert — Speed-only-Fallback, im `meta.walking_filter` ausgewiesen.
 
-Lies diese JSON-Felder — rekonstruiere keine FIT-Logik im Kopf.
+Lies diese JSON-Felder — rekonstruiere keine FIT-Logik im Kopf. **CSV-Fallback (`analyze_run.py <csv> --as-of …`) liefert denselben Aggregat-Kontrakt** (gleiche geteilte Engine-Funktionen, §2c) — kein Roh-Mittelwert-Stub mehr.
 
 ---
 
@@ -589,28 +548,21 @@ python3 .claude/skills/run-bundle-skill/scripts/banister.py ./data/Trainings_v5.
 
 ---
 
-## 7. HM/Race-Projektion · Buffer-Math
+## 7. HM/Race-Projektion · Buffer-Math (SKRIPTIERT)
 
-**Buffer-Formel (intern berechnen, NICHT als Codeblock im Output):**
+**⛔ Die Buffer-Formel wird NICHT mehr im Kopf gerechnet** — sie ist skriptiert (Entscheidung #11, ein Rechenpfad):
 
+```bash
+python3 .claude/skills/daily-check-skill/scripts/stats.py hm_projection \
+  --h1-pace <MM:SS> --decoupling <pct> --temp-c <T> --distance-km 21.1 \
+  [--target-time H:MM:SS] [--cutoff-time H:MM:SS] [--scenarios szenarien.json]
+# intern: H1a = H1 + max(0,T−18)×3,5 s/km · H2a = H1a×(1+Dec%) · Projected = (H1a+H2a)×km/2
+# plus Cutoff-Puffer + Gehpausen-Budget (walk_budget gegen die Sweep-Pace, deterministisch)
 ```
-Buffer = (Ziel-Sek) − Projected_Sek
-H1_actual = H1_Pace + Hitze_Tax
-H2_actual = H1_actual × (1 + Decoupling%)
-Projected = (H1_actual + H2_actual) × 10,55
-Hitze_Tax = max(0, Temp − 18) × 3,5 sek/km [V3-Provisorisch]
-```
 
-**Besenwagen-Realität (letzter HM, validiert — Renn-Detail aus Renn-Kalender, live.md):** Operativer Cutoff = **10:00/km Sweep-Pace = 3:31 Finish**, NICHT 3:00. Die 3:00 ist die Wertungsgrenze. Der aktuelle Pace@Z2 (aus ./data/live.md) liegt klar unter der 10:00/km-Sweep-Pace → Durchkommen ist bei intaktem Lauf gesichert. Bei künftigen Races: offizielle Durchlaufzeiten-Tabelle ziehen, späteste Zeiten = realer Cutoff.
+**Besenwagen-Realität (letzter HM, validiert — Renn-Detail aus Renn-Kalender, live.md):** Operativer Cutoff = **Sweep-Pace des Besenwagens** (letzter HM: 10:00/km = 3:31 Finish), NICHT die Wertungsgrenze. Der aktuelle Pace@Z2 (aus ./data/live.md) gegen die Sweep-Pace stellen → `--cutoff-time`/`--sweep-pace` ans Skript. Bei künftigen Races: offizielle Durchlaufzeiten-Tabelle ziehen, späteste Zeiten = realer Cutoff.
 
-**4 V3-realistische Szenarien:**
-
-| Szenario | H1-Pace | Decoupling | Temp |
-|---|---|---|---|
-| Best Case (taper + cool) | 7:45/km | 5% | 15°C |
-| Solide (taper + leicht warm) | 7:55/km | 6% | 18°C |
-| Realist (typische Race-Bedingungen) | 8:10/km | 7% | 22°C |
-| Heiß + Müde | 8:25/km | 9% | 25°C |
+**4 V3-realistische Szenarien:** Szenarien-Matrix via `--scenarios` (JSON: `[{name, h1_pace, decoupling_pct, temp_c}, …]`). **Die H1-Paces/Decoupling/Temp-Annahmen kommen aus `./data/live.md` (Pace@Z2-Trend) + `Race_Strategie.md` (Drive) — NIE hardcodiert aus dem Repo.** Typisches Muster: Best (taper+cool, Dec 5%, 15°C) · Solide (Dec 6%, 18°C) · Realist (Dec 7%, 22°C) · Heiß+Müde (Dec 9%, 25°C) — die konkreten Paces liefert der Live-State.
 
 **Decoupling-Methodik (KRITISCH):**
 
@@ -1303,6 +1255,6 @@ Eigenes mutables State-File (wie `coaching_cues.md`). `Schuhe_Ausruestung.md` bl
 
 ---
 
-**Ende der Skill-Definition v3.13.**
+**Ende der Skill-Definition v3.14.**
 
 Senpai liest diese Datei bei Run-Analyse-Trigger. Pull-Workflow ist Default — `python3 lib/pull_drive.py` zieht die FIT nach `./data`, `analyze_run_fit.py` reduziert sie; FIT bevorzugt, CSV-Fallback wenn keine FIT für gewünschtes Datum, lokales ZIP nur als Legacy. Walking-Diskriminator ist Kadenz (§4), Wand-Diagnose via Kardio-vs-Neuromuskulär (§7b).

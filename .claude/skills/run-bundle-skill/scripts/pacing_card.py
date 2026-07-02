@@ -8,7 +8,7 @@ fast) and a heat note. Every number is labeled as a measured input or an assumpt
 no VO2max magic.
 
 INPUTS
-  --race "B2Run"            event name (free text)
+  --race "Firmenlauf"       event name (aus dem Renn-Kalender in live.md — kein Repo-Hardcode)
   --distance-km 6           race distance
   --readiness <path.json>   OPTIONAL: stats.py `race_readiness` JSON (reuses its
                             best/real/conservative band — single source of truth)
@@ -19,7 +19,7 @@ PRIORITY for the target pace:  --target-time  >  readiness['projection']['real']
 a transparent fallback (6 km ≈ 6:30/km is just a placeholder, clearly flagged).
 
 API:   from pacing_card import build_card; card = build_card(...)
-CLI:   python pacing_card.py --race "B2Run" --distance-km 6 --readiness rr.json
+CLI:   python pacing_card.py --race "<Event aus live.md>" --distance-km 6 --readiness rr.json
 """
 from __future__ import annotations
 
@@ -27,11 +27,18 @@ import argparse
 import json
 import sys
 
+SCHEMA_VERSION = "1.1"
+
 # Start-discipline + negative-split swing as a fraction of average pace.
 # KM1 is deliberately run SLOWER than average to bank discipline; the back half
 # claws it back. swing = peak deviation at the two ends (sec/km), derived from avg.
 _NEG_SWING_FRAC = 0.05      # ±5 % of avg pace across the race (linear ramp)
 _FALLBACK_PACE_SEC = 390    # 6:30/km — placeholder only, loudly labeled
+
+# V3-Hitze-Konstanten (SSoT: lib/constants.py, run-bundle §11) — Hitze-Hinweis
+# rechnet die deterministische Tax statt einer Hand-Range.
+HEAT_BASELINE_C = 18.0
+HEAT_TAX_S_PER_C = 3.5
 
 
 def parse_mmss(s: str) -> int:
@@ -152,8 +159,8 @@ def build_card(race: str, distance_km: float, readiness: dict | None = None,
     even = _even_splits(total_sec, distance_km)
     neg = _neg_splits(total_sec, distance_km)
     md = _render_md(race, distance_km, total_sec, even, neg, band, basis, temp_c)
-    return {"markdown": md, "target_sec": total_sec, "even": even, "neg": neg,
-            "band": band, "basis": basis}
+    return {"schema_version": SCHEMA_VERSION, "markdown": md, "target_sec": total_sec,
+            "even": even, "neg": neg, "band": band, "basis": basis}
 
 
 def _render_md(race, distance_km, total_sec, even, neg, band, basis, temp_c) -> str:
@@ -206,18 +213,18 @@ def _render_md(race, distance_km, total_sec, even, neg, band, basis, temp_c) -> 
     L.append("## Hitze-Hinweis")
     L.append("")
     if temp_c is not None:
-        if temp_c >= 25:
-            L.append(f"- ⚠️ **{temp_c:g} °C** — Hitze-Penalty: Ziel-Pace realistisch "
-                     "**+10–20 s/km** entschärfen, früh & oft trinken, Kopf kühlen. "
-                     "Pace@HF schlägt Pace@Uhr bei Hitze.")
-        elif temp_c >= 18:
-            L.append(f"- **{temp_c:g} °C** — moderat warm: kleiner Penalty möglich "
-                     "(+5–10 s/km), nach HF statt nach Uhr steuern.")
+        tax = max(0.0, temp_c - HEAT_BASELINE_C) * HEAT_TAX_S_PER_C
+        if tax > 0:
+            L.append(f"- **{temp_c:g} °C** — V3-Hitze-Tax: **+{tax:.0f} s/km** "
+                     f"(max(0, T−{HEAT_BASELINE_C:g}) × {HEAT_TAX_S_PER_C:g} s/km/°C). "
+                     f"Ziel-Pace entsprechend entschärfen"
+                     + (", früh & oft trinken, Kopf kühlen — Pace@HF schlägt Pace@Uhr."
+                        if temp_c >= 25 else ", nach HF statt nach Uhr steuern."))
         else:
-            L.append(f"- **{temp_c:g} °C** — angenehm, kein Hitze-Penalty erwartet.")
+            L.append(f"- **{temp_c:g} °C** — ≤{HEAT_BASELINE_C:g} °C Baseline, keine Hitze-Tax.")
     else:
-        L.append("- Keine Temperatur angegeben. Faustregel: ab ~25 °C nach HF statt "
-                 "Pace steuern und das Finish-Band +10–20 s/km entschärfen.")
+        L.append(f"- Keine Temperatur angegeben. V3-Tax = max(0, T−{HEAT_BASELINE_C:g}) × "
+                 f"{HEAT_TAX_S_PER_C:g} s/km/°C — ab ~25 °C nach HF statt Pace steuern.")
     L.append("")
     L.append("---")
     L.append("<sub>TRANSPARENTE Heuristik. Pace-Ramp = linearer ±5 %-Swing um die "
@@ -228,7 +235,8 @@ def _render_md(race, distance_km, total_sec, even, neg, band, basis, temp_c) -> 
 
 def main(argv=None):
     p = argparse.ArgumentParser(description="Race-day pacing card (markdown).")
-    p.add_argument("--race", required=True, help="event name, e.g. 'B2Run'")
+    p.add_argument("--race", required=True,
+                   help="event name aus dem Renn-Kalender (live.md), z.B. 'Firmenlauf'")
     p.add_argument("--distance-km", type=float, required=True, help="race distance in km")
     p.add_argument("--readiness", help="path to stats.py race_readiness JSON")
     p.add_argument("--target-time", help="explicit goal time MM:SS (overrides readiness)")

@@ -648,6 +648,108 @@ def cmd_banister_fit(args):
 
 
 # ════════════════════════════════════════════════════════════════════════
+#  2b) HM-/LONG-RACE-PROJEKTION  (Buffer-Math, run-bundle §7 — skriptiert)
+# ════════════════════════════════════════════════════════════════════════
+HEAT_BASELINE_C = 18.0
+HEAT_TAX_S_PER_C = 3.5      # V3-Rechenwert (lib/constants.py)
+SWEEP_PACE_S_DEFAULT = 600  # 10:00/km — operativer Besenwagen-Fallback (überschreibbar)
+
+
+def _mmss_to_sec(s):
+    """'M:SS' / 'MM:SS' / 'H:MM:SS' → Sekunden (ValueError bei Murks)."""
+    parts = [int(p) for p in str(s).strip().split(":")]
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    raise ValueError(f"Zeitformat MM:SS oder H:MM:SS erwartet, war {s!r}")
+
+
+def _sec_to_hms(total_sec):
+    total = int(round(total_sec))
+    h, rest = divmod(total, 3600)
+    m, s = divmod(rest, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def project_hm(h1_pace_s, decoupling_pct, temp_c=None, distance_km=21.1,
+               target_time_s=None, cutoff_time_s=None, sweep_pace_s=SWEEP_PACE_S_DEFAULT):
+    """Buffer-Math (run-bundle §7) — DETERMINISTISCH statt Kopfrechnen:
+        H1_actual  = H1_Pace + Hitze_Tax(max(0, Temp−18) × 3,5 s/km)
+        H2_actual  = H1_actual × (1 + Decoupling%)
+        Projected  = (H1_actual + H2_actual) × distance_km/2
+    Optional: Buffer vs. Zielzeit + Gehpausen-Budget vs. Sweep-Pace (Cutoff):
+    jede gegangene Minute kostet gegenüber der projizierten Pace
+    (sweep − projected_pace) s/km anteilig — Budget = Puffer ÷ Mehrkosten."""
+    heat_tax = max(0.0, (temp_c - HEAT_BASELINE_C)) * HEAT_TAX_S_PER_C if temp_c is not None else 0.0
+    h1 = h1_pace_s + heat_tax
+    h2 = h1 * (1.0 + decoupling_pct / 100.0)
+    avg_pace = (h1 + h2) / 2.0
+    projected = avg_pace * distance_km
+    out = {
+        "inputs": {"h1_pace_s": round(h1_pace_s, 1), "decoupling_pct": decoupling_pct,
+                   "temp_c": temp_c, "distance_km": distance_km},
+        "heat_tax_s_per_km": round(heat_tax, 1),
+        "h1_actual_pace": _sec_to_hms(h1) + "/km",
+        "h2_actual_pace": _sec_to_hms(h2) + "/km",
+        "avg_pace": _sec_to_hms(avg_pace) + "/km",
+        "projected_s": int(round(projected)),
+        "projected": _sec_to_hms(projected),
+        "formula": "H1a=H1+HitzeTax; H2a=H1a*(1+Dec); Projected=(H1a+H2a)*km/2 (run-bundle §7)",
+    }
+    if target_time_s:
+        out["target"] = _sec_to_hms(target_time_s)
+        out["buffer_s"] = int(round(target_time_s - projected))     # >0 = Reserve
+    if cutoff_time_s:
+        buffer_c = cutoff_time_s - projected
+        out["cutoff"] = {"time": _sec_to_hms(cutoff_time_s),
+                         "sweep_pace": _sec_to_hms(sweep_pace_s) + "/km",
+                         "buffer_s": int(round(buffer_c))}
+        walk_cost = sweep_pace_s - avg_pace                          # s Mehrkosten je GEGANGENEM km
+        if buffer_c > 0 and walk_cost > 0:
+            walk_km = min(buffer_c / walk_cost, distance_km)         # mehr als das Rennen geht nicht
+            out["cutoff"]["walk_budget"] = {
+                "km": round(walk_km, 2),
+                "minutes_at_sweep": round(walk_km * sweep_pace_s / 60.0, 1),
+                "assumption": f"Gehen ≈ Sweep-Pace {_sec_to_hms(sweep_pace_s)}/km; "
+                              f"Mehrkosten {walk_cost:.0f} s je gegangenem km",
+            }
+        elif buffer_c <= 0:
+            out["cutoff"]["walk_budget"] = {"km": 0.0, "minutes_at_sweep": 0.0,
+                                            "assumption": "kein Puffer — Projektion über Cutoff"}
+    return out
+
+
+def cmd_hm_projection(args):
+    try:
+        h1 = _mmss_to_sec(args.h1_pace)
+        target = _mmss_to_sec(args.target_time) if args.target_time else None
+        cutoff = _mmss_to_sec(args.cutoff_time) if args.cutoff_time else None
+        sweep = _mmss_to_sec(args.sweep_pace) if args.sweep_pace else SWEEP_PACE_S_DEFAULT
+    except ValueError as e:
+        return {"error": str(e)}
+    scenarios = None
+    if args.scenarios:
+        raw = sys.stdin.read() if args.scenarios == "-" else \
+            open(args.scenarios, encoding="utf-8").read()
+        scenarios = json.loads(raw)
+    if scenarios:
+        # Szenarien-Matrix: [{name, h1_pace, decoupling_pct, temp_c}, …] —
+        # H1-Paces kommen aus live.md/Race_Strategie.md (Drive), NIE aus dem Repo.
+        rows = []
+        for sc in scenarios:
+            r = project_hm(_mmss_to_sec(sc["h1_pace"]), float(sc["decoupling_pct"]),
+                           temp_c=sc.get("temp_c"), distance_km=args.distance_km,
+                           target_time_s=target, cutoff_time_s=cutoff, sweep_pace_s=sweep)
+            r["name"] = sc.get("name")
+            rows.append(r)
+        return {"distance_km": args.distance_km, "scenarios": rows,
+                "note": "Szenarien-Inputs (H1/Dec/Temp) aus live.md / Race_Strategie.md — kein Repo-Hardcode."}
+    return project_hm(h1, args.decoupling, temp_c=args.temp_c, distance_km=args.distance_km,
+                      target_time_s=target, cutoff_time_s=cutoff, sweep_pace_s=sweep)
+
+
+# ════════════════════════════════════════════════════════════════════════
 #  CLI
 # ════════════════════════════════════════════════════════════════════════
 def main(argv=None):
@@ -674,6 +776,24 @@ def main(argv=None):
                    help="Renn-Distanz km aus dem Renn-Kalender (live.md).")
     r.add_argument("--pace-window", type=int, default=90, dest="pace_window")
     r.set_defaults(func=cmd_race_readiness)
+
+    hm = sub.add_parser("hm_projection", help="HM-/Long-Race-Buffer-Math (run-bundle §7, skriptiert)")
+    hm.add_argument("--h1-pace", required=True, dest="h1_pace",
+                    help="H1-Pace MM:SS/km (aus live.md/Race_Strategie.md — kein Repo-Hardcode).")
+    hm.add_argument("--decoupling", type=float, default=0.0,
+                    help="Decoupling in %% (valide Quelle, §7-Hierarchie).")
+    hm.add_argument("--temp-c", type=float, default=None, dest="temp_c",
+                    help="Starttemp °C → Hitze-Tax max(0,T−18)×3,5 s/km.")
+    hm.add_argument("--distance-km", type=float, default=21.1, dest="distance_km")
+    hm.add_argument("--target-time", default=None, dest="target_time",
+                    help="Zielzeit H:MM:SS → Buffer-Ausweis.")
+    hm.add_argument("--cutoff-time", default=None, dest="cutoff_time",
+                    help="Cutoff H:MM:SS → Puffer + Gehpausen-Budget.")
+    hm.add_argument("--sweep-pace", default=None, dest="sweep_pace",
+                    help="Besenwagen-Pace MM:SS/km (Default 10:00).")
+    hm.add_argument("--scenarios", default=None,
+                    help="JSON-Datei/'-': [{name,h1_pace,decoupling_pct,temp_c},…] → Matrix.")
+    hm.set_defaults(func=cmd_hm_projection)
 
     a = sub.add_parser("anomaly", help="Robuster z-Score HFV/RHR")
     a.add_argument("--daily", required=True)

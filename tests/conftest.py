@@ -7,11 +7,11 @@ put those script dirs on ``sys.path`` here. Then the test modules can simply
 
 Notes
 -----
-* ``banister.py`` and ``dedup_trainings.py`` exist (byte-identical) in BOTH the
-  daily-check-skill and run-bundle-skill script dirs. We add run-bundle first so
-  those names resolve there; ``slice_hae_day`` / ``safety_gate`` / ``daily_signals``
-  only live in daily-check. Because the duplicates are identical, the order is
-  harmless either way.
+* ``banister.py`` and ``dedup_trainings.py`` exist in BOTH the daily-check-skill
+  and run-bundle-skill script dirs. Byte-identity is ENFORCED by
+  ``test_banister_parity.py`` (daily-check is the source of truth; edit there,
+  then sync). Import order is therefore harmless; ``slice_hae_day`` /
+  ``safety_gate`` / ``daily_signals`` only live in daily-check.
 * ``banister.compute_from_sheet`` does ``from dedup_trainings import dedup`` at
   call time, so ``dedup_trainings`` must be importable — the sys.path insert
   below satisfies that.
